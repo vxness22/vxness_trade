@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment files (never commit secrets)
+.env
+**/.env
+.env.local
+**/.env.local
+.env.*.local
+**/.env.*.local
+frontend/.env
+backend/.env
+
+# Keep example env files
+!**/.env.example
+
+# Backend runtime data / uploads / apk
+backend/data/
+backend/uploads/
+backend/apk/
+
+# Build outputs
+dist/
+build/
+**/dist/
+**/build/
+.next/
+**/.next/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# v0 runtime files
+__v0_runtime_loader.js
+__v0_devtools.tsx
+__v0_jsx-dev-runtime.ts
