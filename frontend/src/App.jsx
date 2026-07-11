@@ -65,12 +65,23 @@ import WebsiteAccountTypes from './website/src/pages/accounts/types/Types'
 import WebsiteDepositsWithdrawals from './website/src/pages/accounts/deposits-withdrawals/Deposits-withdrawals'
 
 function App() {
+  // Subdomain-aware landing: admin.vxness.in -> Admin Login, trade.vxness.in -> Dashboard,
+  // everything else -> marketing site. Keeps the URL clean (no /admin redirect).
+  const host = typeof window !== 'undefined' ? window.location.hostname : ''
+  const isAdminHost = host.startsWith('admin.')
+  const isTradeHost = host.startsWith('trade.')
+  const rootElement = isAdminHost
+    ? <AdminLogin />
+    : isTradeHost
+      ? <Dashboard />
+      : <WebsiteHome />
+
   return (
     <InvestorProvider>
       <Router>
         <Routes>
         {/* Website Routes */}
-        <Route path="/" element={<WebsiteHome />} />
+        <Route path="/" element={rootElement} />
         <Route path="/about" element={<WebsiteAbout />} />
         <Route path="/prop-firm" element={<WebsitePropFirm />} />
         <Route path="/partnership" element={<WebsitePartnership />} />
