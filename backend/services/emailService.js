@@ -93,6 +93,45 @@ export const sendTemplateEmail = async (templateSlug, toEmail, variables = {}) =
   }
 }
 
+// Send a plain OTP email directly (no template dependency). Used for admin login
+// 2FA so it works as soon as SMTP is configured, without seeding email templates.
+export const sendOtpDirect = async (toEmail, otp, expiryMinutes = 10) => {
+  try {
+    const settings = await EmailSettings.findOne()
+    if (!settings || !settings.smtpHost || !settings.smtpUser) {
+      return { success: false, message: 'SMTP not configured' }
+    }
+
+    const transport = await getTransporter()
+    if (!transport) {
+      return { success: false, message: 'Failed to create email transport' }
+    }
+
+    const fromName = settings.fromName || 'Vxness'
+    const fromEmail = settings.fromEmail || settings.smtpUser
+
+    const html = `
+      <div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#0f1115;color:#e6e6e6;border-radius:12px">
+        <h2 style="margin:0 0 8px;color:#fff">Admin Login Verification</h2>
+        <p style="margin:0 0 16px;color:#9aa0a6">Use the code below to sign in. It expires in ${expiryMinutes} minutes.</p>
+        <div style="font-size:32px;font-weight:700;letter-spacing:8px;padding:16px 0;text-align:center;background:#1b1f27;border-radius:8px;color:#4ade80">${otp}</div>
+        <p style="margin:16px 0 0;color:#6b7280;font-size:12px">If you didn't request this, ignore this email.</p>
+      </div>`
+
+    const info = await transport.sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: toEmail,
+      subject: `Your admin login OTP: ${otp}`,
+      html
+    })
+
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    console.error('Error sending OTP email:', error)
+    return { success: false, message: error.message }
+  }
+}
+
 // Generate OTP
 export const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString()

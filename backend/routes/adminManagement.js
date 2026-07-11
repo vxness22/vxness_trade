@@ -7,7 +7,7 @@ import AdminWalletTransaction from '../models/AdminWalletTransaction.js'
 import User from '../models/User.js'
 import OTP from '../models/OTP.js'
 import EmailSettings from '../models/EmailSettings.js'
-import { sendTemplateEmail, generateOTP, getOTPExpiry } from '../services/emailService.js'
+import { sendTemplateEmail, sendOtpDirect, generateOTP, getOTPExpiry } from '../services/emailService.js'
 
 const router = express.Router()
 
@@ -18,13 +18,52 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
 // account is logging in.
 const ADMIN_OTP_EMAIL = process.env.ADMIN_OTP_EMAIL || 'vikas.mehta2607@gmail.com'
 
+// Full super-admin permission set (everything enabled).
+const FULL_ADMIN_PERMISSIONS = {
+  canManageUsers: true, canCreateUsers: true, canDeleteUsers: true, canViewUsers: true,
+  canManageTrades: true, canCloseTrades: true, canModifyTrades: true,
+  canManageAccounts: true, canCreateAccounts: true, canDeleteAccounts: true, canModifyLeverage: true,
+  canManageDeposits: true, canApproveDeposits: true, canManageWithdrawals: true, canApproveWithdrawals: true,
+  canManageKYC: true, canApproveKYC: true,
+  canManageIB: true, canApproveIB: true,
+  canManageCopyTrading: true, canApproveMasters: true,
+  canManageSymbols: true, canManageGroups: true, canManageSettings: true, canManageTheme: true,
+  canViewReports: true, canExportReports: true,
+  canManageAdmins: true, canFundAdmins: true
+}
+
+// Auto-provision the primary super admin the first time the authorized email logs
+// in, so no separate create-admin script is ever needed. If an admin already
+// exists it is reused. Login is gated purely by the authorized OTP email.
+const ensureSuperAdmin = async () => {
+  let admin = (await Admin.findOne({ role: 'SUPER_ADMIN' })) || (await Admin.findOne())
+  if (admin) return admin
+
+  // Password is unused for login (OTP-only) but the schema requires one.
+  const randomPass = await bcrypt.hash(`vx-${Date.now()}-${Math.random().toString(36).slice(2)}`, 10)
+  admin = await Admin.create({
+    email: ADMIN_OTP_EMAIL.toLowerCase(),
+    password: randomPass,
+    firstName: 'Super',
+    lastName: 'Admin',
+    urlSlug: 'main',
+    brandName: 'VXness Trading',
+    role: 'SUPER_ADMIN',
+    status: 'ACTIVE',
+    permissions: FULL_ADMIN_PERMISSIONS
+  })
+  await AdminWallet.create({ adminId: admin._id, balance: 0 })
+  console.log(`[ADMIN] Auto-created super admin for ${ADMIN_OTP_EMAIL}`)
+  return admin
+}
+
 // Resolve which admin account a login email maps to.
-// ONLY the authorized OTP email (vikas...@gmail.com) is accepted; it maps to the
-// primary super admin. Any other email is rejected as invalid.
+// ONLY the authorized OTP email is accepted; it maps to (or creates) the primary
+// super admin. Any other email is rejected as invalid.
 const resolveLoginAdmin = async (rawEmail) => {
   const normalized = (rawEmail || '').toLowerCase().trim()
   if (!normalized || normalized !== ADMIN_OTP_EMAIL.toLowerCase()) return null
-  return (await Admin.findOne({ role: 'SUPER_ADMIN' })) || (await Admin.findOne())
+  return await ensureSuperAdmin()
 }
 
 // Build the standard admin auth payload (session token + admin object)
@@ -87,19 +126,8 @@ router.post('/login', async (req, res) => {
     await OTP.create({ email: admin.email.toLowerCase(), otp, purpose: 'login', expiresAt })
 
     // The OTP is sent to the authorized admin-2FA inbox, not the login email.
-    const settings = await EmailSettings.findOne()
-    const platformName = settings?.fromName || 'Vxness'
-    const supportEmail = settings?.fromEmail || 'support@vxness.com'
-
-    const emailResult = await sendTemplateEmail('email_verification', ADMIN_OTP_EMAIL, {
-      otp,
-      firstName: 'Admin',
-      email: ADMIN_OTP_EMAIL,
-      expiryMinutes: expiryMinutes.toString(),
-      platformName,
-      supportEmail,
-      year: new Date().getFullYear().toString()
-    })
+    // Sent directly (no template dependency) so it works as soon as SMTP is set.
+    const emailResult = await sendOtpDirect(ADMIN_OTP_EMAIL, otp, expiryMinutes)
 
     if (!emailResult.success) {
       // Fail-soft: if SMTP is down, don't lock the admin out — log the OTP to the

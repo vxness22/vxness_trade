@@ -18,12 +18,15 @@ import { testSMTPConnection } from '../services/emailService.js'
 
 dotenv.config()
 
-// ---- Edit these if your mailbox / brand changes ----
-const SMTP_HOST = 'smtp.hostinger.com'
-const SMTP_PORT = 465 // 465 = SSL. Try 587 if 465 is blocked by the host firewall.
-const SMTP_USER = 'support@vxness.com'
-const FROM_EMAIL = 'support@vxness.com'
-const FROM_NAME = 'Vxness Support'
+// ---- Config via env vars (with sensible defaults) ----
+// Example (Gmail):
+//   SMTP_HOST=smtp.gmail.com SMTP_PORT=465 SMTP_USER=you@gmail.com \
+//   FROM_EMAIL=you@gmail.com FROM_NAME=Vxness SMTP_PASS='app-password' node scripts/setupEmail.js
+const SMTP_HOST = process.env.SMTP_HOST || 'smtp.hostinger.com'
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465', 10) // 465 = SSL, 587 = STARTTLS
+const SMTP_USER = process.env.SMTP_USER || 'support@vxness.com'
+const FROM_EMAIL = process.env.FROM_EMAIL || SMTP_USER
+const FROM_NAME = process.env.FROM_NAME || 'Vxness Support'
 // -----------------------------------------------------
 
 const run = async () => {
