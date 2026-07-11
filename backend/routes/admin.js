@@ -753,6 +753,17 @@ router.post('/create-user', async (req, res) => {
 
     const user = await User.create(userData)
 
+    // Notify the new user by email (non-blocking — don't fail user creation if email fails).
+    const emailSettings = await EmailSettings.findOne()
+    sendTemplateEmail('welcome', user.email, {
+      firstName: user.firstName,
+      email: user.email,
+      platformName: emailSettings?.fromName || 'Vxness',
+      loginUrl: 'https://vxness.in/user/login',
+      supportEmail: emailSettings?.fromEmail || 'support@vxness.in',
+      year: new Date().getFullYear().toString()
+    }).catch(err => console.error('[create-user] welcome email failed:', err.message))
+
     res.status(201).json({
       success: true,
       message: 'User created successfully',
