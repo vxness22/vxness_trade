@@ -40,7 +40,20 @@ function normaliseRes(resolution) {
 }
 
 export function initBarHub(httpServer) {
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws/bars' })
+  // IMPORTANT: use noServer + a manual upgrade router. If we passed
+  // { server, path } instead, ws would attach its own 'upgrade' listener that
+  // calls handleUpgrade() for EVERY upgrade and abortHandshake(400)s any path
+  // that isn't /ws/bars — which would DESTROY Socket.IO's /socket.io/ websocket
+  // upgrades (breaking the whole price stream). With noServer we only touch
+  // /ws/bars and leave every other upgrade for Socket.IO's engine.io listener.
+  const wss = new WebSocketServer({ noServer: true })
+
+  httpServer.on('upgrade', (req, socket, head) => {
+    let pathname = '/'
+    try { pathname = new URL(req.url, 'http://localhost').pathname } catch { pathname = (req.url || '').split('?')[0] }
+    if (pathname !== '/ws/bars') return // not ours — let Socket.IO (or others) handle it
+    wss.handleUpgrade(req, socket, head, (ws) => { wss.emit('connection', ws, req) })
+  })
 
   const send = (ws, payload) => {
     if (ws.readyState !== ws.OPEN) return

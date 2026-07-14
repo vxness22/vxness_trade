@@ -18,19 +18,33 @@ function tvCtor() {
   return window.TradingView && window.TradingView.widget
 }
 
+const LIB_URL = '/charting_library/charting_library.standalone.js'
+
 let _libPromise = null
 function loadChartingLibrary() {
   if (typeof window === 'undefined') return Promise.resolve()
   if (tvCtor()) return Promise.resolve()
   if (_libPromise) return _libPromise
-  _libPromise = new Promise((resolve, reject) => {
-    const s = document.createElement('script')
-    s.src = '/charting_library/charting_library.standalone.js'
-    s.async = true
-    s.onload = () => resolve()
-    s.onerror = () => { _libPromise = null; reject(new Error('charting_library failed to load')) }
-    document.head.appendChild(s)
-  })
+  _libPromise = (async () => {
+    // Guard: when the licensed library isn't deployed, the server's SPA fallback
+    // returns index.html (HTTP 200) for this .js request. Injecting that as a
+    // <script> throws an uncaught "Unexpected token '<'". Verify the response is
+    // actually JavaScript FIRST; if not, fail cleanly so the fallback UI shows.
+    const res = await fetch(LIB_URL)
+    const ct = res.headers.get('content-type') || ''
+    if (!res.ok || ct.includes('text/html')) {
+      throw new Error('charting_library not found on server (deploy the library files)')
+    }
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script')
+      s.src = LIB_URL // cache hit from the fetch above; CSP-friendly external load
+      s.async = true
+      s.onload = () => resolve()
+      s.onerror = () => reject(new Error('charting_library failed to load'))
+      document.head.appendChild(s)
+    })
+    if (!tvCtor()) throw new Error('charting_library did not initialize')
+  })().catch((e) => { _libPromise = null; throw e })
   return _libPromise
 }
 
