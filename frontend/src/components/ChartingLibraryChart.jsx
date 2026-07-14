@@ -397,7 +397,8 @@ export default function ChartingLibraryChart({ symbol = 'XAUUSD', interval = '5'
         let moved = false
         const zone = document.createElement('div'); zone.style.cssText = `position:absolute;left:0;right:0;top:0;height:0;background:${zoneBg};pointer-events:none;z-index:6;`
         const line = document.createElement('div'); line.style.cssText = `position:absolute;left:0;right:0;top:0;height:0;border-top:1px dashed ${color};pointer-events:none;z-index:7;`
-        const lbl = document.createElement('div'); lbl.style.cssText = `position:absolute;right:2px;top:0;transform:translateY(-50%);background:${color};color:#fff;font:700 10px system-ui;padding:1px 6px;border-radius:3px;pointer-events:none;z-index:8;white-space:nowrap;`
+        // Centered on the line so it's obvious which bracket (SL/TP) is dragging.
+        const lbl = document.createElement('div'); lbl.style.cssText = `position:absolute;left:50%;top:0;transform:translate(-50%,-50%);background:${color};color:#fff;font:700 11px system-ui;padding:2px 9px;border-radius:4px;pointer-events:none;z-index:8;white-space:nowrap;box-shadow:0 1px 5px rgba(0,0,0,.5);`
         overlay.appendChild(zone); overlay.appendChild(line); overlay.appendChild(lbl)
         const entryY = () => { const g = geom(); if (!g || calibOffset == null) return null; return paneY(p.openPrice, g) + calibOffset }
         const cleanup = () => { for (const el of [zone, line, lbl]) { try { overlay.removeChild(el) } catch { /* noop */ } } }
