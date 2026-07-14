@@ -257,11 +257,11 @@ export default function ChartingLibraryChart({ symbol = 'XAUUSD', interval = '5'
       lock: true, disableSelection: true, disableSave: true, disableUndo: true,
       overrides: {
         linecolor: lineColor, linestyle: dashed ? 2 : 0, linewidth: dashed ? 1 : 2,
-        showLabel: true, textcolor: textColor, fontsize: 11, bold: true,
-        // SL/TP (dashed): put the "SL"/"TP" label on the LEFT of the line (off
-        // the right-axis price tag) so it reads clearly on the line itself.
-        // Entry (solid): keep its P&L label on the right.
-        horzLabelsAlign: dashed ? 'left' : 'right', vertLabelsAlign: dashed ? 'top' : 'middle',
+        // No on-line text label for SL/TP (dashed) — the SL/TP price is shown on
+        // the ride-along button + the right-axis price tag (client request).
+        // Entry (solid) keeps its P&L label on the right.
+        showLabel: !dashed, textcolor: textColor, fontsize: 11, bold: true,
+        horzLabelsAlign: 'right', vertLabelsAlign: 'middle',
       },
     })
 
@@ -437,14 +437,9 @@ export default function ChartingLibraryChart({ symbol = 'XAUUSD', interval = '5'
           const r = containerRef.current?.getBoundingClientRect()
           const price = r ? priceForY(ev.clientY - r.top) : null
           if (!price || !(price > 0)) return
-          const rounded = Number(price.toFixed(dg))
-          const pl = pnlAt(p, rounded)
-          openDialog({
-            title: `Set ${kind === 'sl' ? 'Stop Loss' : 'Take Profit'} @ ${rounded.toFixed(dg)}`,
-            body: `${p.side} ${p.quantity} ${symU} → ${pl >= 0 ? 'profit' : 'loss'} ${pl >= 0 ? '+' : '-'}$${Math.abs(pl).toFixed(2)}`,
-            confirmLabel: `Set ${kind.toUpperCase()}`,
-            onConfirm: () => saveBracket(p, kind, rounded),
-          })
+          // Drag release → save immediately, no confirm dialog (client request).
+          // Drag as many times as you like; each release updates the bracket.
+          saveBracket(p, kind, Number(price.toFixed(dg)))
         }
       }
       return b
@@ -468,11 +463,13 @@ export default function ChartingLibraryChart({ symbol = 'XAUUSD', interval = '5'
         openDialog({ title: 'Close position', body: `Close ${p.side} ${p.quantity} ${symU} at market?`, confirmLabel: 'Close', danger: true, onConfirm: () => closePos(p) })
       }))
       const tpWrap = mkWrap(BTN_RIGHT_PX + 34)
-      tpWrap.appendChild(mkDragBtn('TP', 'rgba(20,184,166,0.97)', `Take profit ${p.side} ${p.quantity} ${symU}`, p, 'tp'))
+      const tpBtnEl = mkDragBtn('TP', 'rgba(20,184,166,0.97)', `Take profit ${p.side} ${p.quantity} ${symU}`, p, 'tp')
+      tpWrap.appendChild(tpBtnEl)
       const slWrap = mkWrap(BTN_RIGHT_PX + 68)
-      slWrap.appendChild(mkDragBtn('SL', 'rgba(245,158,11,0.97)', `Stop loss ${p.side} ${p.quantity} ${symU}`, p, 'sl'))
+      const slBtnEl = mkDragBtn('SL', 'rgba(245,158,11,0.97)', `Stop loss ${p.side} ${p.quantity} ${symU}`, p, 'sl')
+      slWrap.appendChild(slBtnEl)
       overlay.appendChild(xWrap); overlay.appendChild(tpWrap); overlay.appendChild(slWrap)
-      btns.push({ id: p.id, entry: p.openPrice, xWrap, tpWrap, slWrap })
+      btns.push({ id: p.id, entry: p.openPrice, xWrap, tpWrap, slWrap, slBtnEl, tpBtnEl, lastSl: '', lastTp: '' })
     }
     if (btns.length === 0) { try { crossSub?.unsubscribe?.(null, onCross) } catch { /* noop */ } return () => {} }
 
@@ -496,6 +493,11 @@ export default function ChartingLibraryChart({ symbol = 'XAUUSD', interval = '5'
         place(b.xWrap, b.entry)                              // ✕ on the entry line
         place(b.tpWrap, lp.tp > 0 ? lp.tp : b.entry)         // TP button rides the TP line
         place(b.slWrap, lp.sl > 0 ? lp.sl : b.entry)         // SL button rides the SL line
+        // Show the live price next to SL/TP on the button itself.
+        const slTxt = lp.sl > 0 ? `SL ${lp.sl.toFixed(dg)}` : 'SL'
+        if (slTxt !== b.lastSl) { b.slBtnEl.textContent = slTxt; b.lastSl = slTxt }
+        const tpTxt = lp.tp > 0 ? `TP ${lp.tp.toFixed(dg)}` : 'TP'
+        if (tpTxt !== b.lastTp) { b.tpBtnEl.textContent = tpTxt; b.lastTp = tpTxt }
       }
     }
     raf = requestAnimationFrame(sync)
