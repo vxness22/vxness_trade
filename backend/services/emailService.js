@@ -120,7 +120,7 @@ export const sendOtpDirect = async (toEmail, otp, expiryMinutes = 10) => {
     <tr><td align="center">
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#12131a;border:1px solid #23262f;border-radius:16px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;">
         <tr><td align="center" style="padding:36px 40px 0;">
-          <img src="${logoUrl}" alt="Vxness" width="150" style="display:block;margin:0 auto;width:150px;max-width:60%;height:auto;border:0;">
+          <a href="https://vxness.in" target="_blank" style="text-decoration:none;border:0;outline:none;"><img src="${logoUrl}" alt="Vxness" width="150" style="display:block;margin:0 auto;width:150px;max-width:60%;height:auto;border:0;outline:none;text-decoration:none;"></a>
         </td></tr>
         <tr><td align="center" style="padding:18px 40px 0;">
           <div style="width:48px;height:3px;background:#22c55e;border-radius:3px;font-size:0;line-height:0;">&nbsp;</div>

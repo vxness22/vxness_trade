@@ -3,6 +3,7 @@
 // The logo is loaded from the public site; override with EMAIL_LOGO_URL if needed.
 
 const LOGO_URL = process.env.EMAIL_LOGO_URL || 'https://vxness.in/logo.png'
+const SITE_URL = process.env.EMAIL_SITE_URL || 'https://vxness.in'
 
 const C = {
   bg: '#0a0a0a',
@@ -32,7 +33,7 @@ const shell = ({ accent = C.green, heading, subheading = '', bodyHtml, preheader
     <tr><td align="center">
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:${C.card};border:1px solid ${C.border};border-radius:16px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;">
         <tr><td align="center" style="padding:36px 40px 0;">
-          <img src="${LOGO_URL}" alt="Vxness" width="150" style="display:block;margin:0 auto;width:150px;max-width:60%;height:auto;border:0;">
+          <a href="${SITE_URL}" target="_blank" style="text-decoration:none;border:0;outline:none;"><img src="${LOGO_URL}" alt="Vxness" width="150" style="display:block;margin:0 auto;width:150px;max-width:60%;height:auto;border:0;outline:none;text-decoration:none;pointer-events:auto;"></a>
         </td></tr>
         <tr><td align="center" style="padding:18px 40px 0;">
           <div style="width:48px;height:3px;background:${accent};border-radius:3px;font-size:0;line-height:0;">&nbsp;</div>
