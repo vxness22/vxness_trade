@@ -101,6 +101,10 @@ export default function ChartingLibraryChart({ symbol = 'XAUUSD', interval = '5'
   const widgetRef = useRef(null)
   const linesRef = useRef(new Map())
   const appliedSymbolRef = useRef('')
+  // Latest normalized positions, kept fresh for the button sync loop (SL/TP can
+  // change without recreating the buttons, so the loop reads live values here).
+  const positionsRef = useRef([])
+  positionsRef.current = (positions || []).map(normalizePosition)
   const [ready, setReady] = useState(false)
   const [failed, setFailed] = useState(false)
   const [dialog, setDialog] = useState(null)
@@ -347,7 +351,9 @@ export default function ChartingLibraryChart({ symbol = 'XAUUSD', interval = '5'
     }
 
     // Save an SL/TP bracket — sends BOTH brackets (vxness wipes an omitted one).
-    const saveBracket = async (p, kind, price) => {
+    const saveBracket = async (pArg, kind, price) => {
+      // Read the LIVE position so the OTHER bracket we re-send isn't a stale value.
+      const p = positionsRef.current.find((x) => x.id === pArg.id) || pArg
       try {
         const body = {
           tradeId: p.id,
@@ -446,17 +452,27 @@ export default function ChartingLibraryChart({ symbol = 'XAUUSD', interval = '5'
 
     const myPos = (positions || []).map(normalizePosition).filter((p) => p.symbol === symU && p.openPrice > 0)
     const btns = []
+    // Each button lives in its own wrapper so it can ride its OWN line: the SL
+    // button sits on the SL line, the TP button on the TP line, and the ✕ on the
+    // entry line. Fixed horizontal offsets keep them from overlapping when a
+    // bracket isn't set yet (all three rest on the entry line). (client request)
+    const mkWrap = (rightPx) => {
+      const d = document.createElement('div')
+      d.style.cssText = `position:absolute;right:${rightPx}px;transform:translateY(-50%);display:flex;align-items:center;pointer-events:none;visibility:hidden;z-index:6;`
+      return d
+    }
     for (const p of myPos) {
       const sideColor = p.side === 'BUY' ? CHART_BUY_COLOR : CHART_SELL_COLOR
-      const root = document.createElement('div')
-      root.style.cssText = `position:absolute;right:${BTN_RIGHT_PX}px;transform:translateY(-50%);display:flex;align-items:center;gap:3px;pointer-events:none;visibility:hidden;z-index:6;`
-      root.appendChild(mkDragBtn('SL', 'rgba(245,158,11,0.97)', `Stop loss ${p.side} ${p.quantity} ${symU}`, p, 'sl'))
-      root.appendChild(mkDragBtn('TP', 'rgba(20,184,166,0.97)', `Take profit ${p.side} ${p.quantity} ${symU}`, p, 'tp'))
-      root.appendChild(mkBtn('✕', sideColor, `Close ${p.side} ${p.quantity} ${symU}`, () => {
+      const xWrap = mkWrap(BTN_RIGHT_PX)
+      xWrap.appendChild(mkBtn('✕', sideColor, `Close ${p.side} ${p.quantity} ${symU}`, () => {
         openDialog({ title: 'Close position', body: `Close ${p.side} ${p.quantity} ${symU} at market?`, confirmLabel: 'Close', danger: true, onConfirm: () => closePos(p) })
       }))
-      overlay.appendChild(root)
-      btns.push({ p, el: root })
+      const tpWrap = mkWrap(BTN_RIGHT_PX + 34)
+      tpWrap.appendChild(mkDragBtn('TP', 'rgba(20,184,166,0.97)', `Take profit ${p.side} ${p.quantity} ${symU}`, p, 'tp'))
+      const slWrap = mkWrap(BTN_RIGHT_PX + 68)
+      slWrap.appendChild(mkDragBtn('SL', 'rgba(245,158,11,0.97)', `Stop loss ${p.side} ${p.quantity} ${symU}`, p, 'sl'))
+      overlay.appendChild(xWrap); overlay.appendChild(tpWrap); overlay.appendChild(slWrap)
+      btns.push({ id: p.id, entry: p.openPrice, xWrap, tpWrap, slWrap })
     }
     if (btns.length === 0) { try { crossSub?.unsubscribe?.(null, onCross) } catch { /* noop */ } return () => {} }
 
@@ -464,12 +480,22 @@ export default function ChartingLibraryChart({ symbol = 'XAUUSD', interval = '5'
     const sync = () => {
       raf = requestAnimationFrame(sync)
       const g = geom()
-      if (!g || calibOffset == null) { for (const b of btns) b.el.style.visibility = 'hidden'; return }
+      if (!g || calibOffset == null) {
+        for (const b of btns) { b.xWrap.style.visibility = 'hidden'; b.tpWrap.style.visibility = 'hidden'; b.slWrap.style.visibility = 'hidden' }
+        return
+      }
       const h = containerRef.current?.clientHeight || g.h
+      const live = positionsRef.current
+      const place = (wrap, price) => {
+        const y = paneY(price, g) + calibOffset
+        if (!(y > 8) || y > h - 8) { wrap.style.visibility = 'hidden' }
+        else { wrap.style.top = `${y}px`; wrap.style.visibility = 'visible' }
+      }
       for (const b of btns) {
-        const y = paneY(b.p.openPrice, g) + calibOffset
-        if (!(y > 8) || y > h - 8) b.el.style.visibility = 'hidden'
-        else { b.el.style.top = `${y}px`; b.el.style.visibility = 'visible' }
+        const lp = live.find((x) => x.id === b.id) || {}
+        place(b.xWrap, b.entry)                              // ✕ on the entry line
+        place(b.tpWrap, lp.tp > 0 ? lp.tp : b.entry)         // TP button rides the TP line
+        place(b.slWrap, lp.sl > 0 ? lp.sl : b.entry)         // SL button rides the SL line
       }
     }
     raf = requestAnimationFrame(sync)
@@ -477,7 +503,7 @@ export default function ChartingLibraryChart({ symbol = 'XAUUSD', interval = '5'
     return () => {
       cancelAnimationFrame(raf)
       try { crossSub?.unsubscribe?.(null, onCross) } catch { /* noop */ }
-      for (const b of btns) { try { overlay.removeChild(b.el) } catch { /* noop */ } }
+      for (const b of btns) { for (const el of [b.xWrap, b.tpWrap, b.slWrap]) { try { overlay.removeChild(el) } catch { /* noop */ } } }
     }
   }, [ready, symU, positionsKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
