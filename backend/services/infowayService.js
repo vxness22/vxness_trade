@@ -228,6 +228,14 @@ const TF_TO_INFOWAY = {
   '1d': '1D', '1w': '1W', '1mn': '1M',
 }
 
+// Infoway historical klines use the batch_kline v2 API with a numeric klineType:
+//   1=1m 2=5m 3=15m 4=30m 5=1h 6=2h 7=4h 8=1d 9=1w 10=1mo
+const TF_TO_KLINETYPE = {
+  '1m': 1, '5m': 2, '15m': 3, '30m': 4, '1h': 5, '4h': 7, '1d': 8, '1w': 9, '1mn': 10,
+}
+// A couple of platform codes differ from Infoway's for the kline API.
+const KLINE_CODE_OVERRIDE = { NATGAS: 'NGAS', US100: 'NAS100' }
+
 class InfowayService {
   constructor() {
     this.forexWs = null
@@ -591,72 +599,62 @@ class InfowayService {
   //   - limit: number of bars to return (max ~1000)
   // Returns [{ time: Date, open, high, low, close, tickVolume }] sorted ascending.
   //
-  // IMPORTANT: The exact Infoway REST URL + response schema is provider-specific. The
-  // implementation below assumes the common `/api/v1/kline` shape — if Infoway uses a
-  // different path or field names, set INFOWAY_REST_BASE or tweak the parsing block.
+  // Uses Infoway's batch_kline v2 API (the SAME provider as the live WS feed):
+  //   POST https://data.infoway.io/{business}/v2/batch_kline
+  //     header  apiKey: <token>
+  //     body    { klineType:<1-12>, klineNum:<=500, codes:"<ONE code>",
+  //               timestamp:<unix-sec, optional> }
+  //   response  { data:[ { s, respList:[ {t(sec), o,h,l,c,v} ... ] } ] }
+  // respList is newest-first with STRING values; we coerce + sort ascending.
+  // NOTE: query ONE code per request — a multi-code batch returns only ~2 bars
+  // each. Business routing: crypto → 'crypto' + <BASE>USDT, else 'common' + code.
   async getCandles(symbol, timeframe, startTime, limit = 500) {
     if (!INFOWAY_API_KEY) return []
-    const interval = TF_TO_INFOWAY[timeframe] || timeframe
+    const klineType = TF_TO_KLINETYPE[timeframe]
+    if (!klineType) return []
     const business = CRYPTO_SYMBOLS.includes(symbol) ? 'crypto' : 'common'
-    const infSymbol = toInfowaySymbol(symbol)
+    const code = KLINE_CODE_OVERRIDE[symbol] || toInfowaySymbol(symbol)
     const endMs = startTime instanceof Date ? startTime.getTime() : Number(startTime) || Date.now()
+    const endSec = Math.floor(endMs / 1000)
+    const nowSec = Math.floor(Date.now() / 1000)
 
-    const url = new URL(`${INFOWAY_REST_BASE}/api/v1/kline`)
-    url.searchParams.set('apikey', INFOWAY_API_KEY)
-    url.searchParams.set('business', business)
-    url.searchParams.set('symbol', infSymbol)
-    url.searchParams.set('interval', interval)
-    url.searchParams.set('end', String(endMs))
-    url.searchParams.set('limit', String(Math.min(1000, Math.max(1, limit))))
+    const body = {
+      klineType,
+      klineNum: Math.min(500, Math.max(1, limit)),
+      codes: code,
+    }
+    // Only send a historical end when it's clearly in the past; a near-now end
+    // means "latest" (Infoway returns the most recent bars without timestamp).
+    if (endSec > 0 && endSec < nowSec - 120) body.timestamp = endSec
 
+    const url = `${INFOWAY_REST_BASE}/${business}/v2/batch_kline`
     try {
-      const res = await fetch(url.toString())
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apiKey: INFOWAY_API_KEY },
+        body: JSON.stringify(body),
+      })
       if (!res.ok) {
-        console.error(`[Infoway] /kline ${symbol} ${interval} → HTTP ${res.status}`)
+        console.error(`[Infoway] batch_kline ${code} ${timeframe} → HTTP ${res.status}`)
         return []
       }
-      const body = await res.json()
+      const payload = await res.json()
+      const rows = payload && Array.isArray(payload.data) ? payload.data : []
+      const respList = (rows[0] && rows[0].respList) || []
 
-      // Accept a few common shapes:
-      //   { data: [[t,o,h,l,c,v], ...] }              ← binance-style
-      //   { data: [{t,o,h,l,c,v}, ...] }              ← object-style
-      //   { data: { list: [...] } }
-      //   [ ... ] at root
-      let rows = []
-      if (Array.isArray(body)) rows = body
-      else if (Array.isArray(body?.data)) rows = body.data
-      else if (Array.isArray(body?.data?.list)) rows = body.data.list
-      else if (Array.isArray(body?.data?.klines)) rows = body.data.klines
-
-      const candles = rows.map((row) => {
-        if (Array.isArray(row)) {
-          // [t, o, h, l, c, v]
-          const [t, o, h, l, c, v] = row
-          return {
-            time: new Date(Number(t)),
-            open: parseFloat(o),
-            high: parseFloat(h),
-            low: parseFloat(l),
-            close: parseFloat(c),
-            tickVolume: v != null ? parseFloat(v) : 0,
-          }
-        }
-        // object form — try a few field-name variants
-        const t = row.t ?? row.time ?? row.timestamp ?? row.ts
-        return {
-          time: new Date(Number(t)),
-          open: parseFloat(row.o ?? row.open),
-          high: parseFloat(row.h ?? row.high),
-          low: parseFloat(row.l ?? row.low),
-          close: parseFloat(row.c ?? row.close),
-          tickVolume: parseFloat(row.v ?? row.volume ?? row.vol ?? 0),
-        }
-      }).filter((c) => Number.isFinite(c.open) && c.time instanceof Date && !isNaN(c.time))
+      const candles = respList.map((r) => ({
+        time: new Date(Number(r.t) * 1000), // Infoway t is unix SECONDS
+        open: parseFloat(r.o),
+        high: parseFloat(r.h),
+        low: parseFloat(r.l),
+        close: parseFloat(r.c),
+        tickVolume: parseFloat(r.v ?? 0),
+      })).filter((c) => Number.isFinite(c.open) && c.time instanceof Date && !isNaN(c.time))
 
       candles.sort((a, b) => a.time - b.time)
       return candles
     } catch (err) {
-      console.error(`[Infoway] /kline ${symbol} ${interval} error:`, err.message)
+      console.error(`[Infoway] batch_kline ${code} ${timeframe} error:`, err.message)
       return []
     }
   }
