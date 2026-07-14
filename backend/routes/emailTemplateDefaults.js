@@ -33,7 +33,7 @@ const shell = ({ accent = C.green, heading, subheading = '', bodyHtml, preheader
     <tr><td align="center">
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:${C.card};border:1px solid ${C.border};border-radius:16px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;">
         <tr><td align="center" style="padding:36px 40px 0;">
-          <a href="${SITE_URL}" target="_blank" style="text-decoration:none;border:0;outline:none;"><img src="${LOGO_URL}" alt="Vxness" width="150" style="display:block;margin:0 auto;width:150px;max-width:60%;height:auto;border:0;outline:none;text-decoration:none;pointer-events:auto;"></a>
+          <a href="${SITE_URL}" target="_blank" style="text-decoration:none;border:0;outline:none;"><img src="${LOGO_URL}" alt="Vxness" width="150" draggable="false" style="display:block;margin:0 auto;width:150px;max-width:60%;height:auto;border:0;outline:none;text-decoration:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none;"></a>
         </td></tr>
         <tr><td align="center" style="padding:18px 40px 0;">
           <div style="width:48px;height:3px;background:${accent};border-radius:3px;font-size:0;line-height:0;">&nbsp;</div>
