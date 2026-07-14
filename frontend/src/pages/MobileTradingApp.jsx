@@ -2646,6 +2646,8 @@ const MobileTradingApp = () => {
 
           positions={openTrades}
 
+          onRefresh={fetchOpenTrades}
+
         />
 
       </div>

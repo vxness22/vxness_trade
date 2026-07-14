@@ -3491,6 +3491,8 @@ const TradingPage = () => {
 
               positions={openTrades}
 
+              onRefresh={fetchOpenTrades}
+
             />
 
           </div>
