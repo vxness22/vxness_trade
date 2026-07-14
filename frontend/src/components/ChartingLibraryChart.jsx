@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { API_URL } from '../config/api'
 import priceStreamService from '../services/priceStream'
-import { vxnessDatafeed } from '../services/chartingDatafeed'
+import { vxnessDatafeed, setQuoteAdjuster } from '../services/chartingDatafeed'
 
 function tvCtor() {
   if (typeof window === 'undefined') return undefined
@@ -94,7 +94,7 @@ function pnlAt(p, price) {
   return p.side === 'BUY' ? (price - p.openPrice) * q * cs : (p.openPrice - price) * q * cs
 }
 
-export default function ChartingLibraryChart({ symbol = 'XAUUSD', interval = '5', theme = 'dark', positions = [], onRefresh }) {
+export default function ChartingLibraryChart({ symbol = 'XAUUSD', interval = '5', theme = 'dark', positions = [], onRefresh, getQuote }) {
   const containerRef = useRef(null)
   const overlayRef = useRef(null)
   const widgetRef = useRef(null)
@@ -108,6 +108,13 @@ export default function ChartingLibraryChart({ symbol = 'XAUUSD', interval = '5'
   const symU = String(symbol || 'XAUUSD').toUpperCase()
 
   const openDialog = (d) => { setDialogValue(d.input?.defaultValue ?? ''); setDialog(d) }
+
+  // Feed the datafeed the SAME price adjuster the panel/instrument list use, so the
+  // chart candle == the SELL price exactly (admin spread applied). Cleared on unmount.
+  useEffect(() => {
+    setQuoteAdjuster(typeof getQuote === 'function' ? getQuote : null)
+    return () => setQuoteAdjuster(null)
+  }, [getQuote])
 
   // Swallow the library's benign "Value is null" context-menu rejection.
   useEffect(() => {

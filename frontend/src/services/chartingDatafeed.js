@@ -1,15 +1,16 @@
 // Custom datafeed for the TradingView Advanced Charting Library.
 // Faithful port of SwisDex's lib/charting/datafeed.ts, wired to vxness:
-//   - history : GET /api/charts/bars (Infoway klines via infowayService.getCandles)
-//   - live    : /ws/bars (barSocket) — server-aggregated in-progress candle
-//   - bid tick: priceStreamService (Socket.IO priceStream)
+//   - history : GET /api/charts/bars (Infoway klines) — shifted to the DISPLAYED bid
+//   - live    : built from priceStream, driven by the SAME displayed bid the order
+//               panel + instrument list show, so the chart last price is exactly
+//               equal to the SELL price (one source, no separate socket, no drift).
 //
-// Candles are aggregated server-side from the tick MID; here we shift them DOWN
-// to the BID by half the live spread so the chart last-price matches the panel
-// BID and a buy position's current price (MT4/MT5 convention).
+// The order panel / instrument list render adjustQuotesForTradingDisplay(bid,ask,…)
+// (admin spread applied). We use that exact function via setQuoteAdjuster() so the
+// candle == the panel to the last digit. Without an adjuster we fall back to the
+// raw feed bid.
 import { API_URL } from '../config/api'
 import priceStreamService from './priceStream'
-import { barSocket } from './barSocket'
 
 /* ─── Resolution maps ─── */
 
@@ -130,22 +131,40 @@ function waitForPrice(symbol, timeoutMs = 2500) {
   })
 }
 
-// Half the live spread — the amount to shift a MID bar down to the BID.
-function halfSpreadOf(tick) {
-  if (!tick || !(tick.bid > 0) || !(tick.ask > 0)) return 0
-  return (tick.ask - tick.bid) / 2
+// The order panel + instrument list display prices through this adjuster (admin
+// spread/markup). The chart component sets it so the candle uses the EXACT same
+// value. adjuster(symbol, rawBid, rawAsk) → { bid, ask }.
+let _quoteAdjuster = null
+export function setQuoteAdjuster(fn) { _quoteAdjuster = typeof fn === 'function' ? fn : null }
+
+// The DISPLAYED bid for a raw feed tick — exactly what the SELL button / list show.
+function displayedBid(sym, tick) {
+  if (!tick || !(tick.bid > 0)) return null
+  if (_quoteAdjuster) {
+    try { const q = _quoteAdjuster(sym, tick.bid, tick.ask); if (q && q.bid > 0) return q.bid } catch { /* fall back */ }
+  }
+  return tick.bid
 }
 
-function toBidBar(bar, halfSpread, digits) {
-  if (halfSpread <= 0) return bar
-  const shift = (v) => Number((v - halfSpread).toFixed(digits))
-  return {
-    ...bar,
-    open: shift(bar.open),
-    high: shift(bar.high),
-    low: shift(bar.low),
-    close: shift(bar.close),
-  }
+// How far a raw MID bar must move DOWN to sit on the displayed bid (rawMid − dispBid).
+// Equals half the spread when no adjuster is set — same as the old behaviour.
+function displayShift(sym, tick) {
+  if (!tick || !(tick.bid > 0) || !(tick.ask > 0)) return 0
+  const rawMid = (tick.bid + tick.ask) / 2
+  const db = displayedBid(sym, tick)
+  return db != null ? rawMid - db : (tick.ask - tick.bid) / 2
+}
+
+function shiftBar(bar, shift, digits) {
+  if (!shift) return bar
+  const s = (v) => Number((v - shift).toFixed(digits))
+  return { ...bar, open: s(bar.open), high: s(bar.high), low: s(bar.low), close: s(bar.close) }
+}
+
+// Resolution → seconds, for building the live forming bar on the timeframe grid.
+const RES_SECONDS = {
+  '1': 60, '3': 180, '5': 300, '10': 600, '15': 900, '30': 1800, '45': 2700,
+  '60': 3600, '120': 7200, '180': 10800, '240': 14400, D: 86400, '1D': 86400,
 }
 
 /* ─── Config ─── */
@@ -171,16 +190,6 @@ const CONFIG = {
 /* ─── Subscriptions ─── */
 
 const subscriptions = new Map()
-let _reconnectHooked = false
-function ensureReconnectHook() {
-  if (_reconnectHooked) return
-  _reconnectHooked = true
-  barSocket.onReconnect(() => {
-    for (const sub of subscriptions.values()) {
-      try { sub.resetCache && sub.resetCache() } catch { /* ignore */ }
-    }
-  })
-}
 
 /* ═══════════ DATAFEED ═══════════ */
 
@@ -259,14 +268,15 @@ export const vxnessDatafeed = {
         const data = await res.json()
         const rawBars = Array.isArray(data?.bars) ? data.bars : []
         if (rawBars.length > 0) {
-          // Shift MID bars to BID so the chart matches the panel bid / P&L.
+          // Shift MID klines onto the DISPLAYED bid so history is continuous with
+          // the live candle (and matches the panel bid).
           const liveTick = await waitForPrice(sym, 2500)
-          const hs = halfSpreadOf(liveTick)
+          const shift = displayShift(sym, liveTick)
           const digits = symbolDigits(sym)
-          const bars = rawBars.map((b) => toBidBar({
+          const bars = rawBars.map((b) => shiftBar({
             time: b.time * 1000, // seconds → ms
             open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume,
-          }, hs, digits))
+          }, shift, digits))
           onResult(dropWeekendBars(bars, sym), { noData: false })
           return
         }
@@ -278,29 +288,36 @@ export const vxnessDatafeed = {
     }
   },
 
-  subscribeBars: (symbolInfo, resolution, onTick, listenerGuid, onResetCacheNeededCallback) => {
+  subscribeBars: (symbolInfo, resolution, onTick, listenerGuid) => {
     const sym = String(symbolInfo.ticker || symbolInfo.name).toUpperCase()
     const res = String(resolution)
-    ensureReconnectHook()
+    const tfSec = RES_SECONDS[res] || 300
+    let bar = null
+    const id = `chart-bars-${listenerGuid}`
 
-    const unsub = barSocket.subscribe(sym, res, (bar) => {
-      const sub = subscriptions.get(listenerGuid)
-      if (!sub) return
-      const hs = halfSpreadOf(priceStreamService.getPrice(sym))
-      const digits = symbolDigits(sym)
-      const b = toBidBar({
-        time: bar.time * 1000, // seconds → ms
-        open: bar.open, high: bar.high, low: bar.low, close: bar.close, volume: bar.volume,
-      }, hs, digits)
-      sub.onTick(b)
+    // Build the forming candle straight from the price stream using the SAME
+    // displayed bid the order panel / instrument list render. One source ⇒ the
+    // chart last price equals the SELL price exactly, with no tick-to-tick flicker.
+    priceStreamService.subscribe(id, (prices) => {
+      const tick = prices?.[sym]
+      const price = displayedBid(sym, tick)
+      if (!(price > 0)) return
+      const tsec = Math.floor(((tick && tick.time) || Date.now()) / 1000)
+      const barStart = Math.floor(tsec / tfSec) * tfSec
+      if (!bar || bar.time !== barStart) {
+        bar = { time: barStart, open: price, high: price, low: price, close: price }
+      } else {
+        if (price > bar.high) bar.high = price
+        if (price < bar.low) bar.low = price
+        bar.close = price
+      }
+      onTick({ time: bar.time * 1000, open: bar.open, high: bar.high, low: bar.low, close: bar.close, volume: 0 })
     })
 
     subscriptions.set(listenerGuid, {
       symbol: sym,
       resolution: res,
-      onTick,
-      resetCache: onResetCacheNeededCallback,
-      unsubscribe: () => { unsub() },
+      unsubscribe: () => { try { priceStreamService.unsubscribe(id) } catch { /* ignore */ } },
     })
   },
 

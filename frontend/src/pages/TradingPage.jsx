@@ -3493,6 +3493,8 @@ const TradingPage = () => {
 
               onRefresh={fetchOpenTrades}
 
+              getQuote={getDisplayQuotes}
+
             />
 
           </div>
