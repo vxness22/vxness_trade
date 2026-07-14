@@ -254,7 +254,10 @@ export default function ChartingLibraryChart({ symbol = 'XAUUSD', interval = '5'
       overrides: {
         linecolor: lineColor, linestyle: dashed ? 2 : 0, linewidth: dashed ? 1 : 2,
         showLabel: true, textcolor: textColor, fontsize: 11, bold: true,
-        horzLabelsAlign: 'right', vertLabelsAlign: 'middle',
+        // SL/TP (dashed): put the "SL"/"TP" label on the LEFT of the line (off
+        // the right-axis price tag) so it reads clearly on the line itself.
+        // Entry (solid): keep its P&L label on the right.
+        horzLabelsAlign: dashed ? 'left' : 'right', vertLabelsAlign: dashed ? 'top' : 'middle',
       },
     })
 
