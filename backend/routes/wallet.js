@@ -252,9 +252,9 @@ router.post('/deposit', async (req, res) => {
 
           date: new Date().toLocaleString(),
 
-          platformName: settings?.platformName || 'vxness',
+          platformName: settings?.fromName || 'vxness',
 
-          supportEmail: settings?.supportEmail || 'support@vxness.com',
+          supportEmail: settings?.fromEmail || 'support@vxness.in',
 
           year: new Date().getFullYear().toString()
 
@@ -396,9 +396,9 @@ router.post('/withdraw', async (req, res) => {
 
           date: new Date().toLocaleString(),
 
-          platformName: settings?.platformName || 'vxness',
+          platformName: settings?.fromName || 'vxness',
 
-          supportEmail: settings?.supportEmail || 'support@vxness.com',
+          supportEmail: settings?.fromEmail || 'support@vxness.in',
 
           year: new Date().getFullYear().toString()
 
@@ -818,9 +818,9 @@ router.put('/admin/approve/:id', async (req, res) => {
 
           newBalance: wallet.balance.toFixed(2),
 
-          platformName: settings?.platformName || 'vxness',
+          platformName: settings?.fromName || 'vxness',
 
-          supportEmail: settings?.supportEmail || 'support@vxness.com',
+          supportEmail: settings?.fromEmail || 'support@vxness.in',
 
           year: new Date().getFullYear().toString()
 
@@ -903,6 +903,28 @@ router.put('/admin/reject/:id', async (req, res) => {
     await wallet.save()
 
     await transaction.save()
+
+    // Notify the user that their request was rejected (non-blocking)
+    try {
+      const user = await User.findById(transaction.userId)
+      if (user && user.email) {
+        const settings = await EmailSettings.findOne()
+        const templateSlug = transaction.type === 'Deposit' ? 'deposit_rejected' : 'withdrawal_rejected'
+        await sendTemplateEmail(templateSlug, user.email, {
+          firstName: user.firstName || user.email.split('@')[0],
+          amount: transaction.amount.toFixed(2),
+          transactionId: transaction._id.toString(),
+          paymentMethod: transaction.paymentMethod || 'Wallet',
+          date: new Date().toLocaleString(),
+          reason: (req.body && (req.body.reason || req.body.adminRemarks)) || 'Your request did not meet our requirements.',
+          platformName: settings?.fromName || 'Vxness',
+          supportEmail: settings?.fromEmail || 'support@vxness.in',
+          year: new Date().getFullYear().toString()
+        })
+      }
+    } catch (emailError) {
+      console.error('Error sending rejection email:', emailError)
+    }
 
 
 
@@ -1066,9 +1088,9 @@ router.put('/transaction/:id/approve', async (req, res) => {
 
           newBalance: wallet.balance.toFixed(2),
 
-          platformName: settings?.platformName || 'vxness',
+          platformName: settings?.fromName || 'vxness',
 
-          supportEmail: settings?.supportEmail || 'support@vxness.com',
+          supportEmail: settings?.fromEmail || 'support@vxness.in',
 
           year: new Date().getFullYear().toString()
 
@@ -1155,6 +1177,28 @@ router.put('/transaction/:id/reject', async (req, res) => {
     await wallet.save()
 
     await transaction.save()
+
+    // Notify the user that their request was rejected (non-blocking)
+    try {
+      const user = await User.findById(transaction.userId)
+      if (user && user.email) {
+        const settings = await EmailSettings.findOne()
+        const templateSlug = transaction.type === 'Deposit' ? 'deposit_rejected' : 'withdrawal_rejected'
+        await sendTemplateEmail(templateSlug, user.email, {
+          firstName: user.firstName || user.email.split('@')[0],
+          amount: transaction.amount.toFixed(2),
+          transactionId: transaction._id.toString(),
+          paymentMethod: transaction.paymentMethod || 'Wallet',
+          date: new Date().toLocaleString(),
+          reason: adminRemarks || 'Your request did not meet our requirements.',
+          platformName: settings?.fromName || 'Vxness',
+          supportEmail: settings?.fromEmail || 'support@vxness.in',
+          year: new Date().getFullYear().toString()
+        })
+      }
+    } catch (emailError) {
+      console.error('Error sending rejection email:', emailError)
+    }
 
 
 

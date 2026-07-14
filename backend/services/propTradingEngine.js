@@ -78,6 +78,27 @@ class PropTradingEngine {
       expiresAt
     })
 
+    // Send purchase confirmation email (non-blocking — never fail creation on email)
+    try {
+      const user = await User.findById(userId)
+      if (user && user.email) {
+        await sendTemplateEmail('challenge_purchased', user.email, {
+          firstName: user.firstName || user.email.split('@')[0],
+          challengeName: challenge.name,
+          fundSize: `$${challenge.fundSize.toLocaleString()}`,
+          accountId: account.accountId,
+          fee: `$${Number(challenge.challengeFee || 0).toLocaleString()}`,
+          purchaseDate: new Date().toLocaleString(),
+          platformName: 'Vxness',
+          loginUrl: 'https://vxness.in/user/login',
+          supportEmail: 'support@vxness.in',
+          year: new Date().getFullYear().toString()
+        })
+      }
+    } catch (emailError) {
+      console.error('Error sending challenge purchase email:', emailError)
+    }
+
     return account
   }
 
@@ -496,9 +517,9 @@ class PropTradingEngine {
             accountId: account.accountId,
             failureReason: breachReason,
             failureDate: account.failedAt.toLocaleDateString(),
-            platformName: 'vxness',
-            loginUrl: 'http://localhost:5173/login',
-            supportEmail: 'support@vxness.com',
+            platformName: 'Vxness',
+            loginUrl: 'https://vxness.in/user/login',
+            supportEmail: 'support@vxness.in',
             year: new Date().getFullYear().toString()
           })
           console.log(`Challenge failure email sent to ${user.email} for drawdown breach`)
@@ -566,9 +587,9 @@ class PropTradingEngine {
               fundSize: `$${challenge.fundSize.toLocaleString()}`,
               accountId: account.accountId,
               completionDate: account.passedAt.toLocaleDateString(),
-              platformName: 'vxness',
-              loginUrl: 'http://localhost:5173/login',
-              supportEmail: 'support@vxness.com',
+              platformName: 'Vxness',
+              loginUrl: 'https://vxness.in/user/login',
+              supportEmail: 'support@vxness.in',
               year: new Date().getFullYear().toString()
             })
           }
@@ -647,9 +668,9 @@ class PropTradingEngine {
           fundSize: `$${challenge.fundSize.toLocaleString()}`,
           accountId: account.accountId,
           completionDate: account.passedAt.toLocaleDateString(),
-          platformName: 'vxness',
-          loginUrl: 'http://localhost:5173/login',
-          supportEmail: 'support@vxness.com',
+          platformName: 'Vxness',
+          loginUrl: 'https://vxness.in/user/login',
+          supportEmail: 'support@vxness.in',
           year: new Date().getFullYear().toString()
         })
         console.log(`Challenge completion email sent to ${user.email} (admin force pass)`)
@@ -690,9 +711,9 @@ class PropTradingEngine {
           accountId: account.accountId,
           failureReason: account.failReason,
           failureDate: account.failedAt.toLocaleDateString(),
-          platformName: 'vxness',
-          loginUrl: 'http://localhost:5173/login',
-          supportEmail: 'support@vxness.com',
+          platformName: 'Vxness',
+          loginUrl: 'https://vxness.in/user/login',
+          supportEmail: 'support@vxness.in',
           year: new Date().getFullYear().toString()
         })
       }
@@ -890,9 +911,9 @@ class PropTradingEngine {
             accountId: account.accountId,
             failureReason: account.failReason,
             failureDate: account.failedAt.toLocaleDateString(),
-            platformName: 'vxness',
-            loginUrl: 'http://localhost:5173/login',
-            supportEmail: 'support@vxness.com',
+            platformName: 'Vxness',
+            loginUrl: 'https://vxness.in/user/login',
+            supportEmail: 'support@vxness.in',
             year: new Date().getFullYear().toString()
           })
         }

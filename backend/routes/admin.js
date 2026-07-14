@@ -379,9 +379,9 @@ router.put('/users/:id/ban', async (req, res) => {
           email: user.email,
           reason: reason || 'Policy violation',
           date: new Date().toLocaleString(),
-          platformName: settings?.platformName || 'vxness',
-          loginUrl: settings?.loginUrl || 'https://vxness.com/login',
-          supportEmail: settings?.supportEmail || 'support@vxness.com',
+          platformName: settings?.fromName || 'vxness',
+          loginUrl: settings?.loginUrl || 'https://vxness.in/user/login',
+          supportEmail: settings?.fromEmail || 'support@vxness.in',
           year: new Date().getFullYear().toString()
         })
       }

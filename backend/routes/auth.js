@@ -197,8 +197,8 @@ router.post('/signup', async (req, res) => {
       firstName: user.firstName,
       email: user.email,
       platformName: emailSettings?.fromName || 'Trading Platform',
-      loginUrl: process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL}/user/login` : 'https://vxness.com/user/login',
-      supportEmail: emailSettings?.fromEmail || 'support@vxness.com',
+      loginUrl: process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL}/user/login` : 'https://vxness.in/user/login',
+      supportEmail: emailSettings?.fromEmail || 'support@vxness.in',
       year: new Date().getFullYear().toString()
     })
 
@@ -458,8 +458,8 @@ router.post('/forgot-password', async (req, res) => {
           email: user.email,
           otp,
           expiryMinutes,
-          platformName: 'vxness',
-          supportEmail: emailSettings?.fromEmail || 'support@vxness.com',
+          platformName: 'Vxness',
+          supportEmail: emailSettings?.fromEmail || 'support@vxness.in',
           year: new Date().getFullYear().toString()
         })
 
