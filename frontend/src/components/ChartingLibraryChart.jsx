@@ -18,7 +18,12 @@ function tvCtor() {
   return window.TradingView && window.TradingView.widget
 }
 
-const LIB_URL = '/charting_library/charting_library.standalone.js'
+// The ?v cache-buster gives the entry script a fresh URL key. When the library
+// wasn't deployed, the server's SPA fallback returned index.html for this .js
+// path and a CDN (Cloudflare) cached that HTML with a long TTL — so even after
+// the real files were deployed, the plain URL kept serving stale HTML. Bumping
+// ?v sidesteps the poisoned cache key. Increment on any future library update.
+const LIB_URL = '/charting_library/charting_library.standalone.js?v=2'
 
 let _libPromise = null
 function loadChartingLibrary() {
