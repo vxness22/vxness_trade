@@ -183,6 +183,62 @@ router.get('/history', async (req, res) => {
   }
 })
 
+// 5b. Historical OHLC bars in OBJECT form — used by the licensed Charting Library
+// custom datafeed (chartingDatafeed.js). Same source as /history (Infoway klines
+// via infowayService.getCandles) but shaped like SwisDex's gateway
+// /instruments/{sym}/bars so the ported datafeed consumes it unchanged:
+//   GET /api/charts/bars?symbol=&resolution=&from=&to=
+//   → { s:'ok', bars:[{ time:<sec>, open, high, low, close, volume }], noData:false }
+router.get('/bars', async (req, res) => {
+  try {
+    const raw = String(req.query.symbol || '').toUpperCase()
+    const symbol = raw.includes(':') ? raw.split(':')[1] : raw
+    const resolution = String(req.query.resolution || '5')
+    const from = parseInt(req.query.from, 10) // seconds
+    const to = parseInt(req.query.to, 10)     // seconds
+
+    if (!SUPPORTED_SYMBOLS.includes(symbol)) {
+      return res.json({ s: 'ok', bars: [], noData: true })
+    }
+    const timeframe = RES_TO_TIMEFRAME[resolution]
+    if (!timeframe) {
+      return res.json({ s: 'ok', bars: [], noData: true })
+    }
+
+    const endTs = Number.isFinite(to) ? to : Math.floor(Date.now() / 1000)
+    const secondsPerBar = RES_TO_SECONDS[resolution] || 300
+    const windowBars = Number.isFinite(from)
+      ? Math.ceil((endTs - from) / secondsPerBar) + 5
+      : 500
+    const limit = Math.min(1000, Math.max(50, windowBars))
+
+    const candles = await infowayService.getCandles(symbol, timeframe, new Date(endTs * 1000), limit)
+    if (!candles.length) {
+      return res.json({ s: 'ok', bars: [], noData: true })
+    }
+
+    const bars = candles
+      .map(c => ({
+        time: Math.floor(new Date(c.time).getTime() / 1000),
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+        volume: c.tickVolume ?? c.volume ?? 0,
+      }))
+      .filter(b => Number.isFinite(b.time) && (Number.isFinite(from) ? b.time >= from : true))
+      .sort((a, b) => a.time - b.time)
+
+    if (!bars.length) {
+      return res.json({ s: 'ok', bars: [], noData: true })
+    }
+    res.json({ s: 'ok', bars, noData: false })
+  } catch (err) {
+    console.error('[charts] /bars error:', err.message)
+    res.json({ s: 'ok', bars: [], noData: true })
+  }
+})
+
 // 6. Quotes — optional, used by chart watchlist/symbol picker for last price
 router.get('/quotes', (req, res) => {
   const symbols = String(req.query.symbols || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean)

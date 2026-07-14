@@ -26,6 +26,8 @@ import priceStreamService from '../services/priceStream'
 
 import { API_URL } from '../config/api'
 
+import ChartingLibraryChart from '../components/ChartingLibraryChart'
+
 import { useTheme } from '../context/ThemeContext'
 
 import KycTradeRequiredModal from '../components/KycTradeRequiredModal'
@@ -2628,21 +2630,21 @@ const MobileTradingApp = () => {
 
 
 
-      {/* Full Screen TradingView Chart */}
+      {/* Full Screen Chart — licensed Charting Library fed by the vxness broker
+          feed (/api/charts/bars + /ws/bars), so mobile candles match the desktop
+          chart and the order panel. */}
 
       <div className="flex-1 bg-[#0d0d0d] relative min-h-0" ref={chartContainerRef}>
 
-        <iframe
+        <ChartingLibraryChart
 
-          key={activeChartTab}
+          symbol={activeChartTab}
 
-          src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_mobile&symbol=${getSymbolForTradingView(activeChartTab)}&interval=5&hidesidetoolbar=0&hidetoptoolbar=0&symboledit=1&saveimage=1&toolbarbg=0d0d0d&studies=[]&theme=dark&style=1&timezone=Etc%2FUTC&withdateranges=1&showpopupbutton=1&studies_overrides={}&overrides={}&enabled_features=["left_toolbar","header_widget","drawing_templates"]&disabled_features=["hide_left_toolbar_by_default"]&locale=en&utm_source=localhost&utm_medium=widget_new&utm_campaign=chart&hide_side_toolbar=0`}
+          interval="5"
 
-          style={{ width: '100%', height: '100%', border: 'none' }}
+          theme="dark"
 
-          allowFullScreen
-
-          title="TradingView Chart"
+          positions={openTrades}
 
         />
 

@@ -14,6 +14,10 @@ import { Server } from 'socket.io'
 
 import cron from 'node-cron'
 
+import barAggregator from './services/barAggregator.js'
+
+import { initBarHub } from './ws/barHub.js'
+
 import authRoutes from './routes/auth.js'
 
 import adminRoutes from './routes/admin.js'
@@ -96,6 +100,12 @@ const httpServer = createServer(app)
 
 
 
+// Live OHLC bar streaming for the Charting Library datafeed (path /ws/bars).
+// Runs on the same HTTP server as Socket.IO (which uses /socket.io/).
+initBarHub(httpServer)
+
+
+
 // Socket.IO for real-time updates
 
 const io = new Server(httpServer, {
@@ -153,6 +163,12 @@ async function initInfowayConnection() {
       infowayService.subscribe((symbol, price) => {
 
         priceCache.set(symbol, price)
+
+
+
+        // Feed the OHLC bar aggregator so /ws/bars streams live candles built
+        // from the same tick MID the P&L is priced off (SwisDex chart parity).
+        barAggregator.update(symbol, price.bid, price.ask, price.time || Date.now())
 
 
 

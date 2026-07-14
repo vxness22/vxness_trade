@@ -45,3 +45,11 @@ Thumbs.db
 __v0_runtime_loader.js
 __v0_devtools.tsx
 __v0_jsx-dev-runtime.ts
+
+# TradingView Charting Library (licensed vendor files — placed on the server /
+# via CI at deploy time, NOT committed). Keep only the placeholder.
+frontend/public/charting_library/*
+!frontend/public/charting_library/PLACE_LIBRARY_FILES_HERE.md
+
+# Separate SwisDex project living inside this repo — not part of vxness
+swisdex.com/

@@ -1,49 +1,37 @@
-# TradingView Charting Library
+# TradingView Charting Library — place files here
 
-Place the licensed TradingView Charting Library distribution into this folder so the chart container
-(`frontend/src/components/TradingViewChart.jsx`) can load it.
+The licensed **TradingView Advanced Charting Library** distribution files are
+**not committed** to this repo (licensed vendor code + large binaries). They are
+placed here on the server / by CI at deploy time.
 
-## What goes here
-
-Copy the **contents** of the `charting_library/` folder from your approved TradingView distribution
-(the one you received in their private GitHub repo) into this directory.
-
-After copying, this folder should look something like:
+Drop the library distribution into this folder so it looks like:
 
 ```
 frontend/public/charting_library/
-├── charting_library.js          ← loaded at runtime by TradingViewChart.jsx
+├── charting_library.standalone.js
 ├── charting_library.esm.js
+├── charting_library.js
 ├── charting_library.d.ts
-├── bundles/
-│   ├── ...
-└── (other distribution files)
+├── datafeed-api.d.ts
+├── package.json
+└── bundles/                      # the library's chunk bundles
 ```
 
-The component fetches `/charting_library/charting_library.js` and instantiates `window.TradingView.widget`
-with our custom datafeed (`frontend/src/services/chartDatafeed.js`).
+The app loads it from `/charting_library/charting_library.standalone.js` (see
+`frontend/src/components/ChartingLibraryChart.jsx`).
 
-## How to verify
+## How the chart is wired (custom datafeed → vxness backend)
 
-1. Drop the library files in this folder
-2. Restart the Vite dev server (`npm run dev` in `frontend/`)
-3. Open the trading page → chart should load with **broker-aligned candles**
-   (same price as the order panel — both from MetaApi)
-4. Network tab should show requests to:
-   - `/charting_library/charting_library.js` (200 OK)
-   - `/api/charts/config`, `/api/charts/symbols`, `/api/charts/history` (200 OK)
+- **History:** `GET /api/charts/bars?symbol=&resolution=&from=&to=`
+  → `backend/routes/charts.js` (Infoway klines via `infowayService.getCandles`)
+- **Live candles:** WebSocket `GET /ws/bars`
+  → `backend/ws/barHub.js` + `backend/services/barAggregator.js`
+  (OHLC built from the tick MID, streamed per tick + 1s heartbeat)
+- **Bid/ask ticks (mid→bid shift):** Socket.IO `priceStream`
+  → `frontend/src/services/priceStream.js`
 
-## If the chart shows "Failed to load charting_library.js"
+Datafeed: `frontend/src/services/chartingDatafeed.js`
+Live bar socket client: `frontend/src/services/barSocket.js`
 
-The library files are missing or paths are wrong. Confirm `frontend/public/charting_library/charting_library.js`
-exists on disk (case-sensitive on Linux servers).
-
-## Don't commit the library to git
-
-TradingView's license forbids redistributing the library. Add to `.gitignore`:
-
-```
-frontend/public/charting_library/
-```
-
-(Keep this README in git as a placeholder — `!frontend/public/charting_library/PLACE_LIBRARY_FILES_HERE.md`)
+> **Production note:** Nginx must proxy `/ws/bars` to the backend with the
+> WebSocket `Upgrade` headers (same as `/socket.io`).

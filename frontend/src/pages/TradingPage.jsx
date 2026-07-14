@@ -20,7 +20,7 @@ import { marginUsd as computeMarginUsd } from '../utils/margin'
 
 import { isMarketOpen, marketClosedReason } from '../utils/marketHours'
 
-import TradingViewChart from '../components/TradingViewChart'
+import ChartingLibraryChart from '../components/ChartingLibraryChart'
 
 import KycTradeRequiredModal from '../components/KycTradeRequiredModal'
 
@@ -3474,18 +3474,22 @@ const TradingPage = () => {
 
 
 
-          {/* Chart — TradingView Charting Library with custom datafeed bound to MetaApi
-              so candles + last price match the broker feed shown in the order panel. */}
+          {/* Chart — TradingView Charting Library with a custom datafeed bound to the
+              vxness backend (/api/charts/bars history + /ws/bars live) so candles +
+              last price match the Infoway broker feed shown in the order panel. Open
+              positions are drawn as entry / SL / TP lines. */}
 
           <div className={`flex-1 min-h-0 relative ${isDarkMode ? 'bg-[#0d0d0d]' : 'bg-white'}`}>
 
-            <TradingViewChart
+            <ChartingLibraryChart
 
               symbol={selectedInstrument.symbol}
 
               interval="5"
 
               theme={isDarkMode ? 'dark' : 'light'}
+
+              positions={openTrades}
 
             />
 
