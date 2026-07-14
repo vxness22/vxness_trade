@@ -14,6 +14,7 @@ import { createPortal } from 'react-dom'
 import { API_URL } from '../config/api'
 import priceStreamService from '../services/priceStream'
 import { vxnessDatafeed, setQuoteAdjuster } from '../services/chartingDatafeed'
+import logoImage from '../assets/logo.png'
 
 function tvCtor() {
   if (typeof window === 'undefined') return undefined
@@ -480,6 +481,17 @@ export default function ChartingLibraryChart({ symbol = 'XAUUSD', interval = '5'
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+      {/* vxness logo watermark — faint, centered, non-interactive. Sits over the
+          chart canvas but under the SL/TP overlay (DOM order). */}
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', overflow: 'hidden' }}>
+        <img
+          src={logoImage}
+          alt=""
+          aria-hidden
+          draggable={false}
+          style={{ width: '38%', maxWidth: 300, objectFit: 'contain', opacity: dark ? 0.07 : 0.05, userSelect: 'none' }}
+        />
+      </div>
       <div ref={overlayRef} style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }} />
       {failed && (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: dark ? '#9ca3af' : '#6b7280', fontSize: 14, textAlign: 'center', padding: 16 }}>
