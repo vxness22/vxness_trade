@@ -250,7 +250,7 @@ router.post('/deposit', async (req, res) => {
 
           paymentMethod: paymentMethod || 'Bank Transfer',
 
-          date: new Date().toLocaleString(),
+          date: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }),
 
           platformName: settings?.fromName || 'vxness',
 
@@ -394,7 +394,7 @@ router.post('/withdraw', async (req, res) => {
 
           paymentMethod: paymentMethod || 'Bank Transfer',
 
-          date: new Date().toLocaleString(),
+          date: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }),
 
           platformName: settings?.fromName || 'vxness',
 
@@ -814,7 +814,7 @@ router.put('/admin/approve/:id', async (req, res) => {
 
           paymentMethod: transaction.paymentMethod || 'Wallet',
 
-          date: new Date().toLocaleString(),
+          date: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }),
 
           newBalance: wallet.balance.toFixed(2),
 
@@ -915,7 +915,7 @@ router.put('/admin/reject/:id', async (req, res) => {
           amount: transaction.amount.toFixed(2),
           transactionId: transaction._id.toString(),
           paymentMethod: transaction.paymentMethod || 'Wallet',
-          date: new Date().toLocaleString(),
+          date: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }),
           reason: (req.body && (req.body.reason || req.body.adminRemarks)) || 'Your request did not meet our requirements.',
           platformName: settings?.fromName || 'Vxness',
           supportEmail: settings?.fromEmail || 'support@vxness.in',
@@ -1084,7 +1084,7 @@ router.put('/transaction/:id/approve', async (req, res) => {
 
           paymentMethod: transaction.paymentMethod || 'Wallet',
 
-          date: new Date().toLocaleString(),
+          date: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }),
 
           newBalance: wallet.balance.toFixed(2),
 
@@ -1189,7 +1189,7 @@ router.put('/transaction/:id/reject', async (req, res) => {
           amount: transaction.amount.toFixed(2),
           transactionId: transaction._id.toString(),
           paymentMethod: transaction.paymentMethod || 'Wallet',
-          date: new Date().toLocaleString(),
+          date: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }),
           reason: adminRemarks || 'Your request did not meet our requirements.',
           platformName: settings?.fromName || 'Vxness',
           supportEmail: settings?.fromEmail || 'support@vxness.in',

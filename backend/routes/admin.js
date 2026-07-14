@@ -378,7 +378,7 @@ router.put('/users/:id/ban', async (req, res) => {
           firstName: user.firstName || user.email.split('@')[0],
           email: user.email,
           reason: reason || 'Policy violation',
-          date: new Date().toLocaleString(),
+          date: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }),
           platformName: settings?.fromName || 'vxness',
           loginUrl: settings?.loginUrl || 'https://vxness.in/user/login',
           supportEmail: settings?.fromEmail || 'support@vxness.in',

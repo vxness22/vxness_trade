@@ -109,14 +109,43 @@ export const sendOtpDirect = async (toEmail, otp, expiryMinutes = 10) => {
 
     const fromName = settings.fromName || 'Vxness'
     const fromEmail = settings.fromEmail || settings.smtpUser
+    const logoUrl = process.env.EMAIL_LOGO_URL || 'https://vxness.in/logo.png'
 
-    const html = `
-      <div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#0f1115;color:#e6e6e6;border-radius:12px">
-        <h2 style="margin:0 0 8px;color:#fff">Admin Login Verification</h2>
-        <p style="margin:0 0 16px;color:#9aa0a6">Use the code below to sign in. It expires in ${expiryMinutes} minutes.</p>
-        <div style="font-size:32px;font-weight:700;letter-spacing:8px;padding:16px 0;text-align:center;background:#1b1f27;border-radius:8px;color:#4ade80">${otp}</div>
-        <p style="margin:16px 0 0;color:#6b7280;font-size:12px">If you didn't request this, ignore this email.</p>
-      </div>`
+    // Same centered-logo design as the other Vxness email templates.
+    const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0a0a0a;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:32px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#12131a;border:1px solid #23262f;border-radius:16px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;">
+        <tr><td align="center" style="padding:36px 40px 0;">
+          <img src="${logoUrl}" alt="Vxness" width="150" style="display:block;margin:0 auto;width:150px;max-width:60%;height:auto;border:0;">
+        </td></tr>
+        <tr><td align="center" style="padding:18px 40px 0;">
+          <div style="width:48px;height:3px;background:#22c55e;border-radius:3px;font-size:0;line-height:0;">&nbsp;</div>
+        </td></tr>
+        <tr><td style="padding:22px 40px 0;">
+          <h1 style="color:#ffffff;font-size:22px;font-weight:700;margin:0 0 6px;text-align:center;">Admin Login Verification</h1>
+          <p style="color:#8b909c;font-size:14px;margin:0;text-align:center;">Use the code below to sign in</p>
+        </td></tr>
+        <tr><td style="padding:22px 40px 8px;color:#c7ccd6;font-size:15px;line-height:1.7;">
+          <div style="background:#0d0e14;border:1px dashed #22c55e;border-radius:12px;padding:22px;text-align:center;margin:8px 0 14px;">
+            <div style="color:#8b909c;font-size:12px;letter-spacing:2px;margin-bottom:10px;">VERIFICATION CODE</div>
+            <div style="color:#22c55e;font-size:34px;font-weight:700;letter-spacing:10px;">${otp}</div>
+          </div>
+          <p style="margin:0;color:#8b909c;font-size:13px;text-align:center;">This code expires in ${expiryMinutes} minutes. If you didn't request it, please ignore this email.</p>
+        </td></tr>
+        <tr><td style="padding:20px 40px 34px;">
+          <div style="border-top:1px solid #23262f;padding-top:20px;text-align:center;">
+            <p style="color:#5b606b;font-size:12px;margin:0;">© ${new Date().getFullYear()} ${fromName}. All rights reserved.</p>
+          </div>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
 
     const info = await transport.sendMail({
       from: `"${fromName}" <${fromEmail}>`,
