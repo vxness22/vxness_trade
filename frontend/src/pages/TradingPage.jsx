@@ -3757,6 +3757,13 @@ const TradingPage = () => {
                               const d = new Date(t.openedAt || t.createdAt)
                               return (!min || d < min) ? d : min
                             }, null)
+                            // SL/TP for the netted row: show the shared value when every
+                            // trade in the group agrees (e.g. a single trade); a mix of
+                            // different brackets stays "—". Reads sl/stopLoss + tp/takeProfit.
+                            const slVals = group.trades.map(t => Number(t.stopLoss ?? t.sl) || 0)
+                            const tpVals = group.trades.map(t => Number(t.takeProfit ?? t.tp) || 0)
+                            const groupSl = slVals.length && slVals.every(v => v > 0 && v === slVals[0]) ? slVals[0] : 0
+                            const groupTp = tpVals.length && tpVals.every(v => v > 0 && v === tpVals[0]) ? tpVals[0] : 0
                             return (
                               <Fragment key={group.symbol}>
                                 <tr onClick={() => toggleSymbol(group.symbol)} className={`border-t cursor-pointer ${isDarkMode ? 'border-gray-800 hover:bg-[#1a1a1a]' : 'border-gray-200 hover:bg-gray-50'}`}>
@@ -3768,8 +3775,8 @@ const TradingPage = () => {
                                   <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{Math.abs(netLots).toFixed(2)}</td>
                                   <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{formatPrice(group.symbol, avgEntry)}</td>
                                   <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{formatPrice(group.symbol, curPrice)}</td>
-                                  <td className="py-2 px-3 text-xs text-gray-500">—</td>
-                                  <td className="py-2 px-3 text-xs text-gray-500">—</td>
+                                  <td className={`py-2 px-3 text-xs ${groupSl ? (isDarkMode ? 'text-gray-300' : 'text-gray-700') : 'text-gray-500'}`}>{groupSl ? formatPrice(group.symbol, groupSl) : '—'}</td>
+                                  <td className={`py-2 px-3 text-xs ${groupTp ? (isDarkMode ? 'text-gray-300' : 'text-gray-700') : 'text-gray-500'}`}>{groupTp ? formatPrice(group.symbol, groupTp) : '—'}</td>
                                   <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>${group.charges.toFixed(2)}</td>
                                   <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>${group.swap.toFixed(2)}</td>
                                   <td className={`py-2 px-3 text-xs font-medium ${group.netPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>{group.netPnl >= 0 ? '+' : '-'}${Math.abs(group.netPnl).toFixed(2)}</td>
