@@ -51,24 +51,42 @@ function loadChartingLibrary() {
 
 const CHART_SAVE_KEY = 'vxness_chart_layout_v1'
 
-// Hide the TradingView branding logo (bottom-left of the chart). It renders as an
-// anchor to tradingview.com; the CSS-module classes are hashed, so target the link.
-const CSS_HIDE_TV_LOGO = 'a[href^="https://www.tradingview.com"]{display:none!important;}#tv-attr-logo,#tv-logo{display:none!important;}'
+// Hide the "Chart by TradingView" branding logo (bottom-left). It renders as an
+// anchor (text "Chart by TradingView" / link to tradingview.com); the CSS-module
+// classes are hashed, so we hide it by href/text via CSS + a JS sweep.
+const CSS_HIDE_TV_LOGO = 'a[href*="tradingview.com"]{display:none!important;}#tv-attr-logo,#tv-logo{display:none!important;}'
 function injectHideTvLogo(container) {
   try {
-    if (typeof document !== 'undefined' && !document.getElementById('vx-hide-tv-logo')) {
-      const st = document.createElement('style'); st.id = 'vx-hide-tv-logo'; st.textContent = CSS_HIDE_TV_LOGO
-      document.head.appendChild(st)
-    }
-    const iframes = container ? container.querySelectorAll('iframe') : []
-    iframes.forEach((f) => {
-      const doc = f.contentDocument
-      if (doc && !doc.getElementById('vx-hide-tv-logo')) {
-        const st = doc.createElement('style'); st.id = 'vx-hide-tv-logo'; st.textContent = CSS_HIDE_TV_LOGO
-        ;(doc.head || doc.documentElement).appendChild(st)
+    const roots = []
+    if (typeof document !== 'undefined') {
+      if (!document.getElementById('vx-hide-tv-logo')) {
+        const st = document.createElement('style'); st.id = 'vx-hide-tv-logo'; st.textContent = CSS_HIDE_TV_LOGO
+        document.head.appendChild(st)
       }
-    })
-  } catch { /* cross-origin iframe — shouldn't happen for the local library */ }
+      if (container) roots.push(container)
+    }
+    if (container) {
+      container.querySelectorAll('iframe').forEach((f) => {
+        try {
+          const doc = f.contentDocument
+          if (!doc) return
+          roots.push(doc)
+          if (!doc.getElementById('vx-hide-tv-logo')) {
+            const st = doc.createElement('style'); st.id = 'vx-hide-tv-logo'; st.textContent = CSS_HIDE_TV_LOGO
+            ;(doc.head || doc.documentElement).appendChild(st)
+          }
+        } catch { /* cross-origin */ }
+      })
+    }
+    // JS sweep: hide any anchor that is the TradingView branding logo.
+    for (const root of roots) {
+      root.querySelectorAll?.('a').forEach((a) => {
+        const href = a.getAttribute('href') || ''
+        const txt = (a.textContent || '').trim()
+        if (/tradingview\.com/i.test(href) || /by tradingview/i.test(txt)) a.style.display = 'none'
+      })
+    }
+  } catch { /* noop */ }
 }
 
 const CHART_BUY_COLOR = '#3b82f6'
@@ -142,14 +160,18 @@ export default function ChartingLibraryChart({ symbol = 'XAUUSD', interval = '5'
   }, [getQuote])
 
   // Hide the TradingView branding logo once the chart (and its iframe) exist.
-  // Retried for a few seconds because the logo renders shortly after ready.
+  // Retried for ~10s (the logo renders shortly after ready), and re-run on resize
+  // because the adaptive logo re-renders then.
   useEffect(() => {
     if (!ready) return
     const c = containerRef.current
-    injectHideTvLogo(c)
+    const run = () => injectHideTvLogo(c)
+    run()
     let n = 0
-    const iv = setInterval(() => { injectHideTvLogo(c); if (++n > 12) clearInterval(iv) }, 500)
-    return () => clearInterval(iv)
+    const iv = setInterval(() => { run(); if (++n > 20) clearInterval(iv) }, 500)
+    const onResize = () => { run(); setTimeout(run, 300); setTimeout(run, 800) }
+    window.addEventListener('resize', onResize)
+    return () => { clearInterval(iv); window.removeEventListener('resize', onResize) }
   }, [ready])
 
   // Swallow the library's benign "Value is null" context-menu rejection.
