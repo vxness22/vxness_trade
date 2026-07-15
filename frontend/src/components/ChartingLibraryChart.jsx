@@ -230,6 +230,10 @@ export default function ChartingLibraryChart({ symbol = 'XAUUSD', interval = '5'
         container: containerRef.current,
         datafeed: vxnessDatafeed,
         library_path: '/charting_library/',
+        // Injected INTO the chart's own document — the only reliable way to hide
+        // the "Chart by TradingView" branding logo (an outside stylesheet can't
+        // reach inside the chart). Served from frontend/public/tvchart.css.
+        custom_css_url: '/tvchart.css',
         locale: 'en',
         theme: theme === 'light' ? 'Light' : 'Dark',
         autosize: true,

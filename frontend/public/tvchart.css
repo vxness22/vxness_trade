@@ -1,0 +1,17 @@
+/* Custom CSS injected INTO the TradingView chart (via the widget's
+   custom_css_url option) — this reaches inside the chart's own document, so it
+   can hide the "Chart by TradingView" branding logo (bottom-left) that an
+   outside stylesheet/JS can't touch. */
+
+a[href*="tradingview.com"],
+a[href*="tradingview"],
+[class*="chartLogo-"],
+#tv-attr-logo,
+#tv-logo {
+  display: none !important;
+}
+
+/* The branding wrapper (the element that directly contains the logo icon). */
+:has(> [class*="chartLogo-"]) {
+  display: none !important;
+}
