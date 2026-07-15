@@ -78,12 +78,23 @@ function injectHideTvLogo(container) {
         } catch { /* cross-origin */ }
       })
     }
-    // JS sweep: hide any anchor that is the TradingView branding logo.
+    // JS sweep: hide the branding logo whatever its tag. Any anchor pointing to
+    // tradingview.com, OR any element whose ENTIRE text is "…by TradingView"
+    // (so we hit the logo wrapper, not the whole chart), gets display:none.
+    const BRAND = /^(chart|charts|powered)?\s*by tradingview$/i
     for (const root of roots) {
       root.querySelectorAll?.('a').forEach((a) => {
         const href = a.getAttribute('href') || ''
-        const txt = (a.textContent || '').trim()
-        if (/tradingview\.com/i.test(href) || /by tradingview/i.test(txt)) a.style.display = 'none'
+        if (/tradingview\.com/i.test(href)) a.style.display = 'none'
+      })
+      root.querySelectorAll?.('a,div,span,button').forEach((el) => {
+        const txt = (el.textContent || '').trim()
+        if (BRAND.test(txt)) {
+          el.style.display = 'none'
+          if (el.parentElement && (el.parentElement.textContent || '').trim() === txt) {
+            el.parentElement.style.display = 'none'
+          }
+        }
       })
     }
   } catch { /* noop */ }
