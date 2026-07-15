@@ -51,6 +51,26 @@ function loadChartingLibrary() {
 
 const CHART_SAVE_KEY = 'vxness_chart_layout_v1'
 
+// Hide the TradingView branding logo (bottom-left of the chart). It renders as an
+// anchor to tradingview.com; the CSS-module classes are hashed, so target the link.
+const CSS_HIDE_TV_LOGO = 'a[href^="https://www.tradingview.com"]{display:none!important;}#tv-attr-logo,#tv-logo{display:none!important;}'
+function injectHideTvLogo(container) {
+  try {
+    if (typeof document !== 'undefined' && !document.getElementById('vx-hide-tv-logo')) {
+      const st = document.createElement('style'); st.id = 'vx-hide-tv-logo'; st.textContent = CSS_HIDE_TV_LOGO
+      document.head.appendChild(st)
+    }
+    const iframes = container ? container.querySelectorAll('iframe') : []
+    iframes.forEach((f) => {
+      const doc = f.contentDocument
+      if (doc && !doc.getElementById('vx-hide-tv-logo')) {
+        const st = doc.createElement('style'); st.id = 'vx-hide-tv-logo'; st.textContent = CSS_HIDE_TV_LOGO
+        ;(doc.head || doc.documentElement).appendChild(st)
+      }
+    })
+  } catch { /* cross-origin iframe — shouldn't happen for the local library */ }
+}
+
 const CHART_BUY_COLOR = '#3b82f6'
 const CHART_SELL_COLOR = '#ef4444'
 const SL_COLOR = '#f59e0b'
@@ -120,6 +140,17 @@ export default function ChartingLibraryChart({ symbol = 'XAUUSD', interval = '5'
     setQuoteAdjuster(typeof getQuote === 'function' ? getQuote : null)
     return () => setQuoteAdjuster(null)
   }, [getQuote])
+
+  // Hide the TradingView branding logo once the chart (and its iframe) exist.
+  // Retried for a few seconds because the logo renders shortly after ready.
+  useEffect(() => {
+    if (!ready) return
+    const c = containerRef.current
+    injectHideTvLogo(c)
+    let n = 0
+    const iv = setInterval(() => { injectHideTvLogo(c); if (++n > 12) clearInterval(iv) }, 500)
+    return () => clearInterval(iv)
+  }, [ready])
 
   // Swallow the library's benign "Value is null" context-menu rejection.
   useEffect(() => {
