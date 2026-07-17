@@ -468,7 +468,7 @@ export default function ChartingLibraryChart({
           price: p.sl,
           color: SL_COLOR,
           textColor: SL_COLOR,
-          text: `SL ${p.sl.toFixed(dg)}`,
+          text: "", // no on-line text — the left segmented pill carries SL price + P&L
           dashed: true,
         });
       if (p.tp > 0)
@@ -477,7 +477,7 @@ export default function ChartingLibraryChart({
           price: p.tp,
           color: TP_COLOR,
           textColor: TP_COLOR,
-          text: `TP ${p.tp.toFixed(dg)}`,
+          text: "", // no on-line text — the left segmented pill carries TP price + P&L
           dashed: true,
         });
     }
