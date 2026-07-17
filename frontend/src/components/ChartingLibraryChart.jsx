@@ -310,7 +310,7 @@ export default function ChartingLibraryChart({
           // Injected INTO the chart's own document — the only reliable way to hide
           // the "Vxness" branding logo (an outside stylesheet can't
           // reach inside the chart). Served from frontend/public/tvchart.css.
-          custom_css_url: "/tvchart.css",
+          custom_css_url: "/tvchart.css?v=3", // ?v busts Cloudflare's cached copy — bump on edits
           locale: "en",
           theme: theme === "light" ? "Light" : "Dark",
           autosize: true,
