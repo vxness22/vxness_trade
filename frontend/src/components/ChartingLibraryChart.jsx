@@ -318,7 +318,11 @@ export default function ChartingLibraryChart({
           auto_save_delay: 2,
           ...(savedData ? { saved_data: savedData } : {}),
           disabled_features: ["header_symbol_search"],
-          enabled_features: [],
+          // Load the chart iframe from same-origin sameorigin.html so our
+          // custom_css_url (loaded with crossorigin="anonymous") and the JS
+          // sweep can actually reach inside to hide the TradingView logo — a
+          // cross-origin iframe blocks both.
+          enabled_features: ["iframe_loading_same_origin"],
           favorites: {
             intervals: [
               "1",
