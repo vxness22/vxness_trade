@@ -90,24 +90,23 @@ function injectHideTvLogo(container) {
         }
       });
     }
-    // JS sweep: hide the branding logo whatever its tag. Any anchor pointing to
-    // tradingview.com, OR any element whose ENTIRE text is "…by TradingView"
-    // (so we hit the logo wrapper, not the whole chart), gets display:none.
-    const BRAND = /^(chart|charts|powered)?\s*by tradingview$/i;
+    // JS sweep: hide the branding logo whatever its tag. Match anchors by href OR
+    // text (an SVG <title>TradingView</title> pollutes textContent, so we match
+    // "tradingview" anywhere, not an exact string), plus small non-anchor wrappers
+    // whose text mentions "by TradingView".
     for (const root of roots) {
       root.querySelectorAll?.("a").forEach((a) => {
         const href = a.getAttribute("href") || "";
-        if (/tradingview\.com/i.test(href)) a.style.display = "none";
+        if (/tradingview/i.test(href) || /tradingview/i.test(a.textContent || "")) {
+          a.style.display = "none";
+        }
       });
-      root.querySelectorAll?.("a,div,span,button").forEach((el) => {
-        const txt = (el.textContent || "").trim();
-        if (BRAND.test(txt)) {
+      root.querySelectorAll?.("div,span,button").forEach((el) => {
+        if (/by\s*tradingview/i.test(el.textContent || "") && el.children.length <= 2) {
           el.style.display = "none";
-          if (
-            el.parentElement &&
-            (el.parentElement.textContent || "").trim() === txt
-          ) {
-            el.parentElement.style.display = "none";
+          const par = el.parentElement;
+          if (par && /by\s*tradingview/i.test(par.textContent || "") && par.children.length <= 3) {
+            par.style.display = "none";
           }
         }
       });
@@ -1077,6 +1076,40 @@ export default function ChartingLibraryChart({
           pointerEvents: "none",
         }}
       />
+      {/* vxness branding — replaces the "Chart by TradingView" logo (bottom-left). */}
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          left: 10,
+          bottom: 8,
+          display: "flex",
+          alignItems: "center",
+          gap: 5,
+          padding: "3px 9px",
+          borderRadius: 6,
+          background: dark ? "rgba(12,14,18,0.82)" : "rgba(255,255,255,0.82)",
+          pointerEvents: "none",
+          zIndex: 7,
+        }}
+      >
+        <img
+          src={logoImage}
+          alt=""
+          draggable={false}
+          style={{ height: 14, width: "auto", opacity: 0.95 }}
+        />
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 800,
+            letterSpacing: 0.4,
+            color: dark ? "#e5e7eb" : "#111827",
+          }}
+        >
+          vxness
+        </span>
+      </div>
       {failed && (
         <div
           style={{
