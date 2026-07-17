@@ -737,27 +737,20 @@ export default function ChartingLibraryChart({
       return b;
     };
 
-    // Draggable SL/TP button: press & drag up/down → dashed preview → release → confirm → save.
-    const mkDragBtn = (txt, bg, title, p, kind) => {
+    // Attach drag-to-set behaviour to any element: press & drag up/down → dashed
+    // preview (live price + P&L) → release saves the bracket; a plain click opens
+    // a type-a-price dialog. Used on the SL/TP pill's badge + price segments.
+    const attachDrag = (el, p, kind) => {
       const color = kind === "sl" ? SL_COLOR : TP_COLOR;
       const zoneBg =
         kind === "sl" ? "rgba(239,68,68,0.13)" : "rgba(20,184,166,0.13)";
-      const b = document.createElement("button");
-      b.type = "button";
-      b.textContent = txt;
-      b.title = `${title} — drag up/down to set, or click to type`;
-      b.style.cssText = `display:flex;align-items:center;justify-content:center;height:18px;min-width:18px;padding:0 5px;border:0;border-radius:3px;cursor:ns-resize;font-size:10px;font-weight:700;line-height:1;color:#fff;pointer-events:auto;background:${bg};box-shadow:0 1px 3px rgba(0,0,0,.55);`;
-      b.onmouseenter = () => {
-        b.style.filter = "brightness(1.15)";
-      };
-      b.onmouseleave = () => {
-        b.style.filter = "none";
-      };
-      b.onpointerdown = (e) => {
+      el.style.cursor = "ns-resize";
+      el.style.touchAction = "none";
+      el.onpointerdown = (e) => {
         e.preventDefault();
         e.stopPropagation();
         try {
-          b.setPointerCapture(e.pointerId);
+          el.setPointerCapture(e.pointerId);
         } catch {
           /* noop */
         }
@@ -767,7 +760,6 @@ export default function ChartingLibraryChart({
         zone.style.cssText = `position:absolute;left:0;right:0;top:0;height:0;background:${zoneBg};pointer-events:none;z-index:6;`;
         const line = document.createElement("div");
         line.style.cssText = `position:absolute;left:0;right:0;top:0;height:0;border-top:1px dashed ${color};pointer-events:none;z-index:7;`;
-        // Centered on the line so it's obvious which bracket (SL/TP) is dragging.
         const lbl = document.createElement("div");
         lbl.style.cssText = `position:absolute;left:50%;top:0;transform:translate(-50%,-50%);background:${color};color:#fff;font:700 11px system-ui;padding:2px 9px;border-radius:4px;pointer-events:none;z-index:8;white-space:nowrap;box-shadow:0 1px 5px rgba(0,0,0,.5);`;
         overlay.appendChild(zone);
@@ -779,15 +771,15 @@ export default function ChartingLibraryChart({
           return paneY(p.openPrice, g) + calibOffset;
         };
         const cleanup = () => {
-          for (const el of [zone, line, lbl]) {
+          for (const x of [zone, line, lbl]) {
             try {
-              overlay.removeChild(el);
+              overlay.removeChild(x);
             } catch {
               /* noop */
             }
           }
         };
-        b.onpointermove = (ev) => {
+        el.onpointermove = (ev) => {
           if (Math.abs(ev.clientY - startY) > 3) moved = true;
           const r = containerRef.current?.getBoundingClientRect();
           if (!r) return;
@@ -807,17 +799,16 @@ export default function ChartingLibraryChart({
             zone.style.height = `${Math.abs(ey - cy)}px`;
           }
         };
-        b.onpointerup = (ev) => {
-          b.onpointermove = null;
-          b.onpointerup = null;
+        el.onpointerup = (ev) => {
+          el.onpointermove = null;
+          el.onpointerup = null;
           try {
-            b.releasePointerCapture(ev.pointerId);
+            el.releasePointerCapture(ev.pointerId);
           } catch {
             /* noop */
           }
           cleanup();
           if (!moved) {
-            // plain click → type a price
             const cur = kind === "sl" ? p.sl || "" : p.tp || "";
             openDialog({
               title: `${kind === "sl" ? "Stop Loss" : "Take Profit"} — ${p.side} ${p.quantity} ${symU}`,
@@ -839,88 +830,96 @@ export default function ChartingLibraryChart({
           const r = containerRef.current?.getBoundingClientRect();
           const price = r ? priceForY(ev.clientY - r.top) : null;
           if (!price || !(price > 0)) return;
-          // Drag release → save immediately, no confirm dialog (client request).
-          // Drag as many times as you like; each release updates the bracket.
+          // Drag release → save immediately (no dialog). Drag again to re-set.
           saveBracket(p, kind, Number(price.toFixed(dg)));
         };
       };
-      return b;
     };
 
     const myPos = (positions || [])
       .map(normalizePosition)
       .filter((p) => p.symbol === symU && p.openPrice > 0);
-    const btns = [];
-    // Each button lives in its own wrapper so it can ride its OWN line: the SL
-    // button sits on the SL line, the TP button on the TP line, and the ✕ on the
-    // entry line. Fixed horizontal offsets keep them from overlapping when a
-    // bracket isn't set yet (all three rest on the entry line). (client request)
-    const mkWrap = (rightPx) => {
-      const d = document.createElement("div");
-      d.style.cssText = `position:absolute;right:${rightPx}px;transform:translateY(-50%);display:flex;align-items:center;gap:3px;pointer-events:none;visibility:hidden;z-index:6;`;
-      return d;
-    };
-    // A small non-interactive pill that shows the projected P&L in its OWN box,
-    // next to the SL/TP price box (client request).
-    const mkPnlPill = () => {
+    const rows = [];
+    // Left-side segmented pill per line, matching the client's reference:
+    //   [badge] [price] [P&L] [lots] [✕]
+    // Entry pill: side badge (B/S) + entry price + LIVE P&L + lots + close (✕).
+    // SL/TP pill: badge + level price + PROJECTED P&L + lots + remove (✕); badge
+    // and price are drag handles to move the level. When a bracket isn't set, only
+    // its badge shows (a small drag-to-create handle) on the right.
+    const darkPill = theme !== "light";
+    const LEFT_PX = 54; // clear the left drawing toolbar
+    const segBg = darkPill ? "#1b1f27" : "#ffffff";
+    const segFg = darkPill ? "#e5e7eb" : "#111827";
+    const segDim = darkPill ? "#9ca3af" : "#6b7280";
+    const divider = darkPill ? "1px solid rgba(255,255,255,.08)" : "1px solid rgba(0,0,0,.10)";
+    const GREEN = "#16a34a";
+    const RED = "#dc2626";
+    const money = (v) => `${v >= 0 ? "+" : "-"}$${Math.abs(v).toFixed(2)}`;
+
+    const mkSegPill = () => {
       const el = document.createElement("div");
-      el.style.cssText = `display:flex;align-items:center;height:18px;padding:0 6px;border-radius:3px;font-size:10px;font-weight:700;line-height:1;color:#fff;pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.55);white-space:nowrap;`;
-      return el;
+      el.style.cssText = `position:absolute;left:${LEFT_PX}px;transform:translateY(-50%);display:none;align-items:stretch;height:20px;border-radius:4px;overflow:hidden;pointer-events:auto;z-index:6;font:700 10px system-ui;box-shadow:0 1px 4px rgba(0,0,0,.5);`;
+      const mkSeg = (extra) => {
+        const d = document.createElement("div");
+        d.style.cssText = `display:flex;align-items:center;padding:0 6px;white-space:nowrap;${extra || ""}`;
+        return d;
+      };
+      const badge = mkSeg("color:#fff;");
+      const price = mkSeg(`background:${segBg};color:${segFg};border-left:${divider};`);
+      const pnl = mkSeg(`background:${segBg};border-left:${divider};`);
+      const lots = mkSeg(`background:${segBg};color:${segDim};border-left:${divider};`);
+      const x = document.createElement("button");
+      x.type = "button";
+      x.textContent = "✕";
+      x.style.cssText = `display:flex;align-items:center;justify-content:center;padding:0 7px;border:0;border-left:${divider};background:${segBg};color:${segDim};cursor:pointer;font:700 10px system-ui;`;
+      x.onmouseenter = () => { x.style.color = "#ef4444"; };
+      x.onmouseleave = () => { x.style.color = segDim; };
+      el.appendChild(badge);
+      el.appendChild(price);
+      el.appendChild(pnl);
+      el.appendChild(lots);
+      el.appendChild(x);
+      overlay.appendChild(el);
+      return { el, badge, price, pnl, lots, x };
     };
+
     for (const p of myPos) {
-      const sideColor = p.side === "BUY" ? CHART_BUY_COLOR : CHART_SELL_COLOR;
-      const xWrap = mkWrap(BTN_RIGHT_PX);
-      xWrap.appendChild(
-        mkBtn("✕", sideColor, `Close ${p.side} ${p.quantity} ${symU}`, () => {
-          openDialog({
-            title: "Close position",
-            body: `Close ${p.side} ${p.quantity} ${symU} at market?`,
-            confirmLabel: "Close",
-            danger: true,
-            onConfirm: () => closePos(p),
-          });
-        }),
-      );
-      const tpWrap = mkWrap(BTN_RIGHT_PX + 34);
-      const tpBtnEl = mkDragBtn(
-        "TP",
-        "rgba(20,184,166,0.97)",
-        `Take profit ${p.side} ${p.quantity} ${symU}`,
-        p,
-        "tp",
-      );
-      tpWrap.appendChild(tpBtnEl);
-      const tpPnlEl = mkPnlPill();
-      tpWrap.appendChild(tpPnlEl);
-      const slWrap = mkWrap(BTN_RIGHT_PX + 68);
-      const slBtnEl = mkDragBtn(
-        "SL",
-        "rgba(245,158,11,0.97)",
-        `Stop loss ${p.side} ${p.quantity} ${symU}`,
-        p,
-        "sl",
-      );
-      slWrap.appendChild(slBtnEl);
-      const slPnlEl = mkPnlPill();
-      slWrap.appendChild(slPnlEl);
-      overlay.appendChild(xWrap);
-      overlay.appendChild(tpWrap);
-      overlay.appendChild(slWrap);
-      btns.push({
-        id: p.id,
-        entry: p.openPrice,
-        xWrap,
-        tpWrap,
-        slWrap,
-        slBtnEl,
-        tpBtnEl,
-        slPnlEl,
-        tpPnlEl,
-        lastSl: "",
-        lastTp: "",
-      });
+      const sideColor = p.side === "BUY" ? GREEN : RED;
+      // Entry pill
+      const entryPill = mkSegPill();
+      entryPill.badge.textContent = p.side === "BUY" ? "B" : "S";
+      entryPill.badge.style.background = sideColor;
+      entryPill.x.title = `Close ${p.side} ${p.quantity} ${symU}`;
+      entryPill.x.onclick = (e) => {
+        e.stopPropagation();
+        openDialog({
+          title: "Close position",
+          body: `Close ${p.side} ${p.quantity} ${symU} at market?`,
+          confirmLabel: "Close",
+          danger: true,
+          onConfirm: () => closePos(p),
+        });
+      };
+      // SL pill
+      const slPill = mkSegPill();
+      slPill.badge.textContent = "SL";
+      slPill.badge.style.background = RED;
+      attachDrag(slPill.badge, p, "sl");
+      attachDrag(slPill.price, p, "sl");
+      slPill.x.title = "Remove stop loss";
+      slPill.x.onclick = (e) => { e.stopPropagation(); saveBracket(p, "sl", null); };
+      // TP pill
+      const tpPill = mkSegPill();
+      tpPill.badge.textContent = "TP";
+      tpPill.badge.style.background = GREEN;
+      attachDrag(tpPill.badge, p, "tp");
+      attachDrag(tpPill.price, p, "tp");
+      tpPill.x.title = "Remove take profit";
+      tpPill.x.onclick = (e) => { e.stopPropagation(); saveBracket(p, "tp", null); };
+
+      rows.push({ id: p.id, entryPrice: p.openPrice, entryPill, slPill, tpPill });
     }
-    if (btns.length === 0) {
+    if (rows.length === 0) {
       try {
         crossSub?.unsubscribe?.(null, onCross);
       } catch {
@@ -934,54 +933,61 @@ export default function ChartingLibraryChart({
       raf = requestAnimationFrame(sync);
       const g = geom();
       if (!g || calibOffset == null) {
-        for (const b of btns) {
-          b.xWrap.style.visibility = "hidden";
-          b.tpWrap.style.visibility = "hidden";
-          b.slWrap.style.visibility = "hidden";
-        }
+        for (const r of rows)
+          for (const pill of [r.entryPill, r.slPill, r.tpPill]) pill.el.style.display = "none";
         return;
       }
       const h = containerRef.current?.clientHeight || g.h;
       const live = positionsRef.current;
-      const place = (wrap, price) => {
+      const setText = (seg, text) => { if (seg.textContent !== text) seg.textContent = text; };
+      const put = (pill, price) => {
         const y = paneY(price, g) + calibOffset;
-        if (!(y > 8) || y > h - 8) {
-          wrap.style.visibility = "hidden";
-        } else {
-          wrap.style.top = `${y}px`;
-          wrap.style.visibility = "visible";
-        }
+        if (!(y > 8) || y > h - 8) { pill.el.style.display = "none"; return false; }
+        pill.el.style.top = `${y}px`;
+        pill.el.style.display = "flex";
+        return true;
       };
-      for (const b of btns) {
-        const lp = live.find((x) => x.id === b.id) || {};
-        place(b.xWrap, b.entry); // ✕ on the entry line
-        place(b.tpWrap, lp.tp > 0 ? lp.tp : b.entry); // TP button rides the TP line
-        place(b.slWrap, lp.sl > 0 ? lp.sl : b.entry); // SL button rides the SL line
-        // Price on the button; the projected P&L in a SEPARATE pill next to it
-        // (TP → profit if hit, SL → loss if hit). Pill coloured green/red.
-        const money = (v) => `${v >= 0 ? "+" : "-"}$${Math.abs(v).toFixed(2)}`;
-        const paintPill = (el, price) => {
-          if (price > 0) {
-            const pnl = pnlAt(lp, price);
-            el.textContent = money(pnl);
-            el.style.background = pnl >= 0 ? "rgba(16,185,129,0.97)" : "rgba(239,68,68,0.97)";
-            el.style.display = "flex";
+      for (const r of rows) {
+        const lp = live.find((x) => x.id === r.id) || {};
+        const lots = String(lp.quantity ?? "");
+        // Entry — live P&L off the current market price (bid for buy, ask for sell).
+        if (put(r.entryPill, r.entryPrice)) {
+          const t = priceStreamService.getPrice(symU);
+          const cur = t ? (lp.side === "BUY" ? t.bid : t.ask) : r.entryPrice;
+          const pnl = pnlAt(lp, cur);
+          setText(r.entryPill.price, Number(lp.openPrice ?? r.entryPrice).toFixed(dg));
+          setText(r.entryPill.pnl, money(pnl));
+          r.entryPill.pnl.style.color = pnl >= 0 ? GREEN : RED;
+          setText(r.entryPill.lots, lots);
+        }
+        // SL / TP: full pill on its line when set; badge-only drag-to-create
+        // handle on the right (at the entry line) when unset.
+        const bracket = (pill, kind, val) => {
+          const set = val > 0;
+          if (!put(pill, set ? val : r.entryPrice)) return;
+          if (set) {
+            pill.el.style.left = `${LEFT_PX}px`;
+            pill.el.style.right = "auto";
+            const pl = pnlAt(lp, val);
+            setText(pill.price, Number(val).toFixed(dg));
+            setText(pill.pnl, money(pl));
+            pill.pnl.style.color = pl >= 0 ? GREEN : RED;
+            setText(pill.lots, lots);
+            pill.price.style.display = "flex";
+            pill.pnl.style.display = "flex";
+            pill.lots.style.display = "flex";
+            pill.x.style.display = "flex";
           } else {
-            el.style.display = "none";
+            pill.el.style.left = "auto";
+            pill.el.style.right = `${kind === "tp" ? BTN_RIGHT_PX + 34 : BTN_RIGHT_PX + 72}px`;
+            pill.price.style.display = "none";
+            pill.pnl.style.display = "none";
+            pill.lots.style.display = "none";
+            pill.x.style.display = "none";
           }
         };
-        const slTxt = lp.sl > 0 ? `SL ${lp.sl.toFixed(dg)}` : "SL";
-        if (slTxt !== b.lastSl) {
-          b.slBtnEl.textContent = slTxt;
-          b.lastSl = slTxt;
-        }
-        paintPill(b.slPnlEl, lp.sl);
-        const tpTxt = lp.tp > 0 ? `TP ${lp.tp.toFixed(dg)}` : "TP";
-        if (tpTxt !== b.lastTp) {
-          b.tpBtnEl.textContent = tpTxt;
-          b.lastTp = tpTxt;
-        }
-        paintPill(b.tpPnlEl, lp.tp);
+        bracket(r.slPill, "sl", lp.sl);
+        bracket(r.tpPill, "tp", lp.tp);
       }
     };
     raf = requestAnimationFrame(sync);
@@ -993,10 +999,10 @@ export default function ChartingLibraryChart({
       } catch {
         /* noop */
       }
-      for (const b of btns) {
-        for (const el of [b.xWrap, b.tpWrap, b.slWrap]) {
+      for (const r of rows) {
+        for (const pill of [r.entryPill, r.slPill, r.tpPill]) {
           try {
-            overlay.removeChild(el);
+            overlay.removeChild(pill.el);
           } catch {
             /* noop */
           }
