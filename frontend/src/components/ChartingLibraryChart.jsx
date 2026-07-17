@@ -229,17 +229,56 @@ export default function ChartingLibraryChart({
     let n = 0;
     const iv = setInterval(() => {
       run();
-      if (++n > 20) clearInterval(iv);
-    }, 500);
+      if (++n > 30) clearInterval(iv);
+    }, 400);
     const onResize = () => {
       run();
       setTimeout(run, 300);
       setTimeout(run, 800);
     };
     window.addEventListener("resize", onResize);
+    // Persistent, debounced observer on the chart iframe's document so a
+    // re-rendered logo is re-hidden immediately (works now the iframe is
+    // same-origin). Debounced because candle ticks mutate the DOM constantly.
+    const observers = [];
+    let obsTimer = null;
+    const debouncedRun = () => {
+      if (obsTimer) return;
+      obsTimer = setTimeout(() => {
+        obsTimer = null;
+        run();
+      }, 400);
+    };
+    const attach = () => {
+      try {
+        c?.querySelectorAll("iframe").forEach((f) => {
+          const body = f.contentDocument?.body;
+          if (body && !body.__vxLogoObs) {
+            body.__vxLogoObs = true;
+            const o = new MutationObserver(debouncedRun);
+            o.observe(body, { childList: true, subtree: true });
+            observers.push(o);
+          }
+        });
+      } catch {
+        /* cross-origin */
+      }
+    };
+    attach();
+    const attachIv = setInterval(attach, 1000);
+    setTimeout(() => clearInterval(attachIv), 15000);
     return () => {
       clearInterval(iv);
+      clearInterval(attachIv);
+      if (obsTimer) clearTimeout(obsTimer);
       window.removeEventListener("resize", onResize);
+      observers.forEach((o) => {
+        try {
+          o.disconnect();
+        } catch {
+          /* noop */
+        }
+      });
     };
   }, [ready]);
 
