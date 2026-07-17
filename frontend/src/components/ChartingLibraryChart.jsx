@@ -944,13 +944,15 @@ export default function ChartingLibraryChart({
         place(b.xWrap, b.entry); // ✕ on the entry line
         place(b.tpWrap, lp.tp > 0 ? lp.tp : b.entry); // TP button rides the TP line
         place(b.slWrap, lp.sl > 0 ? lp.sl : b.entry); // SL button rides the SL line
-        // Show the live price next to SL/TP on the button itself.
-        const slTxt = lp.sl > 0 ? `SL ${lp.sl.toFixed(dg)}` : "SL";
+        // Show the price + projected P&L at that level on the button itself:
+        // TP → profit if hit, SL → loss if hit.
+        const money = (v) => `${v >= 0 ? "+" : "-"}$${Math.abs(v).toFixed(2)}`;
+        const slTxt = lp.sl > 0 ? `SL ${lp.sl.toFixed(dg)}  ${money(pnlAt(lp, lp.sl))}` : "SL";
         if (slTxt !== b.lastSl) {
           b.slBtnEl.textContent = slTxt;
           b.lastSl = slTxt;
         }
-        const tpTxt = lp.tp > 0 ? `TP ${lp.tp.toFixed(dg)}` : "TP";
+        const tpTxt = lp.tp > 0 ? `TP ${lp.tp.toFixed(dg)}  ${money(pnlAt(lp, lp.tp))}` : "TP";
         if (tpTxt !== b.lastTp) {
           b.tpBtnEl.textContent = tpTxt;
           b.lastTp = tpTxt;
