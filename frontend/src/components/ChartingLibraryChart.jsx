@@ -858,13 +858,13 @@ export default function ChartingLibraryChart({
 
     const mkSegPill = () => {
       const el = document.createElement("div");
-      el.style.cssText = `position:absolute;left:${LEFT_PX}px;transform:translateY(-50%);display:none;align-items:stretch;height:20px;border-radius:4px;overflow:hidden;pointer-events:auto;z-index:6;font:700 10px system-ui;box-shadow:0 1px 4px rgba(0,0,0,.5);`;
+      el.style.cssText = `position:absolute;left:${LEFT_PX}px;transform:translateY(-50%);display:none;align-items:stretch;height:20px;border-radius:4px;overflow:hidden;pointer-events:auto;z-index:6;font:700 10px system-ui;box-shadow:0 1px 4px rgba(0,0,0,.5);border:1px solid transparent;box-sizing:border-box;`;
       const mkSeg = (extra) => {
         const d = document.createElement("div");
         d.style.cssText = `display:flex;align-items:center;padding:0 6px;white-space:nowrap;${extra || ""}`;
         return d;
       };
-      const badge = mkSeg("color:#fff;");
+      const badge = mkSeg(`background:${segBg};font-weight:800;`);
       const price = mkSeg(`background:${segBg};color:${segFg};border-left:${divider};`);
       const pnl = mkSeg(`background:${segBg};border-left:${divider};`);
       const lots = mkSeg(`background:${segBg};color:${segDim};border-left:${divider};`);
@@ -888,7 +888,8 @@ export default function ChartingLibraryChart({
       // Entry pill
       const entryPill = mkSegPill();
       entryPill.badge.textContent = p.side === "BUY" ? "B" : "S";
-      entryPill.badge.style.background = sideColor;
+      entryPill.badge.style.color = sideColor;
+      entryPill.el.style.borderColor = sideColor;
       entryPill.x.title = `Close ${p.side} ${p.quantity} ${symU}`;
       entryPill.x.onclick = (e) => {
         e.stopPropagation();
@@ -903,7 +904,8 @@ export default function ChartingLibraryChart({
       // SL pill
       const slPill = mkSegPill();
       slPill.badge.textContent = "SL";
-      slPill.badge.style.background = RED;
+      slPill.badge.style.color = RED;
+      slPill.el.style.borderColor = RED;
       attachDrag(slPill.badge, p, "sl");
       attachDrag(slPill.price, p, "sl");
       slPill.x.title = "Remove stop loss";
@@ -911,7 +913,8 @@ export default function ChartingLibraryChart({
       // TP pill
       const tpPill = mkSegPill();
       tpPill.badge.textContent = "TP";
-      tpPill.badge.style.background = GREEN;
+      tpPill.badge.style.color = GREEN;
+      tpPill.el.style.borderColor = GREEN;
       attachDrag(tpPill.badge, p, "tp");
       attachDrag(tpPill.price, p, "tp");
       tpPill.x.title = "Remove take profit";
