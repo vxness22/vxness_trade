@@ -670,6 +670,31 @@ export default function ChartingLibraryChart({
     const saveBracket = async (pArg, kind, price) => {
       // Read the LIVE position so the OTHER bracket we re-send isn't a stale value.
       const p = positionsRef.current.find((x) => x.id === pArg.id) || pArg;
+      // Restriction: TP must be in the profit direction and SL in the loss
+      // direction relative to the entry — else warn and don't save.
+      // BUY  → TP above entry, SL below entry.  SELL → TP below entry, SL above.
+      if (price != null && price > 0) {
+        const entry = Number(p.openPrice) || 0;
+        const isBuy = p.side === "BUY";
+        let msg = "";
+        if (kind === "tp") {
+          if (isBuy && price <= entry) msg = "Take Profit must be ABOVE the buy price.";
+          else if (!isBuy && price >= entry) msg = "Take Profit must be BELOW the sell price.";
+        } else {
+          if (isBuy && price >= entry) msg = "Stop Loss must be BELOW the buy price.";
+          else if (!isBuy && price <= entry) msg = "Stop Loss must be ABOVE the sell price.";
+        }
+        if (msg) {
+          openDialog({
+            title: `Invalid ${kind === "tp" ? "Take Profit" : "Stop Loss"}`,
+            body: `${msg} (Entry ${entry})`,
+            confirmLabel: "OK",
+            onConfirm: () => {},
+          });
+          onRefresh?.(); // snap the dragged line back to the saved value
+          return;
+        }
+      }
       try {
         const body = {
           tradeId: p.id,
