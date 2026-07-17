@@ -857,8 +857,15 @@ export default function ChartingLibraryChart({
     // bracket isn't set yet (all three rest on the entry line). (client request)
     const mkWrap = (rightPx) => {
       const d = document.createElement("div");
-      d.style.cssText = `position:absolute;right:${rightPx}px;transform:translateY(-50%);display:flex;align-items:center;pointer-events:none;visibility:hidden;z-index:6;`;
+      d.style.cssText = `position:absolute;right:${rightPx}px;transform:translateY(-50%);display:flex;align-items:center;gap:3px;pointer-events:none;visibility:hidden;z-index:6;`;
       return d;
+    };
+    // A small non-interactive pill that shows the projected P&L in its OWN box,
+    // next to the SL/TP price box (client request).
+    const mkPnlPill = () => {
+      const el = document.createElement("div");
+      el.style.cssText = `display:flex;align-items:center;height:18px;padding:0 6px;border-radius:3px;font-size:10px;font-weight:700;line-height:1;color:#fff;pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.55);white-space:nowrap;`;
+      return el;
     };
     for (const p of myPos) {
       const sideColor = p.side === "BUY" ? CHART_BUY_COLOR : CHART_SELL_COLOR;
@@ -883,6 +890,8 @@ export default function ChartingLibraryChart({
         "tp",
       );
       tpWrap.appendChild(tpBtnEl);
+      const tpPnlEl = mkPnlPill();
+      tpWrap.appendChild(tpPnlEl);
       const slWrap = mkWrap(BTN_RIGHT_PX + 68);
       const slBtnEl = mkDragBtn(
         "SL",
@@ -892,6 +901,8 @@ export default function ChartingLibraryChart({
         "sl",
       );
       slWrap.appendChild(slBtnEl);
+      const slPnlEl = mkPnlPill();
+      slWrap.appendChild(slPnlEl);
       overlay.appendChild(xWrap);
       overlay.appendChild(tpWrap);
       overlay.appendChild(slWrap);
@@ -903,6 +914,8 @@ export default function ChartingLibraryChart({
         slWrap,
         slBtnEl,
         tpBtnEl,
+        slPnlEl,
+        tpPnlEl,
         lastSl: "",
         lastTp: "",
       });
@@ -944,19 +957,31 @@ export default function ChartingLibraryChart({
         place(b.xWrap, b.entry); // ✕ on the entry line
         place(b.tpWrap, lp.tp > 0 ? lp.tp : b.entry); // TP button rides the TP line
         place(b.slWrap, lp.sl > 0 ? lp.sl : b.entry); // SL button rides the SL line
-        // Show the price + projected P&L at that level on the button itself:
-        // TP → profit if hit, SL → loss if hit.
+        // Price on the button; the projected P&L in a SEPARATE pill next to it
+        // (TP → profit if hit, SL → loss if hit). Pill coloured green/red.
         const money = (v) => `${v >= 0 ? "+" : "-"}$${Math.abs(v).toFixed(2)}`;
-        const slTxt = lp.sl > 0 ? `SL ${lp.sl.toFixed(dg)}  ${money(pnlAt(lp, lp.sl))}` : "SL";
+        const paintPill = (el, price) => {
+          if (price > 0) {
+            const pnl = pnlAt(lp, price);
+            el.textContent = money(pnl);
+            el.style.background = pnl >= 0 ? "rgba(16,185,129,0.97)" : "rgba(239,68,68,0.97)";
+            el.style.display = "flex";
+          } else {
+            el.style.display = "none";
+          }
+        };
+        const slTxt = lp.sl > 0 ? `SL ${lp.sl.toFixed(dg)}` : "SL";
         if (slTxt !== b.lastSl) {
           b.slBtnEl.textContent = slTxt;
           b.lastSl = slTxt;
         }
-        const tpTxt = lp.tp > 0 ? `TP ${lp.tp.toFixed(dg)}  ${money(pnlAt(lp, lp.tp))}` : "TP";
+        paintPill(b.slPnlEl, lp.sl);
+        const tpTxt = lp.tp > 0 ? `TP ${lp.tp.toFixed(dg)}` : "TP";
         if (tpTxt !== b.lastTp) {
           b.tpBtnEl.textContent = tpTxt;
           b.lastTp = tpTxt;
         }
+        paintPill(b.tpPnlEl, lp.tp);
       }
     };
     raf = requestAnimationFrame(sync);
