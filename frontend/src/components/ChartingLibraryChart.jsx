@@ -95,6 +95,11 @@ function injectHideTvLogo(container) {
     // "tradingview" anywhere, not an exact string), plus small non-anchor wrappers
     // whose text mentions "by TradingView".
     for (const root of roots) {
+      // The branding logo element (identified in the library bundle): a
+      // `brand-H…` container with a `chartLogo…` icon — hide by class directly.
+      root.querySelectorAll?.('[class*="brand-H"], [class*="chartLogo"]').forEach((el) => {
+        el.style.display = "none";
+      });
       root.querySelectorAll?.("a").forEach((a) => {
         const href = a.getAttribute("href") || "";
         if (/tradingview/i.test(href) || /tradingview/i.test(a.textContent || "")) {

@@ -6,12 +6,14 @@
 a[href*="tradingview.com"],
 a[href*="tradingview"],
 [class*="chartLogo-"],
+[class*="brand-H"],
 #tv-attr-logo,
 #tv-logo {
   display: none !important;
 }
 
 /* The branding wrapper (the element that directly contains the logo icon). */
-:has(> [class*="chartLogo-"]) {
+:has(> [class*="chartLogo-"]),
+:has(> [class*="brand-H"]) {
   display: none !important;
 }
