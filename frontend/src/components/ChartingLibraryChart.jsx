@@ -1081,44 +1081,6 @@ export default function ChartingLibraryChart({
           pointerEvents: "none",
         }}
       />
-      {/* vxness branding — an OPAQUE cover positioned over the "Chart by
-          TradingView" logo (bottom-left of the pane) so it's masked no matter
-          what. Sized wide enough to cover the expanded logo. */}
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          left: 8,
-          bottom: 112,
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          minWidth: 200,
-          height: 26,
-          padding: "0 10px",
-          borderRadius: 6,
-          background: dark ? "#0c0e12" : "#ffffff",
-          pointerEvents: "none",
-          zIndex: 8,
-        }}
-      >
-        <img
-          src={logoImage}
-          alt=""
-          draggable={false}
-          style={{ height: 15, width: "auto" }}
-        />
-        <span
-          style={{
-            fontSize: 12,
-            fontWeight: 800,
-            letterSpacing: 0.4,
-            color: dark ? "#e5e7eb" : "#111827",
-          }}
-        >
-          vxness
-        </span>
-      </div>
       {failed && (
         <div
           style={{
