@@ -438,7 +438,9 @@ const TradingPage = () => {
 
     if (sym.includes('JPY')) return n.toFixed(3)
 
-    if (['BTCUSD', 'ETHUSD', 'XAUUSD', 'XAGUSD'].includes(sym)) return n.toFixed(2)
+    if (/^X(AU|AG|PT|PD)/.test(sym)) return n.toFixed(2) // metals → 2 (gold/silver/platinum/palladium), like TradingView
+
+    if (['BTCUSD', 'ETHUSD'].includes(sym)) return n.toFixed(2)
 
     return n.toFixed(5)
 

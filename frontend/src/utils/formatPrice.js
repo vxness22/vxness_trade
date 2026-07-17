@@ -6,7 +6,8 @@ const INDICES = new Set([
 export const formatPrice = (price, symbol) => {
   if (price === null || price === undefined || isNaN(price)) return '-'
   if (symbol?.includes('JPY')) return price.toFixed(3)
-  if (['BTCUSD', 'ETHUSD', 'XAUUSD', 'XAGUSD'].includes(symbol)) return price.toFixed(2)
+  if (/^X(AU|AG|PT|PD)/.test(symbol || '')) return price.toFixed(2) // metals → 2 (gold/silver/platinum/palladium), like TradingView
+  if (['BTCUSD', 'ETHUSD'].includes(symbol)) return price.toFixed(2)
   if (INDICES.has(symbol)) return price.toFixed(2)
   return price.toFixed(5)
 }
