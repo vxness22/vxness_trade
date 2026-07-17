@@ -60,7 +60,7 @@ const CHART_SAVE_KEY = "vxness_chart_layout_v1";
 // anchor (text "Vxness" / link to tradingview.com); the CSS-module
 // classes are hashed, so we hide it by href/text via CSS + a JS sweep.
 const CSS_HIDE_TV_LOGO =
-  'a[href*="tradingview.com"]{display:none!important;}#tv-attr-logo,#tv-logo{display:none!important;}';
+  'a[href*="tradingview.com"],[class*="brand-H"],[class*="chartLogo"],#tv-attr-logo,#tv-logo{display:none!important;}';
 function injectHideTvLogo(container) {
   try {
     const roots = [];
