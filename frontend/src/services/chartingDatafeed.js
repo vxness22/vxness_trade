@@ -293,6 +293,8 @@ export const vxnessDatafeed = {
     const res = String(resolution)
     const tfSec = RES_SECONDS[res] || 300
     let bar = null
+    let lastSeenTickTime = 0 // last tick.time we processed — detects a genuinely new tick
+    let lastTickAt = 0 // wall-clock ms when we last saw a new tick (market-live check)
     const id = `chart-bars-${listenerGuid}`
 
     // Build the forming candle straight from the price stream using the SAME
@@ -302,14 +304,29 @@ export const vxnessDatafeed = {
       const tick = prices?.[sym]
       const price = displayedBid(sym, tick)
       if (!(price > 0)) return
-      const tsec = Math.floor(((tick && tick.time) || Date.now()) / 1000)
-      const barStart = Math.floor(tsec / tfSec) * tfSec
-      if (!bar || bar.time !== barStart) {
+      const now = Date.now()
+      const tickMs = (tick && tick.time) || now
+      if (tickMs !== lastSeenTickTime) { lastSeenTickTime = tickMs; lastTickAt = now }
+
+      // While the market is LIVE (a fresh tick within 90s), drive the candle
+      // boundary off the WALL CLOCK so a new candle opens on time even during a
+      // lull — otherwise the candle "sticks" until the next tick arrives. When
+      // the market is quiet/closed, freeze on the last real tick time so we don't
+      // paint fake flat candles (e.g. weekends).
+      const marketLive = now - lastTickAt < 90000
+      const boundaryMs = marketLive ? now : tickMs
+      const barStart = Math.floor(Math.floor(boundaryMs / 1000) / tfSec) * tfSec
+
+      if (!bar || barStart > bar.time) {
+        // New period → open a fresh candle at the last price.
         bar = { time: barStart, open: price, high: price, low: price, close: price }
-      } else {
+      } else if (barStart === bar.time) {
         if (price > bar.high) bar.high = price
         if (price < bar.low) bar.low = price
         bar.close = price
+      } else {
+        // Out-of-order / backward tick — ignore so the candle never jumps back.
+        return
       }
       onTick({ time: bar.time * 1000, open: bar.open, high: bar.high, low: bar.low, close: bar.close, volume: 0 })
     })
