@@ -908,8 +908,7 @@ export default function ChartingLibraryChart({
       slPill.el.style.borderColor = RED;
       attachDrag(slPill.badge, p, "sl");
       attachDrag(slPill.price, p, "sl");
-      slPill.x.title = "Remove stop loss";
-      slPill.x.onclick = (e) => { e.stopPropagation(); saveBracket(p, "sl", null); };
+      slPill.x.remove(); // no ✕ icon on SL (client request) — clear it via click-to-type
       // TP pill
       const tpPill = mkSegPill();
       tpPill.badge.textContent = "TP";
@@ -917,8 +916,7 @@ export default function ChartingLibraryChart({
       tpPill.el.style.borderColor = GREEN;
       attachDrag(tpPill.badge, p, "tp");
       attachDrag(tpPill.price, p, "tp");
-      tpPill.x.title = "Remove take profit";
-      tpPill.x.onclick = (e) => { e.stopPropagation(); saveBracket(p, "tp", null); };
+      tpPill.x.remove(); // no ✕ icon on TP (client request) — clear it via click-to-type
 
       rows.push({ id: p.id, entryPrice: p.openPrice, entryPill, slPill, tpPill });
     }
