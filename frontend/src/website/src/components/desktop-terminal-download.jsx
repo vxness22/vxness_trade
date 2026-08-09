@@ -5,7 +5,17 @@ import { Monitor } from "lucide-react"
 // frontend/dist, which `npm run build` wipes). Absolute rather than relative:
 // only the vxness.in server block defines `location /downloads/`, so a visitor
 // on trade. or admin. would otherwise get the SPA's index.html instead of a file.
-export const WINDOWS_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.exe"
+//
+// ?v= is NOT decoration — bump it on every installer release.
+//
+// nginx sends `Cache-Control: public, max-age=14400` on /downloads/, and
+// Cloudflare honours it. Replacing the file on the origin therefore changes
+// nothing for up to four hours: the CDN keeps answering cf-cache-status: HIT
+// with the PREVIOUS build, at its old Content-Length and Last-Modified. That is
+// the worst kind of stale, because the download succeeds and looks correct.
+// The query string is part of Cloudflare's cache key, so bumping it forces a
+// MISS and pulls the new binary through. Same trick as tvchart.css?v=3.
+export const WINDOWS_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.exe?v=1.1.0"
 
 // Flip to the .dmg URL once a macOS build has been produced and uploaded — the
 // installer can only be built and notarised on a Mac.
