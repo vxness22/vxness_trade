@@ -1,0 +1,7 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/">
+        <file>vxness-256.png</file>
+        <file>vxness.ico</file>
+    </qresource>
+</RCC>
