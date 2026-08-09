@@ -18,6 +18,8 @@ import barAggregator from './services/barAggregator.js'
 
 import { initBarHub } from './ws/barHub.js'
 
+import { initAlgoPriceHub } from './ws/algoPriceHub.js'
+
 import authRoutes from './routes/auth.js'
 
 import adminRoutes from './routes/admin.js'
@@ -68,6 +70,10 @@ import technicalAnalysisRoutes from './routes/technicalAnalysis.js'
 
 import marginAlertsRoutes from './routes/marginAlerts.js'
 
+import algoRoutes from './routes/algo.js'
+
+import v1Routes from './routes/v1.js'
+
 import path from 'path'
 
 import { fileURLToPath } from 'url'
@@ -103,6 +109,11 @@ const httpServer = createServer(app)
 // Live OHLC bar streaming for the Charting Library datafeed (path /ws/bars).
 // Runs on the same HTTP server as Socket.IO (which uses /socket.io/).
 initBarHub(httpServer)
+
+// Live tick stream for the desktop terminal (path /ws/algo/prices). Like the
+// bar hub it routes its own upgrades, so it sits alongside Socket.IO without
+// stealing /socket.io/ handshakes.
+initAlgoPriceHub(httpServer)
 
 
 
@@ -376,6 +387,43 @@ setInterval(async () => {
 
 
 
+// Background pending-order execution every 2 seconds.
+//
+// Until now PENDING orders were only converted when a client called
+// POST /api/trade/check-pending, so an order sat unfilled whenever nobody had
+// the web terminal open. The desktop terminal places pending orders and can
+// then be closed, which makes that gap obvious — this runs the same check
+// server-side, alongside the SL/TP and stop-out loops above.
+setInterval(async () => {
+
+  try {
+
+    if (priceCache.size === 0) return
+
+    const currentPrices = {}
+
+    priceCache.forEach((data, symbol) => {
+
+      currentPrices[symbol] = { bid: data.bid, ask: data.ask }
+
+    })
+
+    const executed = await tradeEngine.checkPendingOrders(currentPrices)
+
+    if (executed.length > 0) {
+
+      console.log(`[PENDING AUTO] ${executed.length} pending order(s) executed`)
+
+    }
+
+  } catch (error) {
+
+    // Silent fail - don't spam logs
+
+  }
+
+}, 2000)
+
 
 
 io.on('connection', (socket) => {
@@ -579,6 +627,12 @@ app.use('/api/bonus', bonusRoutes)
 app.use('/api/technical-analysis', technicalAnalysisRoutes)
 
 app.use('/api/margin-alerts', marginAlertsRoutes)
+
+// Desktop terminal surface. /api/algo is key/secret authenticated (market data
+// + execution); /api/v1 is JWT authenticated (sign-in, accounts, blotter).
+app.use('/api/algo', algoRoutes)
+
+app.use('/api/v1', v1Routes)
 
 
 
