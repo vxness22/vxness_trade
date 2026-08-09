@@ -54,10 +54,30 @@ Config Config::load() {
         for (const QJsonValue& v : o.value("chartSymbols").toArray())
             c.chartSymbols << v.toString();
     }
-    if (o.contains("restBase") && !o.value("restBase").toString().isEmpty())
-        c.restBase = o.value("restBase").toString();
-    if (o.contains("wsUrl") && !o.value("wsUrl").toString().isEmpty())
-        c.wsUrl = o.value("wsUrl").toString();
+    // Stored endpoints are accepted only if they still address THIS API shape.
+    //
+    // The Vxness terminal published in July 2025 wrote
+    //     restBase = "https://api.vxness.in/api"
+    // and shares this config path, so an upgrade inherits it. That base is not
+    // merely unusable — it fails in a way that reads like a broken account.
+    // ApiClient derives the platform routes as restBase.replace("/api/algo",
+    // "/api/v1"), which is a no-op on a bare "/api", so sign-in POSTs to
+    // /api/auth/login — a route that EXISTS (it is the website's) and returns a
+    // token. The terminal then asks /api/accounts, gets 404, and reports an
+    // empty account list to someone who demonstrably just signed in.
+    //
+    // So: keep a stored base only when it names the algo gateway, otherwise
+    // fall back to the compiled default. A trader who genuinely wants another
+    // host still sets it in the sign-in dialog, which writes a value that
+    // satisfies this check.
+    const QString storedRest = o.value("restBase").toString();
+    if (storedRest.contains(QStringLiteral("/api/algo")))
+        c.restBase = storedRest;
+
+    const QString storedWs = o.value("wsUrl").toString();
+    if (storedWs.contains(QStringLiteral("/ws/algo/")))
+        c.wsUrl = storedWs;
+
     return c;
 }
 

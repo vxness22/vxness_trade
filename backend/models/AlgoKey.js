@@ -24,10 +24,11 @@ const algoKeySchema = new mongoose.Schema({
     index: true
   },
   apiKey: {
+    // `unique` already builds the index — adding `index: true` as well is what
+    // makes Mongoose warn about a duplicate index definition.
     type: String,
     required: true,
-    unique: true,
-    index: true
+    unique: true
   },
   secretHash: {
     type: String,

@@ -16,11 +16,12 @@ const refreshTokenSchema = new mongoose.Schema({
     index: true
   },
   // SHA-256 of the token. A leak of this collection must not hand out sessions.
+  // `unique` already builds the index; declaring `index: true` too is what
+  // makes Mongoose warn about a duplicate index definition.
   tokenHash: {
     type: String,
     required: true,
-    unique: true,
-    index: true
+    unique: true
   },
   expiresAt: {
     type: Date,
