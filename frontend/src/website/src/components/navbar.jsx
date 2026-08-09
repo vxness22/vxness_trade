@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { Menu, X, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { LoginDialog, OpenAccountDialog } from "@/components/auth-dialogs"
-import { DesktopTerminalDownload } from "@/components/desktop-terminal-download"
+import { DesktopTerminalDownload, WindowsLogo, WINDOWS_URL } from "@/components/desktop-terminal-download"
 
 const marketLinks = [
   { href: "/markets/forex", label: "Forex" },
@@ -34,10 +34,6 @@ export function Navbar() {
   }, [])
 
   return (
-    <>
-    {/* Floating desktop-terminal download launcher — sits outside <header> so it
-        keeps its own stacking context above the nav and the hero. */}
-    <DesktopTerminalDownload />
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         isScrolled ? "bg-white/95 backdrop-blur-md shadow-sm" : "bg-transparent"
@@ -115,6 +111,7 @@ export function Navbar() {
 
           {/* Desktop CTA Buttons */}
           <div className="hidden lg:flex items-center gap-3">
+            <DesktopTerminalDownload />
             <Link to="/user/login">
               <Button className={`text-sm font-medium bg-emerald-500 hover:bg-emerald-600 text-white px-6`}>
                 Log In
@@ -175,6 +172,14 @@ export function Navbar() {
               <Link to="/partnership" className={`block text-sm font-medium py-2 pl-3 hover:text-primary transition-colors ${isScrolled ? "text-foreground" : "text-white"}`} onClick={() => setIsMobileMenuOpen(false)}>Partnership</Link>
               <Link to="/about" className={`block text-sm font-medium py-2 pl-3 hover:text-primary transition-colors ${isScrolled ? "text-foreground" : "text-white"}`} onClick={() => setIsMobileMenuOpen(false)}>About Us</Link>
               <div className="flex flex-col gap-3 pt-4">
+                {/* The desktop launcher is lg-only, so without this row a phone
+                    or tablet visitor has no route to the installer at all. */}
+                <a href={WINDOWS_URL} onClick={() => setIsMobileMenuOpen(false)}>
+                  <Button className="w-full bg-gradient-to-r from-emerald-500 to-lime-500 hover:from-emerald-400 hover:to-lime-400 text-white">
+                    <WindowsLogo className="w-4 h-4 mr-2" />
+                    Desktop Terminal for Windows
+                  </Button>
+                </a>
                 <Link to="/user/login" onClick={() => setIsMobileMenuOpen(false)}>
                   <Button className={`w-full bg-emerald-500 hover:bg-emerald-600 text-white`}>Log In</Button>
                 </Link>
@@ -187,6 +192,5 @@ export function Navbar() {
         )}
       </div>
     </header>
-    </>
   )
 }
