@@ -20,6 +20,11 @@ struct Palette {
     QString text, textStrong, muted, dim;
     // semantic
     QString accent, accentHover, up, down, warn;
+    // The vxness brand sweep as a ready-to-paste QSS qlineargradient(...).
+    // Use it wherever the accent FILLS a surface; `accent` stays the solid
+    // equivalent for the places a gradient is not a legal value (border-color,
+    // color, selection-background-color).
+    QString accentGrad;
     // inputs
     QString inputBg, inputBorder;
     // watchlist cards

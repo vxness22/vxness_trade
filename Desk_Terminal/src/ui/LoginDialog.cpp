@@ -59,25 +59,28 @@ QComboBox#input QAbstractItemView {
     background: %CARDBG%; color: %TEXTSTRONG%; border: 1px solid %BORDER%;
     border-radius: 8px; padding: 4px; selection-background-color: %MENUSEL%; outline: none;
 }
-/* Vxness red, to match the brand panel beside it. Safe here and only here:
-   #primary is the sign-in button and nothing else, so this does not bleed into
-   the trading UI, where red means SELL. */
+/* The vxness green gradient, matching the brand panel beside it.
+   #primary (Sign in) and #success (Connect) are the two steps of one flow and
+   never appear together, so they share the brand ramp rather than competing —
+   the same action colour carries the user from one step to the next.
+   Green here does NOT collide with BUY: the trading UI takes Theme::p().up for
+   that, a flat forest green, while this is the logo's cyan-to-lime sweep. */
 QPushButton#primary {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #c4161c, stop:1 #8f1015);
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0d9b6a, stop:1 #7fc41a);
     color: #ffffff; border: none; border-radius: 10px;
     font-size: 13px; font-weight: 800; letter-spacing: 0.3px;
 }
 QPushButton#primary:hover {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #d81b22, stop:1 #a51218);
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #12b87e, stop:1 #93d827);
 }
 QPushButton#primary:disabled { background: %BTNBG%; color: %DIM%; }
 QPushButton#success {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #15803d, stop:1 #22a95b);
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0d9b6a, stop:1 #7fc41a);
     color: #ffffff; border: none; border-radius: 10px;
     font-size: 13px; font-weight: 800;
 }
 QPushButton#success:hover {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1a9549, stop:1 #2ec27e);
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #12b87e, stop:1 #93d827);
 }
 QPushButton#link {
     background: transparent; border: none; color: %MUTED%;
@@ -199,17 +202,17 @@ QWidget* LoginDialog::buildBrandPanel() {
     auto* p = new QFrame;
     p->setObjectName("brand");
     p->setFixedWidth(290);
-    // Vxness red on black: a deep crimson bleeding into the app's darkest
-    // surface in dark mode, the brand red itself in light mode. Both keep the
-    // white/near-white brand type readable.
+    // The vxness green gradient: the logo's cyan-through-green-into-lime sweep,
+    // bleeding into the app's darkest surface in dark mode and carried at full
+    // saturation in light mode. Both keep the white/near-white brand type
+    // readable, which is why the dark variant lands so much deeper.
     //
-    // This is the only red-forward surface in the app on purpose. Red means
-    // SELL everywhere else (Theme::p().down), so the accent used by buttons,
-    // selections and focus rings stays blue — recolouring those would make
-    // every primary action read as a sell.
+    // This was a red panel while the build was branded TuskaEx. Red was chosen
+    // then because the accent stayed blue and could not be confused with SELL;
+    // now the whole theme is the brand green, so the panel simply follows it.
     const QString grad = Theme::isDark()
-        ? "stop:0 #4a1015, stop:0.55 #24090c, stop:1 #0f1116"
-        : "stop:0 #c4161c, stop:0.55 #9d1015, stop:1 #6d0a0e";
+        ? "stop:0 #0c5f4a, stop:0.55 #0a2a22, stop:1 #0f1116"
+        : "stop:0 #0d8fa8, stop:0.55 #12a05a, stop:1 #5f9f10";
     p->setStyleSheet(QString("#brand{background:qlineargradient(x1:0,y1:0,x2:0.7,y2:1,%1);"
                              "border-top-left-radius:16px;border-bottom-left-radius:16px;}")
                      .arg(grad));
@@ -254,10 +257,10 @@ QWidget* LoginDialog::buildBrandPanel() {
     v->addWidget(bullet(tr("Positions, pending orders and full trade history")));
 
     v->addStretch();
-    auto* foot = new QLabel(tr("Secure sign-in · api.vxness.in"));
-    foot->setStyleSheet(QString("background:transparent; color:%1; font-size:10px;"
-                                "font-weight:600;").arg(dark ? "#664d51" : "#e2adb0"));
-    v->addWidget(foot);
+    // No endpoint footer here on purpose. It named the host in small print on
+    // the brand panel, which told a trader nothing they could act on and went
+    // stale the moment the endpoint was changed in Advanced settings — where
+    // the actual value is shown, editable, and correct.
     return p;
 }
 

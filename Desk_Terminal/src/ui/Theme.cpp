@@ -16,25 +16,30 @@ const Palette DARK = {
     /* muted        */ "#7c828c",
     /* dim          */ "#6b7280",
 
-    /* accent       */ "#3b82f6",
-    /* accentHover  */ "#2563eb",
+    /* accent       */ "#2fbf71",
+    /* accentHover  */ "#26a35f",
     /* up           */ "#26a269",
     /* down         */ "#e01b24",
     /* warn         */ "#f59e0b",
+    // The logo's own sweep, sampled from resources/vxness-256.png: cyan through
+    // green into lime. The cyan and lime ends are what keep it distinguishable
+    // from `up` — see the note above LIGHT.
+    /* accentGrad   */ "qlineargradient(x1:0, y1:0, x2:1, y2:0,"
+                       " stop:0 #0fa8c8, stop:0.5 #2fbf71, stop:1 #8fd014)",
 
     /* inputBg      */ "#1a1d23",
     /* inputBorder  */ "#2a2e36",
 
     /* cardBg       */ "#14161b",
     /* cardBorder   */ "#23262e",
-    /* cardHover    */ "#3a4358",
-    /* cardSelBg    */ "#172033",
-    /* cardSelBorder*/ "#3b82f6",
+    /* cardHover    */ "#2c4a3c",
+    /* cardSelBg    */ "#12281d",
+    /* cardSelBorder*/ "#2fbf71",
 
     /* tableBg      */ "#0f1115",
     /* tableAlt     */ "#12141a",
     /* rowHover     */ "#171b22",
-    /* rowSel       */ "#1c2b4a",
+    /* rowSel       */ "#17342a",
     /* rowSelText   */ "#ffffff",
 
     /* btnBg        */ "#22262e",
@@ -44,7 +49,7 @@ const Palette DARK = {
 
     /* menuBg       */ "#16181d",
     /* menuBorder   */ "#2a2e36",
-    /* menuSel      */ "#1e2a44",
+    /* menuSel      */ "#193326",
 
     /* scrollHandle */ "#2c313a",
     /* scrollHover  */ "#3a404b",
@@ -53,13 +58,19 @@ const Palette DARK = {
 };
 
 // MetaTrader-style light scheme: grey window chrome, white data surfaces, a
-// visible 1px grid on every table and a deep-blue brand/accent. The terminal
-// defaults to this mode because the MT5 layout it now mirrors is a light UI.
+// visible 1px grid on every table and the vxness green brand/accent. The
+// terminal defaults to this mode because the MT5 layout it mirrors is light.
+//
+// ONE THING TO WATCH: the accent is now green, and green also means "up" /
+// BUY (`up` below). They are deliberately different tones — the brand is a
+// cyan-to-lime sweep, `up` is a flat forest green — but if a control ever reads
+// as a BUY when it is not, this is why. BUY/SELL surfaces never use `accent`;
+// they take `up`/`down` explicitly, so the two only ever meet by eye.
 const Palette LIGHT = {
     /* bg           */ "#eef0f3",
     /* panel        */ "#f4f5f7",
     /* panelAlt     */ "#e6e9ee",
-    /* headerBg     */ "#1a5fb4",   // the blue brand strip above the menu bar
+    /* headerBg     */ "#128a4e",   // the green brand strip above the menu bar
     /* border       */ "#c3c8d1",
 
     /* text         */ "#1f2430",
@@ -67,25 +78,29 @@ const Palette LIGHT = {
     /* muted        */ "#5a6472",
     /* dim          */ "#8a94a3",
 
-    /* accent       */ "#1a5fb4",
-    /* accentHover  */ "#14498a",
+    /* accent       */ "#128a4e",
+    /* accentHover  */ "#0e6b3c",
     /* up           */ "#127a35",
     /* down         */ "#c01c28",
     /* warn         */ "#b45309",
+    // Darker stops than the dark theme's: the same cyan/lime on white washes
+    // out and drops white button text below a readable contrast ratio.
+    /* accentGrad   */ "qlineargradient(x1:0, y1:0, x2:1, y2:0,"
+                       " stop:0 #0d8fa8, stop:0.5 #128a4e, stop:1 #6faf10)",
 
     /* inputBg      */ "#ffffff",
     /* inputBorder  */ "#b9bfca",
 
     /* cardBg       */ "#ffffff",
     /* cardBorder   */ "#c3c8d1",
-    /* cardHover    */ "#8fb0dd",
-    /* cardSelBg    */ "#cfe0f7",
-    /* cardSelBorder*/ "#1a5fb4",
+    /* cardHover    */ "#8fd4ab",
+    /* cardSelBg    */ "#d3f0de",
+    /* cardSelBorder*/ "#128a4e",
 
     /* tableBg      */ "#ffffff",
     /* tableAlt     */ "#f6f8fa",
-    /* rowHover     */ "#e8f0fb",
-    /* rowSel       */ "#cfe0f7",
+    /* rowHover     */ "#e9f7ef",
+    /* rowSel       */ "#d3f0de",
     /* rowSelText   */ "#0d1117",
 
     /* btnBg        */ "#e9ecf1",
@@ -95,7 +110,7 @@ const Palette LIGHT = {
 
     /* menuBg       */ "#ffffff",
     /* menuBorder   */ "#b9bfca",
-    /* menuSel      */ "#cfe0f7",
+    /* menuSel      */ "#d3f0de",
 
     /* scrollHandle */ "#b6bcc7",
     /* scrollHover  */ "#98a0ad",
@@ -260,6 +275,7 @@ QMenu::item:selected { background: %MENUSEL%; }
         .replace("%TEXT%",        c.text)
         .replace("%MUTED%",       c.muted)
         .replace("%DIM%",         c.dim)
+        .replace("%ACCENTGRAD%",  c.accentGrad)
         .replace("%ACCENT%",      c.accent)
         .replace("%INPUTBG%",     c.inputBg)
         .replace("%INPUTBORDER%", c.inputBorder)
