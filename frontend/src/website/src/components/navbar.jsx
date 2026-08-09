@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { Menu, X, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { LoginDialog, OpenAccountDialog } from "@/components/auth-dialogs"
+import { DesktopTerminalDownload } from "@/components/desktop-terminal-download"
 
 const marketLinks = [
   { href: "/markets/forex", label: "Forex" },
@@ -33,6 +34,10 @@ export function Navbar() {
   }, [])
 
   return (
+    <>
+    {/* Floating desktop-terminal download launcher — sits outside <header> so it
+        keeps its own stacking context above the nav and the hero. */}
+    <DesktopTerminalDownload />
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         isScrolled ? "bg-white/95 backdrop-blur-md shadow-sm" : "bg-transparent"
@@ -182,5 +187,6 @@ export function Navbar() {
         )}
       </div>
     </header>
+    </>
   )
 }
