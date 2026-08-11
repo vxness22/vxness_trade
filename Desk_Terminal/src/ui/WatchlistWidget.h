@@ -29,6 +29,9 @@ public slots:
     void updateQuote(const Quote& q);
     void applyTheme();
 
+protected:
+    void resizeEvent(QResizeEvent* e) override;
+
 signals:
     void symbolActivated(const QString& symbol);
     // Double-click is the MT5 gesture for "trade this one" — it opens the
@@ -47,6 +50,8 @@ private:
     };
 
     void openMarketMenu();
+    // Re-fits Symbol | Bid | Ask | Spread to the table's current viewport.
+    void layoutColumns();
     void applyFilter();
     void setMarket(const QString& group);
     void onSelectionChanged();

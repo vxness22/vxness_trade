@@ -730,10 +730,37 @@
       var off = self._calibOffset;
       var h = self._host ? self._host.clientHeight : g.h;
 
+      // Rows already placed in the left column this frame, so a second position
+      // on the same instrument does not land underneath the first.
+      //
+      // Two trades on one symbol are usually opened seconds apart at the same
+      // or near-identical price, which put them at the same y and the same x —
+      // a pixel-perfect overlap that looked exactly like the older trade had
+      // vanished. Only the PILLS are nudged; the entry lines stay on their true
+      // price, because a line drawn away from the price it represents is a lie
+      // about where the trade sits.
+      var takenY = [];
+      var STACK_PX = 22;                       // pill height plus a hairline gap
+      var declash = function (y) {
+        for (var pass = 0; pass < 16; pass++) {
+          var hit = false;
+          for (var i = 0; i < takenY.length; i++) {
+            if (Math.abs(y - takenY[i]) < STACK_PX) { y += STACK_PX; hit = true; break; }
+          }
+          if (!hit) break;
+        }
+        return y;
+      };
+
       // Place a pill on `price`; false if it would fall outside the pane.
-      var put = function (pill, price) {
+      // `stack` opts the pill into overlap avoidance (entry pills only — SL/TP
+      // pills are drag handles, and moving one away from its line would make
+      // the grab point disagree with the level being dragged).
+      var put = function (pill, price, stack) {
         var y = self._paneY(price, g) + off;
+        if (stack) y = declash(y);
         if (!(y > 8) || y > h - 8) { pill.el.style.display = "none"; return false; }
+        if (stack) takenY.push(y);
         pill.el.style.top = y + "px";
         pill.el.style.display = "flex";
         return true;
@@ -759,7 +786,7 @@
         var open = Number(p.open_price) || 0;
 
         // Entry — live P&L off the current bid (buy) / ask (sell).
-        if (put(r.entry, open)) {
+        if (put(r.entry, open, true)) {
           var pnl = self._livePnl(p);
           setText(r.entry.price, fmt(open, d));
           setText(r.entry.pnl, fmtProfit(pnl));

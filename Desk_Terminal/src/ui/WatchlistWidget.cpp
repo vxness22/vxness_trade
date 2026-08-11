@@ -11,6 +11,7 @@
 #include <QMap>
 #include <QPoint>
 #include <QTimer>
+#include <QResizeEvent>
 #include <QTime>
 #include <QFont>
 #include <QColor>
@@ -73,16 +74,20 @@ WatchlistWidget::WatchlistWidget(QWidget* parent) : QWidget(parent) {
     // driven by the wheel / keyboard. Both bars were pure chrome here.
     m_table->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_table->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    // Plain interactive widths that add up to the default panel width, with
-    // Spread taking the slack — and the user free to drag any of them.
-    // Automatic modes were tried and both failed: Stretch-on-all elided symbols
-    // to "EUR…", and Stretch-on-symbol + Fixed left the fixed widths unapplied
-    // and collapsed the symbol column to "…".
-    m_table->horizontalHeader()->setStretchLastSection(true);
+    // Widths are recomputed from the viewport on every resize — see
+    // layoutColumns(). They used to be three fixed values plus
+    // setStretchLastSection(true), which is what hid the Spread column: the
+    // fixed widths were sized for the default panel, the splitter then gave the
+    // table less room, and the stretched last section kept a width measured
+    // against the wider viewport. Its right-aligned numbers therefore rendered
+    // past the visible edge with the horizontal scrollbar switched off, so the
+    // column looked permanently blank while Bid and Ask were fine.
+    //
+    // Automatic modes are still not usable here: Stretch-on-all elides symbols
+    // to "EUR…", and Stretch-on-symbol + Fixed leaves the fixed widths
+    // unapplied and collapses the symbol column to "…".
+    m_table->horizontalHeader()->setStretchLastSection(false);
     m_table->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
-    m_table->setColumnWidth(0, 104);
-    m_table->setColumnWidth(1, 80);
-    m_table->setColumnWidth(2, 80);
     connect(m_table, &QTableWidget::itemSelectionChanged,
             this, &WatchlistWidget::onSelectionChanged);
     // Row index maps straight into m_all — applyFilter() rebuilds the table in
@@ -129,6 +134,11 @@ void WatchlistWidget::applyTheme() {
             ask->setForeground(QColor(r.dir > 0 ? c.up : r.dir < 0 ? c.down : c.text));
         if (auto* sym = m_table->item(r.row, 0))
             sym->setForeground(QColor(r.dir > 0 ? c.up : r.dir < 0 ? c.down : c.muted));
+        // Spread too — a theme switch must not leave this column reading in the
+        // old palette's colour, which is how it became invisible in the first
+        // place. Every column in this table now carries an explicit foreground.
+        if (auto* sp = m_table->item(r.row, 3))
+            sp->setForeground(QColor(c.muted));
     }
 }
 
@@ -219,6 +229,30 @@ void WatchlistWidget::setMarket(const QString& group) {
     applyFilter();
 }
 
+void WatchlistWidget::resizeEvent(QResizeEvent* e) {
+    QWidget::resizeEvent(e);
+    layoutColumns();
+}
+
+// Fits all four columns inside the viewport, whatever width the splitter has
+// given the panel. The three numeric columns are sized first and Symbol takes
+// the remainder, because a clipped instrument name is merely ugly while a
+// clipped Spread column is invisible — and looks like missing data.
+void WatchlistWidget::layoutColumns() {
+    if (!m_table || !m_table->viewport()) return;
+    const int w = m_table->viewport()->width();
+    if (w <= 0) return;
+
+    // Wide enough for "159.228" / "0.85421" in the monospace cell font, capped
+    // so a wide panel spends its extra room on the symbol rather than on three
+    // oceans of padding.
+    const int num = qBound(52, (w - 96) / 3, 88);
+    m_table->setColumnWidth(1, num);
+    m_table->setColumnWidth(2, num);
+    m_table->setColumnWidth(3, num);
+    m_table->setColumnWidth(0, qMax(64, w - num * 3));
+}
+
 void WatchlistWidget::applyFilter() {
     const QString q = m_search->text().trimmed().toUpper();
     for (const SymbolSpec& s : m_all) {
@@ -267,8 +301,17 @@ void WatchlistWidget::updateQuote(const Quote& q) {
         ask->setForeground(dirColor);
     }
     // Spread in points, the unit MT5 shows it in.
+    //
+    // The colour is NOT optional. Symbol/Bid/Ask are each given an explicit
+    // foreground on every tick, and this column was the only one that never
+    // was — so it fell back to the view's palette text colour, which on the
+    // themed row background rendered as invisible. The column looked empty at
+    // every width, which read as "spread is not showing" rather than as a
+    // contrast bug. Muted rather than dirColor: the spread does not tick up or
+    // down with the price, and colouring it green/red implied that it did.
     if (auto* sp = m_table->item(row.row, 3)) {
         const double points = q.spread * std::pow(10.0, row.digits - 1);
         sp->setText(QString::number(points, 'f', 1));
+        sp->setForeground(QColor(t.muted));
     }
 }

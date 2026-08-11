@@ -99,6 +99,10 @@ private:
     // cannot be pointed at an instrument before its metadata exists. Symbols
     // can be re-fetched mid-session, hence the latch.
     bool m_chartLayoutRestored = false;
+    // Pane 0's instrument as it was on disk at launch. Captured during the
+    // layout restore because persistChartLayout() overwrites m_cfg.chartSymbols
+    // from the live panes before the startup symbol is chosen.
+    QString m_savedPane0Symbol;
     QFrame*  m_identityDivider = nullptr;  // hairline before the first menu
     QSplitter* m_centerSplit = nullptr;
 

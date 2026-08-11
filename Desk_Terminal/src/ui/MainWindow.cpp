@@ -660,13 +660,23 @@ void MainWindow::onSymbolsReceived(const QVector<SymbolSpec>& symbols) {
         const int       wantCount = m_cfg.chartCount;
         const QStringList wantSyms = m_cfg.chartSymbols;
 
+        // Pane 0's saved instrument has to be captured HERE, in the same
+        // snapshot as the rest, and carried out of this block in a member.
+        // Reading m_cfg.chartSymbols again further down does not work: by then
+        // persistChartLayout() has already rewritten it from the live panes,
+        // so the saved symbol is gone and the startup pick silently fell back
+        // to the default — which is the bug this whole block exists to avoid.
+        if (!wantSyms.isEmpty()) m_savedPane0Symbol = wantSyms.first();
+
         if (wantCount > 1)
             m_charts->setChartCount(wantCount);
-        // Pane 0 is deliberately skipped: the terminal always opens on the
-        // startup instrument (XAUUSD, see below), so restoring the saved symbol
-        // there would immediately be overwritten anyway. Panes 1..n keep what
-        // they were showing, so a 2x2 comes back with its other three
-        // instruments intact.
+        // Pane 0 used to be skipped here, because the block below always forced
+        // the startup instrument on it. That is what made open trades vanish
+        // from the chart after a restart: the position overlay only draws
+        // positions whose symbol matches the CHARTED one (tx_positions.js
+        // filters on p.symbol === chart.symbol()), so a trader holding GBPUSD
+        // reopened the terminal onto gold and saw an empty chart with no lines.
+        // Panes 1..n are restored the same way they always were.
         for (int i = 1; i < wantSyms.size() && i < m_charts->chartCount(); ++i) {
             const QString s = wantSyms.at(i);
             if (s.isEmpty() || !m_specs.contains(s)) continue;
@@ -682,20 +692,29 @@ void MainWindow::onSymbolsReceived(const QVector<SymbolSpec>& symbols) {
     m_api->fetchPrices({});
     setStatus(tr("%1 instruments loaded").arg(symbols.size()));
 
-    // Open on XAUUSD — the platform's headline instrument — rather than on the
-    // alphabetical first, which is usually a share with a closed market and an
-    // empty chart. The rest of the list is fallback for a deployment that does
-    // not carry gold.
+    // Reopen on the instrument the trader left the terminal on. Falling back to
+    // XAUUSD — the platform's headline instrument — only when there is nothing
+    // saved, because the alphabetical first is usually a pair with a closed
+    // market and an empty chart.
     //
-    // This wins over whatever pane 0 was showing last session — every launch
-    // starts on gold. The grid (1/2/4) and the OTHER panes' instruments are
-    // still restored above, so a 2x2 comes back as it was apart from the pane
-    // in focus.
+    // This used to unconditionally pick gold, which quietly threw away the
+    // session: a trader holding GBPUSD came back to a gold chart, and because
+    // the position overlay only draws lines for the CHARTED symbol, their open
+    // trade looked like it had disappeared. The saved symbol has to win.
     if (!symbols.isEmpty()) {
-        QString pick = symbols.front().symbol;
-        for (const QString& pref : {"XAUUSD", "EURUSD", "BTCUSD", "GBPUSD", "ETHUSD"}) {
-            if (m_specs.contains(pref)) { pick = pref; break; }
+        QString pick;
+
+        // Pane 0's saved instrument, if it is one this deployment still carries.
+        if (!m_savedPane0Symbol.isEmpty() && m_specs.contains(m_savedPane0Symbol))
+            pick = m_savedPane0Symbol;
+
+        if (pick.isEmpty()) {
+            pick = symbols.front().symbol;
+            for (const QString& pref : {"XAUUSD", "EURUSD", "BTCUSD", "GBPUSD", "ETHUSD"}) {
+                if (m_specs.contains(pref)) { pick = pref; break; }
+            }
         }
+
         m_watch->selectSymbol(pick);   // moves selection -> triggers onSymbolActivated
         onSymbolActivated(pick);
     }
