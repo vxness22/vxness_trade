@@ -180,6 +180,11 @@
     widget.onChartReady(() => {
       const l = document.getElementById("loading");
       if (l) l.style.display = "none";
+      // A fresh chart has no dialog open by definition, so clear any hidden
+      // state the previous one left behind BEFORE re-arming the watcher. The
+      // native strip is a sibling of the web view and survives the rebuild, so
+      // without this a stale "hidden" outlives the chart that caused it.
+      try { bridge.setOverlayHidden(false); } catch (e) {}
       // Re-attached per widget: a theme switch rebuilds the chart, and with it
       // the iframe the observer was watching.
       watchDialogs(bridge);
@@ -210,6 +215,10 @@
     } catch (e) { /* cross-origin — handled below */ }
     if (!doc || !doc.body) {
       console.warn("dialog watch: chart iframe document unavailable; strip will not auto-hide");
+      // Fail OPEN, never closed. Without this the strip keeps whatever state a
+      // previous chart left it in, and if that state was hidden the trader is
+      // left with no BUY/SELL control and no way to get it back.
+      try { bridge.setOverlayHidden(false); } catch (e) {}
       return;
     }
 
@@ -225,25 +234,73 @@
       '.tv-dropdown-behavior__body', '[class*="menuWrap"]', '[class*="popupMenu"]'
     ].join(',');
 
-    // Presence is not enough: some of these containers exist permanently and
-    // are merely empty when closed, which would pin the strip hidden forever.
-    // Require something actually laid out on screen.
+    // Presence is not enough, and neither is a non-zero rect.
+    //
+    // THIS IS WHAT BROKE TRADING. Several of the selectors above match
+    // containers the charting library keeps in the DOM permanently — laid out,
+    // sized, but transparent or visibility:hidden until something opens inside
+    // them. The old test asked only for width/height > 1, so it answered "a
+    // dialog is open" on a chart with nothing open at all. setOverlayHidden(true)
+    // then fired on the first poll and never came back, which takes the one-click
+    // strip off screen for the whole session — and that strip IS the BUY/SELL
+    // control. The terminal looked fine, priced fine, drew positions fine, and
+    // simply had no way to place a trade.
+    //
+    // So: require the element to be genuinely rendered, and big enough to be a
+    // real dialog rather than a 2px sliver.
+    const win = frame.contentWindow;
+    function reallyVisible(el) {
+      const r = el.getBoundingClientRect();
+      if (!(r.width > 24 && r.height > 24)) return false;      // slivers are not dialogs
+      const vw = doc.documentElement.clientWidth || 0;
+      const vh = doc.documentElement.clientHeight || 0;
+      if (r.right <= 0 || r.bottom <= 0 || r.left >= vw || r.top >= vh) return false;  // parked off screen
+      if (el.getAttribute("aria-hidden") === "true") return false;
+      let cs = null;
+      try { cs = win.getComputedStyle(el); } catch (e) { return false; }
+      if (!cs) return false;
+      if (cs.display === "none" || cs.visibility === "hidden") return false;
+      if (parseFloat(cs.opacity || "1") < 0.05) return false;
+      return true;
+    }
+
     function anythingOpen() {
       const nodes = doc.querySelectorAll(SEL);
       for (let i = 0; i < nodes.length; i++) {
-        const r = nodes[i].getBoundingClientRect();
-        if (r.width > 1 && r.height > 1) return true;
+        if (reallyVisible(nodes[i])) return true;
       }
       return false;
     }
 
+    // What matched, for the diagnostic log. Hiding the one-click strip removes
+    // the trader's BUY/SELL control, so when it happens the log has to say what
+    // caused it — chasing a permanently hidden strip without this meant guessing
+    // at ten selectors against a DOM that cannot be inspected from outside.
+    function firstOpen() {
+      const nodes = doc.querySelectorAll(SEL);
+      for (let i = 0; i < nodes.length; i++) {
+        if (reallyVisible(nodes[i])) {
+          const el = nodes[i];
+          return (el.tagName || "?").toLowerCase() +
+                 (el.getAttribute("data-dialog-name") ? "[" + el.getAttribute("data-dialog-name") + "]" : "") +
+                 (el.getAttribute("data-name") ? "[" + el.getAttribute("data-name") + "]" : "") +
+                 (el.className && el.className.baseVal === undefined
+                    ? "." + String(el.className).split(/\s+/).slice(0, 2).join(".")
+                    : "");
+        }
+      }
+      return null;
+    }
+
     let last = null;
     function update() {
-      const open = anythingOpen();
+      const cause = firstOpen();
+      const open = cause !== null;
       if (open === last) return;
       last = open;
       const wm = document.getElementById("tx_watermark");
       if (wm) wm.style.visibility = open ? "hidden" : "visible";
+      console.info("one-click strip " + (open ? "HIDDEN by " + cause : "SHOWN"));
       try { bridge.setOverlayHidden(open); } catch (e) { console.warn("setOverlayHidden", e); }
     }
 

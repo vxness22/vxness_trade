@@ -44,5 +44,9 @@ private:
     ChartBridge*    m_bridge;
     QWebEngineView* m_view;
     QWebChannel*    m_channel;
-    QWidget*        m_overlay = nullptr;
+    QWidget* m_overlay = nullptr;
+    // Slim right-aligned row that hosts the one-click strip above the chart.
+    // The strip is NOT floated over the web view: QWebEngineView composites its
+    // native surface over sibling widgets, which hid it completely.
+    QWidget* m_overlayHost = nullptr;
 };

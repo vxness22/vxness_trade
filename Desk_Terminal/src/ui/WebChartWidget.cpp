@@ -8,6 +8,7 @@
 #include <QWebEngineProfile>
 #include <QWebChannel>
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QCoreApplication>
 #include <QFileInfo>
 #include <QFile>
@@ -136,39 +137,60 @@ QString WebChartWidget::resolveIndexHtml() {
 void WebChartWidget::setOverlayWidget(QWidget* w) {
     if (!w) return;
     m_overlay = w;
-    // The strip re-sizes itself when a longer price arrives (BTCUSD's six
-    // figures against EURUSD's five decimals). Nothing else would notice — it
-    // is placed by hand, not by a layout — so it says so and we re-place it.
-    // Unique connection: setOverlayWidget runs again on every pane switch.
-    if (auto* t = qobject_cast<OrderTicket*>(w))
-        connect(t, &OrderTicket::sizeHintChanged, this,
-                &WebChartWidget::positionOverlay, Qt::UniqueConnection);
-    // Deliberately NOT added to the layout: it has to sit on top of the web
-    // view, not beside it. raise() puts it above the view in the stacking order.
-    w->setParent(this);
-    w->raise();
+
+    // The strip is a LAYOUT ROW above the chart, not a widget floating over it.
+    //
+    // It used to be parented to this widget with no layout, moved by hand into
+    // the chart's top toolbar band and raise()d. That relies on a plain Qt
+    // widget painting above a QWebEngineView sibling, and it does not: the web
+    // view renders through its own native surface, which composites OVER
+    // siblings regardless of Qt's stacking order on this Qt/GPU combination.
+    // The strip was created, shown, correctly positioned — and completely
+    // covered by the chart. Since that strip carries BUY and SELL, the terminal
+    // had no way to place a trade at all, while looking entirely healthy: the
+    // dialog watcher even reported "one-click strip SHOWN" the whole time.
+    //
+    // A layout row cannot be covered by anything, on any Qt version or GPU
+    // path. It costs ~40px off the top of the chart; being able to trade is
+    // worth more than those pixels.
+    auto* lay = qobject_cast<QVBoxLayout*>(layout());
+    if (!lay) return;
+
+    // A slim right-aligned band, not a full-width block. Dropped straight into
+    // the vertical layout the strip stretched to fill half the pane, turning
+    // the SELL tile into a chest-high red slab; the host row keeps it at its
+    // natural size and parks it where it used to float.
+    if (!m_overlayHost) {
+        m_overlayHost = new QWidget(this);
+        auto* h = new QHBoxLayout(m_overlayHost);
+        h->setContentsMargins(6, 2, 6, 2);
+        h->setSpacing(0);
+        lay->insertWidget(0, m_overlayHost, 0);
+        // Stretch on the view, not the strip: every pixel the layout has spare
+        // belongs to the candles.
+        lay->setStretchFactor(m_view, 1);
+    }
+    // Laid out from the LEFT with a trailing stretch, not the other way round.
+    // A leading stretch pushed a strip wider than the pane off the right edge,
+    // which reproduced the original symptom exactly — a row of the right height
+    // and nothing drawn in it. Anchored left, it is clipped at worst, never
+    // invisible.
+    auto* h = static_cast<QHBoxLayout*>(m_overlayHost->layout());
+    w->setParent(m_overlayHost);
+    w->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
+    h->insertWidget(0, w, 0);
+    if (h->count() == 1) h->addStretch(1);
     w->show();
+    m_overlayHost->show();
     positionOverlay();
 }
 
 void WebChartWidget::positionOverlay() {
     if (!m_overlay) return;
-    // A reparented widget keeps whatever geometry it had (a parentless widget
-    // defaults to 640x480), and with no layout governing it nothing ever
-    // corrects that — the strip stretched its BUY/SELL tiles right across the
-    // chart. Size it to its own sizeHint on every reposition instead.
-    m_overlay->adjustSize();
-    // Parked in the chart's top toolbar band, in the empty run between the
-    // Indicators/undo controls and the icon cluster on the right. The inset has
-    // to clear BOTH that cluster and the price axis beyond it, which together
-    // occupy a little over 200px. Clamped so a narrow chart pushes the strip
-    // back toward the left toolbar rather than under the icons or off screen.
-    const int rightInset = 145;
-    const int x = qMax(56, width() - m_overlay->width() - rightInset);
-    // Flush with the top of the chart area — no inset, so the strip sits level
-    // with the toolbar row rather than hanging below it.
-    m_overlay->move(x, 0);
-    m_overlay->raise();
+    // The layout owns the geometry now; all that is left is to let the strip
+    // ask for its natural height when a longer price arrives (BTCUSD's six
+    // figures against EURUSD's five decimals).
+    m_overlay->updateGeometry();
 }
 
 void WebChartWidget::resizeEvent(QResizeEvent* e) {
