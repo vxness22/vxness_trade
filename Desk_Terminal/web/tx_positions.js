@@ -183,19 +183,36 @@
     return base + (cur - ref) * dir * Number(p.lots) * this._contract(p.symbol);
   };
 
-  // A bracket may only sit on the side of the entry that its purpose implies:
-  // BUY  -> TP above entry, SL below.   SELL -> TP below entry, SL above.
+  // A bracket is checked against the CURRENT MARKET, not the entry price.
+  //
+  // It used to be checked against the entry, which forbade the single most
+  // common stop management there is: buy at 525, price runs to 530, move the
+  // stop to 526 to lock in a profit. That is not an invalid stop — it is the
+  // whole point of having one — and the rule rejected it as "must be BELOW the
+  // buy price". Break-even and trailing stops were impossible.
+  //
+  // What actually makes a bracket invalid is sitting on the wrong side of the
+  // market, because the server would trigger it on the very next tick: a BUY's
+  // stop has to be below the bid it will be closed at, and its target above.
+  // Where those levels fall relative to the entry is the trader's business.
+  // This mirrors the server's own check in PUT /api/v1/positions/:id.
+  //
   // Returns "" when the level is acceptable (0 = remove, always allowed).
   Overlay.prototype._invalidReason = function (p, kind, level) {
     if (!(level > 0)) return "";
-    var entry = Number(p.open_price) || 0;
     var isBuy = this._isBuy(p);
+    var q = this._quote[p.symbol];
+    // A BUY is closed at the bid, a SELL at the ask. With no tick yet, fall back
+    // to the entry rather than blocking an edit on missing data.
+    var ref = q ? (isBuy ? Number(q.bid) : Number(q.ask)) : (Number(p.open_price) || 0);
+    if (!(ref > 0)) return "";
+    var at = " (" + fmt(ref, this._digits(p.symbol)) + ")";
     if (kind === "tp") {
-      if (isBuy  && level <= entry) return "Take Profit must be ABOVE the buy price.";
-      if (!isBuy && level >= entry) return "Take Profit must be BELOW the sell price.";
+      if (isBuy  && level <= ref) return "Take Profit must be ABOVE the current price" + at + ".";
+      if (!isBuy && level >= ref) return "Take Profit must be BELOW the current price" + at + ".";
     } else {
-      if (isBuy  && level >= entry) return "Stop Loss must be BELOW the buy price.";
-      if (!isBuy && level <= entry) return "Stop Loss must be ABOVE the sell price.";
+      if (isBuy  && level >= ref) return "Stop Loss must be BELOW the current price" + at + ".";
+      if (!isBuy && level <= ref) return "Stop Loss must be ABOVE the current price" + at + ".";
     }
     return "";
   };

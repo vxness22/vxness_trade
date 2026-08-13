@@ -454,7 +454,36 @@ router.put('/modify', async (req, res) => {
     // Parse values and handle NaN
     const parsedSl = sl !== undefined && sl !== null && sl !== '' ? parseFloat(sl) : null
     const parsedTp = tp !== undefined && tp !== null && tp !== '' ? parseFloat(tp) : null
-    
+
+    // Brackets are checked against the CURRENT MARKET, never against the entry.
+    //
+    // Checking against the entry is what stopped a trader moving a stop into
+    // profit — bought at 525, price at 530, stop to 526 — which is ordinary
+    // break-even/trailing stop management, not an error. What genuinely must be
+    // rejected is a level on the wrong side of the market, because the SL/TP
+    // sweep would fire it on the next tick and close the position instantly for
+    // no reason the trader could see. This route had no check at all.
+    const q = getFreshPrice(existingTrade.symbol)
+    if (q && q.bid > 0 && q.ask > 0 && existingTrade.status === 'OPEN') {
+      const isBuy = existingTrade.side === 'BUY'
+      const ref = isBuy ? q.bid : q.ask   // a BUY closes at the bid, a SELL at the ask
+      const bad = (level, kind) => {
+        if (level == null || !Number.isFinite(level) || level <= 0) return null
+        if (kind === 'sl') {
+          if (isBuy && level >= ref) return `Stop loss must be below the current price (${ref}) for a BUY`
+          if (!isBuy && level <= ref) return `Stop loss must be above the current price (${ref}) for a SELL`
+        } else {
+          if (isBuy && level <= ref) return `Take profit must be above the current price (${ref}) for a BUY`
+          if (!isBuy && level >= ref) return `Take profit must be below the current price (${ref}) for a SELL`
+        }
+        return null
+      }
+      const err = bad(parsedSl, 'sl') || bad(parsedTp, 'tp')
+      if (err) {
+        return res.status(400).json({ success: false, message: err, code: 'BRACKET_WRONG_SIDE' })
+      }
+    }
+
     const trade = await tradeEngine.modifyTrade(
       tradeId,
       parsedSl !== null && !isNaN(parsedSl) ? parsedSl : null,
