@@ -704,6 +704,10 @@ const TradingPage = () => {
 
         fetchOpenTrades()
 
+        // Pending too. Without it a server-side fill never left this tab's
+        // Pending list, so a filled order looked unfilled until a refresh.
+        fetchPendingOrders()
+
         fetchAccountSummary()
 
       }, 5000)
@@ -1462,6 +1466,12 @@ const TradingPage = () => {
 
   // Fetch pending orders
 
+  // Last pending snapshot + orders cancelled from this tab, so fetchPendingOrders
+  // can tell a FILL apart from a cancellation. Refs, not state: they are read
+  // inside the fetch and must not re-run the effect that schedules it.
+  const pendingOrdersRef = useRef([])
+  const cancelledOrderIds = useRef(new Set())
+
   const fetchPendingOrders = async () => {
 
     try {
@@ -1472,7 +1482,34 @@ const TradingPage = () => {
 
       if (data.success) {
 
-        setPendingOrders(data.trades || [])
+        const next = data.trades || []
+
+        // An order that has left the pending list has been filled by the server.
+        //
+        // The browser used to be what executed pending orders — it called
+        // /trade/check-pending and refreshed itself when that answered
+        // executedCount > 0. The server now runs the same check every 2s and
+        // wins the race, so the browser's call comes back with 0 and it never
+        // learned that anything had happened. The order sat in the Pending tab
+        // until a manual refresh, which is exactly the "it only showed after a
+        // hard refresh" report. Diff the list instead: whatever vanished, and
+        // was not cancelled from this tab, has been filled.
+        const gone = pendingOrdersRef.current.filter(
+          (p) => !next.some((n) => n._id === p._id) && !cancelledOrderIds.current.has(p._id)
+        )
+
+        if (gone.length > 0) {
+          fetchOpenTrades()
+          fetchAccountSummary()
+          gone.forEach((o) => {
+            setTradeSuccess(
+              `${o.orderType} executed: ${o.symbol} ${o.side} @ ${formatTradePrice(o.symbol, o.pendingPrice)}`
+            )
+          })
+        }
+
+        pendingOrdersRef.current = next
+        setPendingOrders(next)
 
       }
 
@@ -2156,6 +2193,11 @@ const TradingPage = () => {
 
 
       if (data.success) {
+
+        // Remember it, so the next poll reads this order leaving the pending
+        // list as a cancellation and not as a fill — otherwise cancelling one
+        // would pop an "executed" toast.
+        cancelledOrderIds.current.add(tradeId)
 
         setTradeSuccess('Order cancelled')
 
