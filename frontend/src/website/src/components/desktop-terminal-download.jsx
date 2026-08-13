@@ -15,7 +15,7 @@ import { Monitor } from "lucide-react"
 // the worst kind of stale, because the download succeeds and looks correct.
 // The query string is part of Cloudflare's cache key, so bumping it forces a
 // MISS and pulls the new binary through. Same trick as tvchart.css?v=3.
-export const WINDOWS_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.exe?v=1.1.2"
+export const WINDOWS_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.exe?v=1.1.3"
 
 // Flip to the .dmg URL once a macOS build has been produced and uploaded — the
 // installer can only be built and notarised on a Mac.

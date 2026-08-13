@@ -25,7 +25,7 @@ AppName={#MyApp}
 ; Keep in step with FILEVERSION/PRODUCTVERSION in resources/app.rc. The
 ; download FILENAME is deliberately unversioned (see OutputBaseFilename), so
 ; bumping this does not require touching the website link.
-AppVersion=1.1.2
+AppVersion=1.1.3
 AppPublisher=Vxness
 DefaultDirName={autopf}\Vxness Terminal
 DefaultGroupName=Vxness Terminal
