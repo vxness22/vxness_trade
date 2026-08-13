@@ -172,6 +172,51 @@ router.post('/open', async (req, res) => {
       })
     }
 
+    // ---- Pending orders: an explicit level, on the correct side of the market ----
+    //
+    // The entry price now travels in its own field. Callers used to smuggle it in
+    // as bid AND ask, which made the engine treat the requested level as a live
+    // quote and add the admin spread to it — the order then armed above where the
+    // trader had put it. `price` is the new field; `pendingPrice` is accepted so a
+    // client that has not been updated keeps working.
+    let entryPrice = null
+    if (orderType !== 'MARKET') {
+      const raw = req.body?.price ?? req.body?.pendingPrice
+      entryPrice = raw != null ? parseFloat(raw) : parseFloat(bid)
+      if (!Number.isFinite(entryPrice) || entryPrice <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'A pending order needs an entry price',
+          code: 'PENDING_PRICE_REQUIRED'
+        })
+      }
+
+      // A limit must sit on the far side of the market and a stop beyond it.
+      // Without this the API accepted, for example, a BUY_LIMIT above the market
+      // — which the executor then filled on the very next tick at whatever the
+      // market was. The trader got an instant market fill from something they
+      // had placed as a resting order.
+      const q = getFreshPrice(symbol)
+      if (q && q.bid > 0 && q.ask > 0) {
+        const isBuy = side === 'BUY'
+        const ref = isBuy ? q.ask : q.bid
+        const isLimit = orderType.endsWith('_LIMIT')
+        const wrongSide =
+          (isBuy && isLimit && entryPrice >= ref) ||
+          (isBuy && !isLimit && entryPrice <= ref) ||
+          (!isBuy && isLimit && entryPrice <= ref) ||
+          (!isBuy && !isLimit && entryPrice >= ref)
+        if (wrongSide) {
+          const where = isLimit ? (isBuy ? 'below' : 'above') : (isBuy ? 'above' : 'below')
+          return res.status(400).json({
+            success: false,
+            message: `A ${side} ${isLimit ? 'limit' : 'stop'} must be ${where} the current price (${ref}).`,
+            code: 'PENDING_WRONG_SIDE'
+          })
+        }
+      }
+    }
+
     // Regular trading account - use standard trade engine
     const trade = await tradeEngine.openTrade(
       userId,
@@ -185,7 +230,8 @@ router.post('/open', async (req, res) => {
       parseFloat(ask),
       sl ? parseFloat(sl) : null,
       tp ? parseFloat(tp) : null,
-      leverage // Pass user-selected leverage
+      leverage, // Pass user-selected leverage
+      entryPrice
     )
 
     // Check if this is a master trader and copy to followers

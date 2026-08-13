@@ -392,7 +392,10 @@ class TradeEngine {
 
   // Open a new trade
 
-  async openTrade(userId, tradingAccountId, symbol, segment, side, orderType, quantity, bid, ask, sl = null, tp = null, userLeverage = null) {
+  // pendingPrice is REQUIRED for a limit/stop order and ignored for MARKET.
+  // Callers used to fake it by passing the requested level as both bid and ask;
+  // see the note above openPrice for why that quietly moved the trigger.
+  async openTrade(userId, tradingAccountId, symbol, segment, side, orderType, quantity, bid, ask, sl = null, tp = null, userLeverage = null, pendingPrice = null) {
 
     const account = await TradingAccount.findById(tradingAccountId).populate('accountTypeId')
 
@@ -438,10 +441,28 @@ class TradeEngine {
 
 
 
-    // Execution price = LP price + admin spread. Commission is charged separately
-    // (see trade.commission below) so users see the $ amount in the Charges column.
+    const isPending = orderType !== 'MARKET'
 
-    const openPrice = this.calculateExecutionPrice(side, bid, ask, charges.spreadValue, charges.spreadType, symbol)
+    // A pending order's price is the LEVEL THE TRADER ASKED FOR, untouched.
+    //
+    // It used to run through calculateExecutionPrice like a market order, and
+    // callers passed the requested level as both bid and ask to work around
+    // that. The spread was then added on top: an order typed as 4455 was stored
+    // to trigger at 4455 + spread. On an account with a 50-cent gold spread the
+    // order sat there while the price the trader was watching went straight
+    // through their level — the exact "price reached it and nothing happened"
+    // report. The spread still applies, but where it belongs: at FILL time,
+    // because checkPendingOrders arms BUY on ask and SELL on bid.
+    if (isPending && !(Number(pendingPrice) > 0)) {
+      throw new Error('A pending order needs an entry price')
+    }
+
+    // Market execution price = LP price + admin spread. Commission is charged
+    // separately (see trade.commission below) so users see the $ amount in the
+    // Charges column.
+    const openPrice = isPending
+      ? Number(pendingPrice)
+      : this.calculateExecutionPrice(side, bid, ask, charges.spreadValue, charges.spreadType, symbol)
 
 
 
@@ -561,9 +582,9 @@ class TradeEngine {
 
       floatingPnl: 0,
 
-      status: orderType === 'MARKET' ? 'OPEN' : 'PENDING',
+      status: isPending ? 'PENDING' : 'OPEN',
 
-      pendingPrice: orderType !== 'MARKET' ? openPrice : null
+      pendingPrice: isPending ? openPrice : null
 
     })
 

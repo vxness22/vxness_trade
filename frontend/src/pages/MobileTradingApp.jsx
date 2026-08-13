@@ -882,9 +882,14 @@ const MobileTradingApp = () => {
 
           quantity: parseFloat(volume),
 
-          bid: pendingPrice || prices.bid,
+          // Entry level in its own field — same fix as the desktop web terminal.
+          // Sent as bid AND ask it was read as a live quote and the admin spread
+          // was added to it, arming the order above the level that was typed.
+          price: pendingPrice,
 
-          ask: pendingPrice || prices.ask,
+          bid: prices.bid,
+
+          ask: prices.ask,
 
           leverage: leverage,
 

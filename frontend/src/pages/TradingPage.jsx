@@ -1969,9 +1969,17 @@ const TradingPage = () => {
 
           quantity: parseFloat(volume),
 
-          bid: pendingPrice || currentBid,
+          // The entry level goes in its own field. It used to be sent as BOTH
+          // bid and ask so the engine would adopt it as the open price — but the
+          // engine treated it as a live quote and added the admin spread on top,
+          // so the order armed above the level the trader typed. Sending the real
+          // quote also means the server's market-closed and stale-price checks
+          // finally see the actual market instead of the number in this form.
+          price: pendingPrice,
 
-          ask: pendingPrice || currentAsk,
+          bid: currentBid,
+
+          ask: currentAsk,
 
           sl: showStopLoss && stopLoss ? parseFloat(stopLoss) : null,
 
