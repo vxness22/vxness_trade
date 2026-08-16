@@ -11,6 +11,10 @@ import { pipSize, contractSize as symbolContractSize, marginUsd, pnlUsd } from '
 import { overallDrawdownPercent } from '../utils/drawdownMath.js'
 import infowayService from './infowayService.js'
 
+// See tradeEngine.js — how far a bracket may sit from the market before the
+// sweep treats it as corrupt data instead of a price to fill at.
+const MAX_BRACKET_DISTANCE = 0.5
+
 class PropTradingEngine {
   constructor() {
     this.ERROR_CODES = {
@@ -819,6 +823,21 @@ class PropTradingEngine {
         } else {
           console.log(`[Challenge SL/TP] BUY check: bid(${bid}) <= sl(${sl}) = ${bid <= sl}, bid(${bid}) >= tp(${tp}) = ${bid >= tp}`)
         }
+      }
+
+      // Same guard as the live engine: a bracket nowhere near the market is
+      // corrupt data, not a fill price. Closing AT such a level is what turned a
+      // gold-priced stop on a GBPUSD position into $4.37m of fake profit.
+      const refMid = (bid + ask) / 2
+      const insane = (level) =>
+        Number.isFinite(level) && level > 0 && refMid > 0 &&
+        Math.abs(level - refMid) / refMid > MAX_BRACKET_DISTANCE
+      if (insane(sl) || insane(tp)) {
+        console.error(
+          `[Challenge SL/TP GUARD] Trade ${trade.tradeId} ${trade.side} ${trade.symbol} has a bracket far from ` +
+          `the market (SL=${sl ?? '-'} TP=${tp ?? '-'} market=${refMid}). Refusing to close on it.`
+        )
+        continue
       }
 
       let shouldClose = false

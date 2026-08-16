@@ -20,6 +20,12 @@ import ibEngine from './ibEngineNew.js'
 
 
 
+// How far a stop/target may sit from the current market before the SL/TP sweep
+// treats it as corrupt data rather than a price to fill at. 50% is far wider
+// than any real bracket (a stop that distant would never be hit) and far tighter
+// than the 3000x gap that let a gold-priced stop on a GBPUSD trade pay out.
+const MAX_BRACKET_DISTANCE = 0.5
+
 class TradeEngine {
 
   constructor() {
@@ -1130,6 +1136,35 @@ class TradeEngine {
 
 
 
+      // A bracket that is nowhere near the market is corrupt data, not a fill.
+      //
+      // A GBPUSD BUY once carried a stop of 4372 — a gold price, stored back when
+      // PUT /api/trade/modify had no validation. `bid <= sl` was instantly true
+      // (1.3489 <= 4372), the sweep closed the trade AT 4372, and
+      // (4372 - 1.3494) * 0.01 * 100000 minted $4,370,650 into a $5,105 account.
+      //
+      // Input validation alone cannot be the only guard: anything that writes a
+      // trade — the admin panel, a migration, a direct DB edit — can still put a
+      // wrong-side level in. So the sweep refuses to act on a level that is
+      // absurdly far from the market rather than paying out against it.
+      const refMid = (bid + ask) / 2
+      const insane = (level) =>
+        Number.isFinite(level) && level > 0 && refMid > 0 &&
+        Math.abs(level - refMid) / refMid > MAX_BRACKET_DISTANCE
+
+      if (insane(sl) || insane(tp)) {
+        if (!this._lastInsaneLog) this._lastInsaneLog = {}
+        const nowMs = Date.now()
+        if (!this._lastInsaneLog[trade.tradeId] || nowMs - this._lastInsaneLog[trade.tradeId] > 300000) {
+          console.error(
+            `[SL/TP GUARD] Trade ${trade.tradeId} ${trade.side} ${trade.symbol} has a bracket far from the market ` +
+            `(SL=${sl ?? '-'} TP=${tp ?? '-'} market=${refMid}). Refusing to close on it — fix the level.`
+          )
+          this._lastInsaneLog[trade.tradeId] = nowMs
+        }
+        continue
+      }
+
       const trigger = trade.checkSlTp(bid, ask)
 
       if (trigger) {
@@ -1140,7 +1175,7 @@ class TradeEngine {
 
         let closeAsk = ask
 
-        
+
 
         if (trigger === 'SL') {
 
