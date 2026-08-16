@@ -717,24 +717,43 @@ export default function ChartingLibraryChart({
     const saveBracket = async (pArg, kind, price) => {
       // Read the LIVE position so the OTHER bracket we re-send isn't a stale value.
       const p = positionsRef.current.find((x) => x.id === pArg.id) || pArg;
-      // Restriction: TP must be in the profit direction and SL in the loss
-      // direction relative to the entry — else warn and don't save.
-      // BUY  → TP above entry, SL below entry.  SELL → TP below entry, SL above.
-      if (price != null && price > 0) {
-        const entry = Number(p.openPrice) || 0;
+      // A bracket is checked against the CURRENT MARKET, not the entry price.
+      //
+      // Checking against the entry forbade the single most common stop
+      // management there is: buy at 525, price runs to 530, move the stop to 526
+      // to lock in profit. That is not an invalid stop — it is the whole point
+      // of having one — and this rule rejected it as "must be BELOW the buy
+      // price". Break-even and trailing stops were impossible from the chart.
+      //
+      // What actually makes a bracket invalid is sitting on the wrong side of
+      // the MARKET, because the server's SL/TP sweep would fire it on the next
+      // tick and close the position instantly. A BUY closes at the bid, a SELL
+      // at the ask. Where the level sits relative to the entry is the trader's
+      // business. This mirrors the server's own check in PUT /api/trade/modify
+      // and the desktop terminal's overlay.
+      // If there is no live tick we do NOT guess — falling back to the entry
+      // price here would re-create the exact bug this check was fixed for (a
+      // break-even stop blocked, and the entry mislabelled as "current price").
+      // The server re-checks against its own feed and returns a clear
+      // BRACKET_WRONG_SIDE message, which the catch below already surfaces.
+      const q = price != null && price > 0 ? priceStreamService.getPrice(p.symbol) : null;
+      if (q && q.bid > 0 && q.ask > 0) {
         const isBuy = p.side === "BUY";
+        const ref = isBuy ? Number(q.bid) : Number(q.ask);
+
         let msg = "";
+        const at = ` (${ref.toFixed(digitsFor(p.symbol))})`;
         if (kind === "tp") {
-          if (isBuy && price <= entry) msg = "Take Profit must be ABOVE the buy price.";
-          else if (!isBuy && price >= entry) msg = "Take Profit must be BELOW the sell price.";
+          if (isBuy && price <= ref) msg = `Take Profit must be ABOVE the current price${at}.`;
+          else if (!isBuy && price >= ref) msg = `Take Profit must be BELOW the current price${at}.`;
         } else {
-          if (isBuy && price >= entry) msg = "Stop Loss must be BELOW the buy price.";
-          else if (!isBuy && price <= entry) msg = "Stop Loss must be ABOVE the sell price.";
+          if (isBuy && price >= ref) msg = `Stop Loss must be BELOW the current price${at}.`;
+          else if (!isBuy && price <= ref) msg = `Stop Loss must be ABOVE the current price${at}.`;
         }
         if (msg) {
           openDialog({
             title: `Invalid ${kind === "tp" ? "Take Profit" : "Stop Loss"}`,
-            body: `${msg} (Entry ${entry})`,
+            body: msg,
             confirmLabel: "OK",
             onConfirm: () => {},
           });

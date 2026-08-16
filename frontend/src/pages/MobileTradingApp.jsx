@@ -34,6 +34,8 @@ import KycTradeRequiredModal from '../components/KycTradeRequiredModal'
 
 import { formatPrice } from '../utils/formatPrice'
 
+import { pnlUsd } from '../utils/margin'
+
 import { isMarketOpen, marketClosedReason } from '../utils/marketHours'
 
 
@@ -1246,11 +1248,8 @@ const MobileTradingApp = () => {
 
     if (!currentPrice || currentPrice <= 0) return trade._lastPnl || 0
 
-    const pnl = trade.side === 'BUY'
-
-      ? (currentPrice - trade.openPrice) * trade.quantity * (trade.contractSize || 100000)
-
-      : (trade.openPrice - currentPrice) * trade.quantity * (trade.contractSize || 100000)
+    const pnl = pnlUsd(trade.symbol, trade.side, trade.openPrice, currentPrice,
+      trade.quantity, trade.contractSize || 100000, getPrice)
 
     trade._lastPnl = pnl // Cache for fallback
 

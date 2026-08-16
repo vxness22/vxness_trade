@@ -162,11 +162,36 @@
   Overlay.prototype._isBuy = function (p) {
     return String(p.side).toLowerCase() !== "sell";
   };
+  // USD value of one unit of the symbol's QUOTE currency. `Δprice * lots *
+  // contract` is denominated in that quote currency, not in dollars — on USDJPY
+  // it is yen, so a pill would read ~146x the real number without this.
+  // Mirrors backend utils/symbolMeta.js quoteToUsd.
+  Overlay.prototype._quoteToUsd = function (sym, price) {
+    var s = String(sym || "").toUpperCase();
+    var m = this._meta[s];
+    // metals / crypto / commodities / indices are all quoted in USD
+    if (m && m.category && m.category !== "Forex") return 1;
+    if (!/^[A-Z]{6}$/.test(s)) return 1;
+
+    var base = s.slice(0, 3), quote = s.slice(3, 6);
+    if (quote === "USD") return 1;
+
+    var p = Number(price);
+    if (base === "USD") return p > 0 ? 1 / p : 1;
+
+    // cross: convert the quote currency through its own USD pair
+    var direct = this._quote[quote + "USD"];
+    if (direct && direct.bid > 0 && direct.ask > 0) return (direct.bid + direct.ask) / 2;
+    var inverse = this._quote["USD" + quote];
+    if (inverse && inverse.bid > 0 && inverse.ask > 0) return 2 / (inverse.bid + inverse.ask);
+    return 1;
+  };
   // What the position would realise if it closed at `level`. The server stays
   // authoritative — this only previews a level before it is committed.
   Overlay.prototype._pnlAt = function (p, level) {
     var dir = this._isBuy(p) ? 1 : -1;
-    return (level - Number(p.open_price)) * dir * Number(p.lots) * this._contract(p.symbol);
+    var raw = (level - Number(p.open_price)) * dir * Number(p.lots) * this._contract(p.symbol);
+    return raw * this._quoteToUsd(p.symbol, level);
   };
   // Live P&L for the entry pill: anchor on the server's authoritative profit and
   // add only the move since the price that profit was computed at. Exact at each
@@ -180,7 +205,8 @@
     var cur = this._isBuy(p) ? q.bid : q.ask;
     if (!(cur > 0)) return base;
     var dir = this._isBuy(p) ? 1 : -1;
-    return base + (cur - ref) * dir * Number(p.lots) * this._contract(p.symbol);
+    var move = (cur - ref) * dir * Number(p.lots) * this._contract(p.symbol);
+    return base + move * this._quoteToUsd(p.symbol, cur);
   };
 
   // A bracket is checked against the CURRENT MARKET, not the entry price.
@@ -404,7 +430,10 @@
 
       var isBuy = self._isBuy(p);
       var pnl = Number(p.profit) || 0;
-      var notional = Number(p.open_price) * Number(p.lots) * self._contract(p.symbol);
+      // USD notional — pnl is already USD, so the denominator has to be too or
+      // the return % is off by the quote-currency factor on non-USD pairs.
+      var notional = Number(p.open_price) * Number(p.lots) * self._contract(p.symbol) *
+                     self._quoteToUsd(p.symbol, Number(p.open_price));
       var pct = notional > 0 ? (pnl / notional) * 100 : 0;
       var entryText = (isBuy ? "BUY " : "SELL ") + Number(p.lots).toFixed(2) + "  " +
                       fmtProfit(pnl) + " (" + (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%)";

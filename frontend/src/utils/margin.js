@@ -47,24 +47,56 @@ export function usdValueOf(ccy, getQuote) {
   return null
 }
 
-// Returns margin in USD (number). leverageNum is numeric (e.g. 500 for 1:500).
-export function marginUsd(symbol, quantity, price, leverageNum, getQuote) {
+// USD value of ONE unit of a symbol's QUOTE currency — mirrors backend
+// utils/symbolMeta.js `quoteToUsd`. `Δprice * lots * contractSize` is denominated
+// in the pair's quote currency, NOT in dollars:
+//   EURUSD -> USD already (1)   USDJPY -> yen (1/145)   EURGBP -> pounds (1.34)
+export function quoteToUsd(symbol, price, getQuote) {
+  const s = String(symbol || '').toUpperCase()
+  if (isUsdQuotedNonForex(s)) return 1
+
+  const base = s.slice(0, 3)
+  const quote = s.slice(3, 6)
+  if (quote === 'USD') return 1
+
+  if (base === 'USD') {
+    const p = Number(price)
+    if (p > 0) return 1 / p
+    const viaFeed = usdValueOf(quote, getQuote)
+    return viaFeed != null ? viaFeed : 1
+  }
+
+  const rate = usdValueOf(quote, getQuote)
+  return rate != null ? rate : 1
+}
+
+// Floating/realised P&L in USD, before commission and swap.
+export function pnlUsd(symbol, side, openPrice, currentPrice, quantity, cs, getQuote) {
+  const size = Number(cs) || contractSize(symbol)
+  const raw = String(side).toUpperCase() === 'BUY'
+    ? (currentPrice - openPrice) * quantity * size
+    : (openPrice - currentPrice) * quantity * size
+  return raw * quoteToUsd(symbol, currentPrice, getQuote)
+}
+
+// Position value in USD — the base for margin and any percentage-of-value figure.
+export function notionalUsd(symbol, quantity, price, getQuote) {
   const s = String(symbol || '').toUpperCase()
   const cs = contractSize(s)
-  const lev = Number(leverageNum) || 100
-  let notionalUsd
 
-  if (isUsdQuotedNonForex(s)) {
-    notionalUsd = quantity * cs * price
-  } else {
-    const base = s.slice(0, 3)
-    const quote = s.slice(3, 6)
-    if (quote === 'USD') notionalUsd = quantity * cs * price
-    else if (base === 'USD') notionalUsd = quantity * cs
-    else {
-      const baseUsd = usdValueOf(base, getQuote)
-      notionalUsd = baseUsd != null ? quantity * cs * baseUsd : quantity * cs * price
-    }
-  }
-  return notionalUsd / lev
+  if (isUsdQuotedNonForex(s)) return quantity * cs * price
+
+  const base = s.slice(0, 3)
+  const quote = s.slice(3, 6)
+  if (quote === 'USD') return quantity * cs * price
+  if (base === 'USD') return quantity * cs
+
+  const baseUsd = usdValueOf(base, getQuote)
+  return baseUsd != null ? quantity * cs * baseUsd : quantity * cs * price
+}
+
+// Returns margin in USD (number). leverageNum is numeric (e.g. 500 for 1:500).
+export function marginUsd(symbol, quantity, price, leverageNum, getQuote) {
+  const lev = Number(leverageNum) || 100
+  return notionalUsd(symbol, quantity, price, getQuote) / lev
 }

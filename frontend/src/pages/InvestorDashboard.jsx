@@ -14,6 +14,7 @@ import {
 import { API_URL } from '../config/api'
 import priceStreamService from '../services/priceStream'
 import { formatPrice } from '../utils/formatPrice'
+import { pnlUsd } from '../utils/margin'
 
 const InvestorDashboard = () => {
   const { accountId } = useParams()
@@ -90,14 +91,9 @@ const InvestorDashboard = () => {
     
     const currentPrice = trade.side === 'BUY' ? prices.bid : prices.ask
     const contractSize = trade.contractSize || 1
-    let pnl = 0
-    
-    if (trade.side === 'BUY') {
-      pnl = (currentPrice - trade.openPrice) * trade.quantity * contractSize
-    } else {
-      pnl = (trade.openPrice - currentPrice) * trade.quantity * contractSize
-    }
-    
+    const pnl = pnlUsd(trade.symbol, trade.side, trade.openPrice, currentPrice,
+      trade.quantity, contractSize, (s) => livePrices[s] || null)
+
     return pnl - (trade.commission || 0) - (trade.swap || 0)
   }
 

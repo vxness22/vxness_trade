@@ -8,6 +8,8 @@ import Trade from '../models/Trade.js'
 import Charges from '../models/Charges.js'
 import IBCommissionConfig from '../models/IBCommissionConfig.js'
 import { resolveTradeSegment } from '../utils/tradeSegment.js'
+import { notionalUsd } from '../utils/symbolMeta.js'
+import infowayService from './infowayService.js'
 
 class IBEngine {
   constructor() {
@@ -29,13 +31,18 @@ class IBEngine {
     return this.CONTRACT_SIZES.DEFAULT_FOREX
   }
 
-  _calcChargeCommission(quantity, price, commissionType, commissionValue, contractSize) {
+  _calcChargeCommission(quantity, price, commissionType, commissionValue, contractSize, symbol = null) {
     const ct = String(commissionType || 'PER_LOT')
     const cv = Number(commissionValue) || 0
     if (cv <= 0) return 0
     if (ct === 'PER_LOT') return quantity * cv
     if (ct === 'PER_TRADE') return cv
-    if (ct === 'PERCENTAGE') return quantity * contractSize * price * (cv / 100)
+    if (ct === 'PERCENTAGE') {
+      // Percentage of USD notional — `qty * cs * price` is quote-currency
+      // (yen on USDJPY), so the IB pool would be ~146x too big without this.
+      if (symbol) return notionalUsd(symbol, quantity, price, (s) => infowayService.getPrice(s)) * (cv / 100)
+      return quantity * contractSize * price * (cv / 100)
+    }
     return quantity * cv
   }
 
@@ -67,7 +74,8 @@ class IBEngine {
         t.closePrice,
         charges.commissionType,
         charges.commissionValue,
-        t.contractSize || this.getContractSize(t.symbol)
+        t.contractSize || this.getContractSize(t.symbol),
+        t.symbol
       )
     }
 
@@ -530,7 +538,9 @@ class IBEngine {
         if (plan.commissionType === 'PER_LOT') {
           commissionAmount = trade.quantity * rate
         } else {
-          const tradeValue = trade.quantity * contractSize * (trade.openPrice || 0)
+          // USD notional — `qty * cs * price` is quote currency (yen on USDJPY).
+          const tradeValue = notionalUsd(trade.symbol, trade.quantity, trade.openPrice || 0,
+            (s) => infowayService.getPrice(s))
           commissionAmount = tradeValue * (rate / 100)
         }
 

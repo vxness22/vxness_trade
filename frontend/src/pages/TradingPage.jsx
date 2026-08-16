@@ -16,7 +16,7 @@ import { API_URL } from '../config/api'
 
 import { adjustQuotesForTradingDisplay } from '../services/chargePricing'
 
-import { marginUsd as computeMarginUsd } from '../utils/margin'
+import { marginUsd as computeMarginUsd, pnlUsd } from '../utils/margin'
 
 import { isMarketOpen, marketClosedReason } from '../utils/marketHours'
 
@@ -230,9 +230,8 @@ const TradingPage = () => {
     const lp = livePrices[trade.symbol]
     const inst = instruments.find(i => i.symbol === trade.symbol) || selectedInstrument
     const cur = lp ? (trade.side === 'BUY' ? lp.bid : lp.ask) : (trade.side === 'BUY' ? inst.bid : inst.ask)
-    const pnl = trade.side === 'BUY'
-      ? (cur - trade.openPrice) * trade.quantity * trade.contractSize
-      : (trade.openPrice - cur) * trade.quantity * trade.contractSize
+    const pnl = pnlUsd(trade.symbol, trade.side, trade.openPrice, cur,
+      trade.quantity, trade.contractSize, (s) => livePrices[s] || null)
     return sum + pnl
   }, 0), [openTrades, livePrices, instruments, selectedInstrument])
 
@@ -1052,11 +1051,8 @@ const TradingPage = () => {
 
           hasValidPrices = true
 
-          const pnl = trade.side === 'BUY'
-
-            ? (currentPrice - trade.openPrice) * trade.quantity * trade.contractSize
-
-            : (trade.openPrice - currentPrice) * trade.quantity * trade.contractSize
+          const pnl = pnlUsd(trade.symbol, trade.side, trade.openPrice, currentPrice,
+            trade.quantity, trade.contractSize, (s) => livePrices[s] || null)
 
           totalFloatingPnl += pnl - (trade.commission || 0) - (trade.swap || 0)
 
@@ -2417,11 +2413,8 @@ const TradingPage = () => {
 
         : (trade.side === 'BUY' ? inst.bid : inst.ask)
 
-      const pnl = trade.side === 'BUY' 
-
-        ? (currentPrice - trade.openPrice) * trade.quantity * trade.contractSize
-
-        : (trade.openPrice - currentPrice) * trade.quantity * trade.contractSize
+      const pnl = pnlUsd(trade.symbol, trade.side, trade.openPrice, currentPrice,
+        trade.quantity, trade.contractSize, (s) => livePrices[s] || null)
 
 
 
@@ -3695,9 +3688,8 @@ const TradingPage = () => {
                   const currentPrice = livePrice
                     ? (trade.side === 'BUY' ? livePrice.bid : livePrice.ask)
                     : (trade.side === 'BUY' ? inst.bid : inst.ask)
-                  const pnl = trade.side === 'BUY'
-                    ? (currentPrice - trade.openPrice) * trade.quantity * trade.contractSize
-                    : (trade.openPrice - currentPrice) * trade.quantity * trade.contractSize
+                  const pnl = pnlUsd(trade.symbol, trade.side, trade.openPrice, currentPrice,
+                    trade.quantity, trade.contractSize, (s) => livePrices[s] || null)
                   if (!groupsMap[trade.symbol]) {
                     groupsMap[trade.symbol] = { symbol: trade.symbol, trades: [], longLots: 0, shortLots: 0, netPnl: 0, charges: 0, swap: 0, entrySum: 0, qtySum: 0, bid: 0, ask: 0 }
                   }

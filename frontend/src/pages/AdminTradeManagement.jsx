@@ -76,6 +76,8 @@ import { API_URL } from '../config/api'
 
 import { formatPrice } from '../utils/formatPrice'
 
+import { pnlUsd, notionalUsd } from '../utils/margin'
+
 
 
 
@@ -578,15 +580,8 @@ const AdminTradeManagement = () => {
 
 
 
-    const pnl = trade.side === 'BUY'
-
-
-
-      ? (currentPrice - trade.openPrice) * trade.quantity * contractSize
-
-
-
-      : (trade.openPrice - currentPrice) * trade.quantity * contractSize
+    const pnl = pnlUsd(trade.symbol, trade.side, trade.openPrice, currentPrice,
+      trade.quantity, contractSize, (s) => livePrices[s] || null)
 
 
 
@@ -1550,15 +1545,11 @@ const AdminTradeManagement = () => {
 
 
 
-    const pnl = selectedTrade.side === 'BUY'
-
-
-
-      ? (parseFloat(editForm.closePrice) - parseFloat(editForm.openPrice)) * parseFloat(editForm.quantity) * contractSize
-
-
-
-      : (parseFloat(editForm.openPrice) - parseFloat(editForm.closePrice)) * parseFloat(editForm.quantity) * contractSize
+    const pnl = pnlUsd(
+      selectedTrade.symbol, selectedTrade.side,
+      parseFloat(editForm.openPrice), parseFloat(editForm.closePrice),
+      parseFloat(editForm.quantity), contractSize, (s) => livePrices[s] || null
+    )
 
 
 
@@ -1626,7 +1617,7 @@ const AdminTradeManagement = () => {
 
 
 
-        const totalVolume = data.trades.reduce((sum, t) => sum + (t.quantity * t.contractSize * t.openPrice), 0)
+        const totalVolume = data.trades.reduce((sum, t) => sum + notionalUsd(t.symbol, t.quantity, t.openPrice, (s) => livePrices[s] || null), 0)
 
 
 
@@ -4014,15 +4005,11 @@ const AdminTradeManagement = () => {
 
 
 
-                    const pnl = selectedTrade.side === 'BUY'
-
-
-
-                      ? (parseFloat(editForm.closePrice) - parseFloat(editForm.openPrice)) * parseFloat(editForm.quantity) * contractSize
-
-
-
-                      : (parseFloat(editForm.openPrice) - parseFloat(editForm.closePrice)) * parseFloat(editForm.quantity) * contractSize
+                    const pnl = pnlUsd(
+                      selectedTrade.symbol, selectedTrade.side,
+                      parseFloat(editForm.openPrice), parseFloat(editForm.closePrice),
+                      parseFloat(editForm.quantity), contractSize, (s) => livePrices[s] || null
+                    )
 
 
 
@@ -4290,15 +4277,9 @@ const AdminTradeManagement = () => {
 
 
 
-                    const rawPnl = selectedTrade.side === 'BUY' 
-
-
-
-                      ? (closeFormPrice - selectedTrade.openPrice) * selectedTrade.quantity * contractSize
-
-
-
-                      : (selectedTrade.openPrice - closeFormPrice) * selectedTrade.quantity * contractSize
+                    const rawPnl = pnlUsd(selectedTrade.symbol, selectedTrade.side,
+                      selectedTrade.openPrice, closeFormPrice,
+                      selectedTrade.quantity, contractSize, (s) => livePrices[s] || null)
 
 
 

@@ -303,7 +303,7 @@ router.post('/positions/:id/close', jwtAuth, async (req, res) => {
     const closePrice = trade.side === 'BUY' ? q.bid : q.ask
     const share = askedLots / trade.quantity
     const rawPnl = tradeEngine.calculatePnl(
-      trade.side, trade.openPrice, closePrice, askedLots, trade.contractSize
+      trade.side, trade.openPrice, closePrice, askedLots, trade.contractSize, trade.symbol
     )
     const swapShare = (trade.swap || 0) * share
     const realized = rawPnl - swapShare

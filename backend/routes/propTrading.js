@@ -6,6 +6,8 @@ import Wallet from '../models/Wallet.js'
 import Transaction from '../models/Transaction.js'
 import propTradingEngine from '../services/propTradingEngine.js'
 import { overallDrawdownPercent } from '../utils/drawdownMath.js'
+import { pnlUsd } from '../utils/symbolMeta.js'
+import infowayService from '../services/infowayService.js'
 
 const router = express.Router()
 
@@ -195,11 +197,10 @@ router.get('/my-accounts/:userId', async (req, res) => {
         if (priceData) {
           const currentPrice = trade.side === 'BUY' ? priceData.bid : priceData.ask
           const contractSize = trade.contractSize || 100000
-          if (trade.side === 'BUY') {
-            floatingPnl += (currentPrice - trade.openPrice) * trade.quantity * contractSize
-          } else {
-            floatingPnl += (trade.openPrice - currentPrice) * trade.quantity * contractSize
-          }
+          floatingPnl += pnlUsd(
+            trade.symbol, trade.side, trade.openPrice, currentPrice,
+            trade.quantity, contractSize, (s) => infowayService.getPrice(s)
+          )
           floatingPnl -= (trade.commission || 0) + (trade.swap || 0)
         } else {
           // Fallback to stored PnL if no live price

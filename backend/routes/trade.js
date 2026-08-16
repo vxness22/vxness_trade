@@ -13,6 +13,7 @@ import infowayService from '../services/infowayService.js'
 import { resolveTradeSegment } from '../utils/tradeSegment.js'
 import { commissionDollarAmount } from '../utils/commissionMath.js'
 import { isMarketOpen } from '../utils/marketHours.js'
+import { pnlUsd } from '../utils/symbolMeta.js'
 
 // Get price from cache (populated by background streamPrices in server.js)
 function getFreshPrice(symbol) {
@@ -323,9 +324,10 @@ router.post('/close', async (req, res) => {
     if (challengeAccount) {
       // Close trade for challenge account
       const closePrice = tradeToClose.side === 'BUY' ? parseFloat(bid) : parseFloat(ask)
-      const rawPnl = tradeToClose.side === 'BUY'
-        ? (closePrice - tradeToClose.openPrice) * tradeToClose.quantity * tradeToClose.contractSize
-        : (tradeToClose.openPrice - closePrice) * tradeToClose.quantity * tradeToClose.contractSize
+      const rawPnl = pnlUsd(
+        tradeToClose.symbol, tradeToClose.side, tradeToClose.openPrice, closePrice,
+        tradeToClose.quantity, tradeToClose.contractSize, getFreshPrice
+      )
       
       // Get charges for commission on close
       const charges = await Charges.getChargesForTrade(
@@ -609,11 +611,10 @@ router.get('/netting/:tradingAccountId', async (req, res) => {
       let tradePnl = 0
       if (priceData) {
         const currentPrice = trade.side === 'BUY' ? priceData.bid : priceData.ask
-        if (trade.side === 'BUY') {
-          tradePnl = (currentPrice - trade.openPrice) * trade.quantity * trade.contractSize
-        } else {
-          tradePnl = (trade.openPrice - currentPrice) * trade.quantity * trade.contractSize
-        }
+        tradePnl = pnlUsd(
+          trade.symbol, trade.side, trade.openPrice, currentPrice,
+          trade.quantity, trade.contractSize, getFreshPrice
+        )
         tradePnl = tradePnl - (trade.commission || 0) - (trade.swap || 0)
       }
 
@@ -827,10 +828,10 @@ router.get('/summary/:tradingAccountId', async (req, res) => {
       const priceData = currentPrices[trade.symbol]
       if (priceData) {
         const currentPrice = trade.side === 'BUY' ? priceData.bid : priceData.ask
-        const pnl = trade.side === 'BUY'
-          ? (currentPrice - trade.openPrice) * trade.quantity * trade.contractSize
-          : (trade.openPrice - currentPrice) * trade.quantity * trade.contractSize
-        floatingPnl += pnl
+        floatingPnl += pnlUsd(
+          trade.symbol, trade.side, trade.openPrice, currentPrice,
+          trade.quantity, trade.contractSize, getFreshPrice
+        )
       }
     }
 

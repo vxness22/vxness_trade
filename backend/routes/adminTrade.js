@@ -4,6 +4,10 @@ import express from 'express'
 
 import Trade from '../models/Trade.js'
 
+import infowayService from '../services/infowayService.js'
+
+import { pnlUsd, marginUsd } from '../utils/symbolMeta.js'
+
 
 
 import TradingAccount from '../models/TradingAccount.js'
@@ -242,7 +246,7 @@ router.post('/create', async (req, res) => {
 
 
 
-    const marginRequired = (quantity * contractSize * openPrice) / leverageNum
+    const marginRequired = marginUsd(symbol, quantity, openPrice, leverageNum, (s) => infowayService.getPrice(s))
 
 
 
@@ -666,15 +670,8 @@ router.put('/edit/:tradeId', async (req, res) => {
 
 
 
-        const pnl = trade.side === 'BUY'
-
-
-
-          ? (closePrice - trade.openPrice) * trade.quantity * contractSize
-
-
-
-          : (trade.openPrice - closePrice) * trade.quantity * contractSize
+        const pnl = pnlUsd(trade.symbol, trade.side, trade.openPrice, closePrice,
+          trade.quantity, contractSize, (s) => infowayService.getPrice(s))
 
 
 
@@ -842,11 +839,8 @@ router.put('/edit/:tradeId', async (req, res) => {
 
 
 
-      const contractSize = trade.contractSize || 100
-
-
-
-      trade.marginUsed = (trade.quantity * contractSize * trade.openPrice) / leverage
+      trade.marginUsed = marginUsd(trade.symbol, trade.quantity, trade.openPrice, leverage,
+        (s) => infowayService.getPrice(s))
 
 
 
@@ -1047,15 +1041,8 @@ router.post('/close/:tradeId', async (req, res) => {
 
 
 
-    const rawPnl = trade.side === 'BUY'
-
-
-
-      ? (finalClosePrice - trade.openPrice) * trade.quantity * trade.contractSize
-
-
-
-      : (trade.openPrice - finalClosePrice) * trade.quantity * trade.contractSize
+    const rawPnl = pnlUsd(trade.symbol, trade.side, trade.openPrice, finalClosePrice,
+      trade.quantity, trade.contractSize, (s) => infowayService.getPrice(s))
 
 
 

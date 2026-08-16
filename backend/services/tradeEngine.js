@@ -8,7 +8,7 @@ import { resolveTradeSegment } from '../utils/tradeSegment.js'
 
 import { commissionDollarAmount } from '../utils/commissionMath.js'
 
-import { pipSize, contractSize as symbolContractSize, isCrypto as symbolIsCrypto, marginUsd } from '../utils/symbolMeta.js'
+import { pipSize, contractSize as symbolContractSize, isCrypto as symbolIsCrypto, marginUsd, pnlUsd, notionalUsd } from '../utils/symbolMeta.js'
 
 import infowayService from './infowayService.js'
 
@@ -102,6 +102,8 @@ class TradeEngine {
       return marginUsd(symbol, quantity, openPrice, leverageNum, (sym) => infowayService.getPrice(sym))
     }
 
+    console.warn('[tradeEngine] calculateMargin called without symbol — margin is NOT currency-corrected')
+
     const margin = (quantity * contractSize * openPrice) / leverageNum
 
     return Math.round(margin * 100) / 100 // Round to 2 decimal places
@@ -120,9 +122,23 @@ class TradeEngine {
 
 
 
-  // Calculate PnL for a trade
+  // Calculate PnL for a trade, in USD.
+  //
+  // `symbol` is what makes the result dollars rather than "units of whatever
+  // currency the pair is quoted in". Without it this returns the legacy raw
+  // product, which is only correct for USD-quoted symbols — always pass it.
 
-  calculatePnl(side, openPrice, currentPrice, quantity, contractSize = this.CONTRACT_SIZE) {
+  calculatePnl(side, openPrice, currentPrice, quantity, contractSize = this.CONTRACT_SIZE, symbol = null) {
+
+    if (symbol) {
+
+      return pnlUsd(symbol, side, openPrice, currentPrice, quantity, contractSize, (s) => infowayService.getPrice(s))
+
+    }
+
+    // No caller should reach here. Without a symbol the result is in the pair's
+    // quote currency, which is the bug that inflated JPY balances ~146x.
+    console.warn('[tradeEngine] calculatePnl called without symbol — result is NOT USD-converted')
 
     if (side === 'BUY') {
 
@@ -144,7 +160,7 @@ class TradeEngine {
 
     const currentPrice = trade.side === 'BUY' ? currentBid : currentAsk
 
-    const rawPnl = this.calculatePnl(trade.side, trade.openPrice, currentPrice, trade.quantity, trade.contractSize)
+    const rawPnl = this.calculatePnl(trade.side, trade.openPrice, currentPrice, trade.quantity, trade.contractSize, trade.symbol)
 
     return rawPnl - trade.commission - trade.swap
 
@@ -676,7 +692,7 @@ class TradeEngine {
 
     // Calculate final PnL (commission already deducted on open, subtract swap and close commission)
 
-    const rawPnl = this.calculatePnl(trade.side, trade.openPrice, closePrice, trade.quantity, trade.contractSize)
+    const rawPnl = this.calculatePnl(trade.side, trade.openPrice, closePrice, trade.quantity, trade.contractSize, trade.symbol)
 
     const realizedPnl = rawPnl - trade.swap - closeCommission
 
@@ -1336,9 +1352,11 @@ class TradeEngine {
 
       } else {
 
-        // Percentage of trade value
+        // Percentage of the position's USD notional. `qty * cs * price` alone is
+        // in the pair's quote currency (14.5M "yen" on a 1-lot USDJPY), so it has
+        // to go through notionalUsd like margin does.
 
-        const tradeValue = trade.quantity * trade.contractSize * trade.openPrice
+        const tradeValue = notionalUsd(trade.symbol, trade.quantity, trade.openPrice, (s) => infowayService.getPrice(s))
 
         swapAmount = tradeValue * (swapRate / 100)
 

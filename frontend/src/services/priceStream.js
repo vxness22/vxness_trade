@@ -1,6 +1,7 @@
 // Institutional-grade real-time price streaming service using Socket.IO
 import { io } from 'socket.io-client'
 import { API_BASE_URL } from '../config/api'
+import { pnlUsd } from '../utils/margin'
 
 const SOCKET_URL = API_BASE_URL
 
@@ -126,12 +127,13 @@ class PriceStreamService {
     
     const currentPrice = trade.side === 'BUY' ? prices.bid : prices.ask
     const contractSize = trade.contractSize || 100
-    
-    if (trade.side === 'BUY') {
-      return (currentPrice - trade.openPrice) * trade.quantity * contractSize
-    } else {
-      return (trade.openPrice - currentPrice) * trade.quantity * contractSize
-    }
+
+    // pnlUsd converts out of the pair's quote currency — the bare price delta is
+    // only dollars for USD-quoted symbols (USDJPY would read ~150x too high).
+    return pnlUsd(
+      trade.symbol, trade.side, trade.openPrice, currentPrice,
+      trade.quantity, contractSize, (s) => this.prices[s] || null
+    )
   }
 }
 

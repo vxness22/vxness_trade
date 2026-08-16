@@ -89,34 +89,89 @@ export function usdValueOf(ccy, getPrice) {
   return null
 }
 
-// Margin required in USD for a position, leverage as a number (e.g. 500 for 1:500).
-// Correctly handles three cases instead of blindly multiplying by price:
-//   USD-quoted (XXXUSD + metals/crypto/commodities/indices): notional = qty * cs * price
-//   USD-base   (USDXXX):                                      notional = qty * cs   (already USD)
-//   cross      (neither side USD, e.g. EURGBP/GBPJPY):        notional = qty * cs * usdValueOf(base)
-export function marginUsd(symbol, quantity, price, leverageNum, getPrice) {
+// USD value of ONE unit of a symbol's QUOTE currency — the multiplier that turns
+// a raw `Δprice * lots * contractSize` figure into real USD.
+//
+// This is the piece that was missing everywhere P&L was calculated. That raw
+// product is denominated in the pair's QUOTE currency, not in dollars:
+//   EURUSD  quote USD  -> already USD                          -> factor 1
+//   USDJPY  quote JPY  -> yen; 1 JPY ~ $0.0069                 -> factor 1/145
+//   GBPJPY  quote JPY  -> yen                                  -> factor 1/145
+//   EURGBP  quote GBP  -> pounds; 1 GBP ~ $1.34                -> factor 1.34
+// Booking the raw number as dollars overstates a USDJPY result ~145x.
+//
+// For a USDXXX pair the pair's own price IS "XXX per USD", so 1/price is the
+// exact rate at that fill — no second lookup, no dependency on another symbol.
+// Crosses resolve the quote currency through its own USD pair.
+export function quoteToUsd(symbol, price, getPrice) {
+  const s = String(symbol || '').toUpperCase()
+  const cls = classify(s)
+
+  // metals / crypto / commodities / indices are all quoted in USD already
+  if (cls !== 'forex' && cls !== 'jpy') return 1
+
+  const base = s.slice(0, 3)
+  const quote = s.slice(3, 6)
+
+  if (quote === 'USD') return 1
+
+  if (base === 'USD') {
+    const p = Number(price)
+    if (p > 0) return 1 / p
+    const viaFeed = usdValueOf(quote, getPrice)
+    return viaFeed != null ? viaFeed : 1
+  }
+
+  const rate = usdValueOf(quote, getPrice)
+  if (rate == null) {
+    // Returning 1 here reproduces the original bug for this symbol. Every symbol
+    // in the current feed resolves, so this firing means a new instrument was
+    // added whose quote currency has no USD pair to convert through.
+    console.warn(`[symbolMeta] quoteToUsd: no USD rate for ${quote} (${s}) — P&L will NOT be USD-converted`)
+    return 1
+  }
+  return rate
+}
+
+// Realised/floating P&L in USD. The single entry point every engine and route
+// should use — never the bare `Δprice * lots * contractSize` product.
+export function pnlUsd(symbol, side, openPrice, closePrice, quantity, cs, getPrice) {
+  const size = Number(cs) || contractSize(symbol)
+  const raw = String(side).toUpperCase() === 'BUY'
+    ? (closePrice - openPrice) * quantity * size
+    : (openPrice - closePrice) * quantity * size
+  return raw * quoteToUsd(symbol, closePrice, getPrice)
+}
+
+// Notional (position) value in USD. The base for margin, percentage commission
+// and percentage swap — all three used to compute `qty * cs * price` and treat
+// it as dollars, which is only true for USD-quoted symbols.
+//   USD-quoted (XXXUSD + metals/crypto/commodities/indices): qty * cs * price
+//   USD-base   (USDXXX):                                     qty * cs   (already USD)
+//   cross      (neither side USD, e.g. EURGBP/GBPJPY):        qty * cs * usdValueOf(base)
+export function notionalUsd(symbol, quantity, price, getPrice) {
   const s = String(symbol || '').toUpperCase()
   const cs = contractSize(s)
-  const lev = Number(leverageNum) || 100
   const cls = classify(s)
-  let notionalUsd
 
   if (cls !== 'forex' && cls !== 'jpy') {
     // metals / crypto / commodities / indices are all USD-quoted
-    notionalUsd = quantity * cs * price
-  } else {
-    const base = s.slice(0, 3)
-    const quote = s.slice(3, 6)
-    if (quote === 'USD') {
-      notionalUsd = quantity * cs * price            // XXXUSD: price = USD per base unit
-    } else if (base === 'USD') {
-      notionalUsd = quantity * cs                     // USDXXX: 1 lot = cs USD already
-    } else {
-      const baseUsd = usdValueOf(base, getPrice)      // cross: convert base -> USD
-      notionalUsd = baseUsd != null
-        ? quantity * cs * baseUsd
-        : quantity * cs * price                       // fallback (approx) if rate unavailable
-    }
+    return quantity * cs * price
   }
-  return Math.round((notionalUsd / lev) * 100) / 100
+
+  const base = s.slice(0, 3)
+  const quote = s.slice(3, 6)
+  if (quote === 'USD') return quantity * cs * price   // XXXUSD: price = USD per base unit
+  if (base === 'USD') return quantity * cs            // USDXXX: 1 lot = cs USD already
+
+  const baseUsd = usdValueOf(base, getPrice)          // cross: convert base -> USD
+  return baseUsd != null
+    ? quantity * cs * baseUsd
+    : quantity * cs * price                           // fallback (approx) if rate unavailable
+}
+
+// Margin required in USD for a position, leverage as a number (e.g. 500 for 1:500).
+export function marginUsd(symbol, quantity, price, leverageNum, getPrice) {
+  const lev = Number(leverageNum) || 100
+  return Math.round((notionalUsd(symbol, quantity, price, getPrice) / lev) * 100) / 100
 }

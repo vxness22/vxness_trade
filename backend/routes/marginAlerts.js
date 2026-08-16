@@ -3,6 +3,8 @@ import MarginAlert from '../models/MarginAlert.js'
 import TradingAccount from '../models/TradingAccount.js'
 import User from '../models/User.js'
 import Trade from '../models/Trade.js'
+import { marginUsd } from '../utils/symbolMeta.js'
+import infowayService from '../services/infowayService.js'
 
 const router = express.Router()
 
@@ -162,10 +164,16 @@ router.get('/check-margins', async (req, res) => {
       // Calculate total margin used by open trades
       let totalMarginUsed = 0
       for (const trade of openTrades) {
-        // Simplified margin calculation - adjust based on your actual formula
-        const leverage = parseInt(account.leverage.replace('1:', '')) || 100
-        const marginRequired = (trade.quantity * trade.openPrice) / leverage
-        totalMarginUsed += marginRequired
+        // Use the margin the engine actually reserved. The old inline formula
+        // dropped contractSize entirely AND ignored quote currency, so alerts
+        // fired against a margin level that matched nothing the trader saw.
+        totalMarginUsed += trade.marginUsed > 0
+          ? trade.marginUsed
+          : marginUsd(
+              trade.symbol, trade.quantity, trade.openPrice,
+              parseInt(String(account.leverage).replace('1:', '')) || 100,
+              (s) => infowayService.getPrice(s)
+            )
       }
 
       // Calculate margin level percentage

@@ -1,4 +1,6 @@
 import mongoose from 'mongoose'
+import { pnlUsd } from '../utils/symbolMeta.js'
+import infowayService from '../services/infowayService.js'
 
 const tradeSchema = new mongoose.Schema({
   userId: {
@@ -162,17 +164,15 @@ tradeSchema.methods.calculatePnl = function(currentBid, currentAsk) {
   if (this.status !== 'OPEN') return this.realizedPnl || 0
   
   const currentPrice = this.side === 'BUY' ? currentBid : currentAsk
-  let pnl = 0
-  
-  if (this.side === 'BUY') {
-    pnl = (currentPrice - this.openPrice) * this.quantity * this.contractSize
-  } else {
-    pnl = (this.openPrice - currentPrice) * this.quantity * this.contractSize
-  }
-  
+
+  // pnlUsd converts out of the pair's quote currency; the bare price delta is
+  // only dollars for USD-quoted symbols.
+  let pnl = pnlUsd(this.symbol, this.side, this.openPrice, currentPrice, this.quantity, this.contractSize,
+    (s) => infowayService.getPrice(s))
+
   // Subtract commission and swap
   pnl = pnl - this.commission - this.swap
-  
+
   return pnl
 }
 

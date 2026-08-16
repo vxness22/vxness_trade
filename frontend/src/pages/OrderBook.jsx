@@ -70,6 +70,7 @@ import { confirmToast } from '../utils/dialogs'
 import logoImage from '../assets/logo.png'
 
 import { formatPrice } from '../utils/formatPrice'
+import { pnlUsd } from '../utils/margin'
 
 
 
@@ -453,13 +454,10 @@ const OrderBook = () => {
 
     const contractSize = trade.contractSize || getContractSize(trade.symbol)
 
-    const pnl = trade.side === 'BUY'
+    const pnl = pnlUsd(trade.symbol, trade.side, trade.openPrice, currentPrice,
+      trade.quantity, contractSize, (s) => livePrices[s] || null)
 
-      ? (currentPrice - trade.openPrice) * trade.quantity * contractSize
 
-      : (trade.openPrice - currentPrice) * trade.quantity * contractSize
-
-    
 
     return pnl - (trade.commission || 0) - (trade.swap || 0)
 

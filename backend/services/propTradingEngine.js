@@ -7,7 +7,7 @@ import Charges from '../models/Charges.js'
 import { sendTemplateEmail } from '../services/emailService.js'
 import { resolveTradeSegment } from '../utils/tradeSegment.js'
 import { commissionDollarAmount } from '../utils/commissionMath.js'
-import { pipSize, contractSize as symbolContractSize, marginUsd } from '../utils/symbolMeta.js'
+import { pipSize, contractSize as symbolContractSize, marginUsd, pnlUsd } from '../utils/symbolMeta.js'
 import { overallDrawdownPercent } from '../utils/drawdownMath.js'
 import infowayService from './infowayService.js'
 
@@ -285,9 +285,10 @@ class PropTradingEngine {
     // (see trade.commission below) so users see the $ amount in the Charges column.
     const openPrice = this.calculateExecutionPrice(side, bid, ask, charges.spreadValue, charges.spreadType, symbol)
 
-    // Calculate margin
+    // Calculate margin — currency-aware, or a JPY/cross pair reserves the wrong
+    // amount and the account can be over-leveraged.
     const leverage = rules.maxLeverage || 100
-    const marginRequired = (quantity * contractSize * openPrice) / leverage
+    const marginRequired = marginUsd(symbol, quantity, openPrice, leverage, (s) => infowayService.getPrice(s))
 
     // Calculate commission on open
     let commission = 0
@@ -853,10 +854,11 @@ class PropTradingEngine {
       if (shouldClose) {
         console.log(`Challenge trade ${trade.tradeId} ${closeReason} triggered: ${trade.side} ${trade.symbol} at ${closePrice}`)
         
-        // Calculate PnL
-        const pnl = trade.side === 'BUY'
-          ? (closePrice - trade.openPrice) * trade.quantity * trade.contractSize
-          : (trade.openPrice - closePrice) * trade.quantity * trade.contractSize
+        // Calculate PnL in USD (pnlUsd converts out of the pair's quote currency)
+        const pnl = pnlUsd(
+          trade.symbol, trade.side, trade.openPrice, closePrice,
+          trade.quantity, trade.contractSize, (s) => infowayService.getPrice(s)
+        )
 
         // Update trade
         trade.status = 'CLOSED'
@@ -970,14 +972,25 @@ class PropTradingEngine {
 
   // Helper methods
   calculatePotentialLoss(tradeParams) {
-    const { side, openPrice, stopLoss, quantity, contractSize = 100000 } = tradeParams
+    const { side, stopLoss, quantity, symbol, bid, ask } = tradeParams
     if (!stopLoss) return 0
-    
-    const priceDiff = side === 'BUY' 
-      ? openPrice - stopLoss 
-      : stopLoss - openPrice
-    
-    return Math.abs(priceDiff * quantity * contractSize)
+
+    // validateTradeOpen passes bid/ask, not openPrice, and never a contractSize.
+    // Reading `openPrice` straight off tradeParams yielded undefined -> NaN, and
+    // `NaN > maxLossAmount` is false, so the max-loss-per-trade rule never fired.
+    const entry = Number(tradeParams.openPrice) > 0
+      ? Number(tradeParams.openPrice)
+      : (side === 'BUY' ? Number(ask) : Number(bid))
+    if (!(entry > 0)) return 0
+
+    const cs = Number(tradeParams.contractSize) > 0
+      ? Number(tradeParams.contractSize)
+      : this.getContractSize(symbol)
+
+    // Risk-to-SL in USD. The bare price-diff product is quote currency, which on
+    // a JPY pair overstates the risk ~146x and would reject valid trades.
+    return Math.abs(pnlUsd(symbol, side, entry, stopLoss, quantity, cs,
+      (s) => infowayService.getPrice(s)))
   }
 
   calculateMargin(tradeParams, account) {
@@ -987,6 +1000,7 @@ class PropTradingEngine {
     if (symbol) {
       return marginUsd(symbol, quantity, openPrice, leverageNum, (sym) => infowayService.getPrice(sym))
     }
+    console.warn('[propTradingEngine] calculateMargin called without symbol — margin is NOT currency-corrected')
     return (quantity * openPrice * contractSize) / leverageNum
   }
 
