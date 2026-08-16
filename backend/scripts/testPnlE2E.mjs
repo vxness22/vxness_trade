@@ -131,12 +131,27 @@ async function main() {
   console.log(`floating P&L engine ${money(sum.floatingPnl)}  expected ${money(wantFloat)}  equity ${money(sum.equity)}   ${floatOk ? 'PASS' : 'FAIL'}`)
 
   // ---- margin ----
+  // Expectations are DERIVED, never hard-coded: a cross pair's margin depends on
+  // a live rate (GBPJPY needs GBPUSD), so a literal here only holds for whatever
+  // prices the machine happened to have. Independent of symbolMeta on purpose.
   console.log('\n--- margin (1 lot, 1:100) ---')
-  for (const [sym, px, want] of [['EURUSD',1.1321,1132.10],['USDJPY',145.51,1000],['XAUUSD',4155.65,4155.65],['GBPJPY',195.81,1345.10]]) {
+  const mid = (s) => { const p = infowayService.getPrice(s); return p ? (p.bid + p.ask) / 2 : null }
+  const wantMargin = (sym, px) => {
+    const cs = sym === 'XAUUSD' ? 100 : 100000
+    if (NONFX(sym)) return cs * px / 100
+    const base = sym.slice(0, 3), quote = sym.slice(3, 6)
+    if (quote === 'USD') return cs * px / 100          // XXXUSD: notional = cs * price
+    if (base === 'USD') return cs / 100                // USDXXX: 1 lot = cs USD already
+    const r = mid(base + 'USD')                        // cross: convert the BASE to USD
+    return r != null ? cs * r / 100 : null
+  }
+  for (const [sym, px] of [['EURUSD', 1.1321], ['USDJPY', 145.51], ['XAUUSD', 4155.65], ['GBPJPY', 195.81]]) {
+    const want = wantMargin(sym, px)
+    if (want == null) { console.log(`  ${sym.padEnd(8)} SKIPPED — no live rate to derive from`); continue }
     const m = tradeEngine.calculateMargin(1, px, '1:100', undefined, sym)
     const ok = Math.abs(m - want) < 1
     ok ? pass++ : fail++
-    console.log(`  ${sym.padEnd(8)} margin ${money(m).padStart(11)}   expected ~${money(want)}   ${ok ? 'PASS' : 'FAIL'}`)
+    console.log(`  ${sym.padEnd(8)} margin ${money(m).padStart(11)}   expected ${money(want).padStart(11)}   ${ok ? 'PASS' : 'FAIL'}`)
   }
 
   // ---- SL/TP auto-close path (the background loop that closes trades) ----
