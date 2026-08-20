@@ -14,6 +14,7 @@ import { resolveTradeSegment } from '../utils/tradeSegment.js'
 import { commissionDollarAmount } from '../utils/commissionMath.js'
 import { isMarketOpen } from '../utils/marketHours.js'
 import { pnlUsd } from '../utils/symbolMeta.js'
+import { webAuth, ownedAccount, ownedTrade, denyAccount, denyTrade } from '../utils/webAuth.js'
 
 // Get price from cache (populated by background streamPrices in server.js)
 function getFreshPrice(symbol) {
@@ -49,11 +50,15 @@ async function assertKycApprovedForUserId(userId, res) {
 }
 
 // POST /api/trade/open - Open a new trade
-router.post('/open', async (req, res) => {
+// The four state-changing routes below take their user from the verified token,
+// never from the body, and confirm the account/trade belongs to them. See
+// utils/webAuth.js for why. The read-only GETs are deliberately left alone for
+// now so this change cannot break anything a trader is mid-way through.
+router.post('/open', webAuth, async (req, res) => {
   try {
-    const { 
-      userId, 
-      tradingAccountId, 
+    const {
+      userId,
+      tradingAccountId,
       symbol, 
       segment, 
       side, 
@@ -67,14 +72,20 @@ router.post('/open', async (req, res) => {
     } = req.body
 
     // Validate required fields
-    if (!userId || !tradingAccountId || !symbol || !side || !orderType || !quantity) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Missing required fields' 
+    if (!tradingAccountId || !symbol || !side || !orderType || !quantity) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields'
       })
     }
 
-    if (!(await assertKycApprovedForUserId(userId, res))) return
+    // The body's userId is ignored outright — the token decides who this is,
+    // and the account being traded has to belong to them.
+    const ownAccount = await ownedAccount(req, tradingAccountId)
+    if (!ownAccount) return denyAccount(res)
+    const ownerId = String(req.authUser._id)
+
+    if (!(await assertKycApprovedForUserId(ownerId, res))) return
 
     // Check if market data is available (bid/ask must be valid numbers > 0)
     if (!bid || !ask || parseFloat(bid) <= 0 || parseFloat(ask) <= 0 || isNaN(parseFloat(bid)) || isNaN(parseFloat(ask))) {
@@ -160,7 +171,7 @@ router.post('/open', async (req, res) => {
 
       // Open trade for challenge account
       const trade = await propTradingEngine.openChallengeTrade(
-        userId,
+        ownerId,
         tradingAccountId,
         tradeParams
       )
@@ -220,7 +231,7 @@ router.post('/open', async (req, res) => {
 
     // Regular trading account - use standard trade engine
     const trade = await tradeEngine.openTrade(
-      userId,
+      ownerId,
       tradingAccountId,
       symbol,
       segment || 'Forex',
@@ -267,16 +278,18 @@ router.post('/open', async (req, res) => {
 })
 
 // POST /api/trade/close - Close a trade
-router.post('/close', async (req, res) => {
+router.post('/close', webAuth, async (req, res) => {
   try {
     const { tradeId, bid, ask } = req.body
 
     if (!tradeId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Trade ID is required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Trade ID is required'
       })
     }
+
+    if (!(await ownedTrade(req, tradeId))) return denyTrade(res)
 
     // Check if market data is available
     if (!bid || !ask || parseFloat(bid) <= 0 || parseFloat(ask) <= 0 || isNaN(parseFloat(bid)) || isNaN(parseFloat(ask))) {
@@ -429,10 +442,13 @@ router.post('/close', async (req, res) => {
 })
 
 // PUT /api/trade/modify - Modify trade SL/TP
-router.put('/modify', async (req, res) => {
+router.put('/modify', webAuth, async (req, res) => {
   try {
     const { tradeId, sl, tp } = req.body
     console.log('Modify trade request:', { tradeId, sl, tp })
+
+    // This is the route that put a gold-priced stop (4372) on a GBPUSD trade.
+    if (tradeId && !(await ownedTrade(req, tradeId))) return denyTrade(res)
 
     if (!tradeId) {
       return res.status(400).json({ 
@@ -910,9 +926,11 @@ router.post('/check-stopout', async (req, res) => {
 })
 
 // POST /api/trade/cancel - Cancel a pending order
-router.post('/cancel', async (req, res) => {
+router.post('/cancel', webAuth, async (req, res) => {
   try {
     const { tradeId } = req.body
+
+    if (tradeId && !(await ownedTrade(req, tradeId))) return denyTrade(res)
 
     if (!tradeId) {
       return res.status(400).json({ 

@@ -33,6 +33,7 @@ import { useTheme } from '../context/ThemeContext'
 import KycTradeRequiredModal from '../components/KycTradeRequiredModal'
 
 import { formatPrice } from '../utils/formatPrice'
+import { authHeaders } from '../utils/authFetch'
 
 import { pnlUsd } from '../utils/margin'
 
@@ -866,7 +867,7 @@ const MobileTradingApp = () => {
 
         method: 'POST',
 
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
 
         body: JSON.stringify({
 
@@ -981,7 +982,7 @@ const MobileTradingApp = () => {
 
         method: 'POST',
 
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
 
         body: JSON.stringify({
 
@@ -1082,7 +1083,7 @@ const MobileTradingApp = () => {
 
         method: 'PUT',
 
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
 
         body: JSON.stringify({
 
@@ -1134,7 +1135,7 @@ const MobileTradingApp = () => {
 
         method: 'POST',
 
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
 
         body: JSON.stringify({ tradeId: orderId })
 
@@ -2808,7 +2809,7 @@ const MobileTradingApp = () => {
 
                   method: 'POST',
 
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: authHeaders(),
 
                   body: JSON.stringify({
 
@@ -2910,7 +2911,7 @@ const MobileTradingApp = () => {
 
                   method: 'POST',
 
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: authHeaders(),
 
                   body: JSON.stringify({
 

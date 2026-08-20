@@ -70,6 +70,7 @@ import { confirmToast } from '../utils/dialogs'
 import logoImage from '../assets/logo.png'
 
 import { formatPrice } from '../utils/formatPrice'
+import { authHeaders } from '../utils/authFetch'
 import { pnlUsd } from '../utils/margin'
 
 
@@ -719,7 +720,7 @@ const OrderBook = () => {
 
         method: 'POST',
 
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
 
         body: JSON.stringify({
 
@@ -771,7 +772,7 @@ const OrderBook = () => {
 
         method: 'POST',
 
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
 
         body: JSON.stringify({ tradeId: order._id })
 

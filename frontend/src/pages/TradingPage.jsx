@@ -17,6 +17,7 @@ import { API_URL } from '../config/api'
 import { adjustQuotesForTradingDisplay } from '../services/chargePricing'
 
 import { marginUsd as computeMarginUsd, pnlUsd } from '../utils/margin'
+import { authHeaders } from '../utils/authFetch'
 
 import { isMarketOpen, marketClosedReason } from '../utils/marketHours'
 
@@ -1800,7 +1801,7 @@ const TradingPage = () => {
 
         method: 'POST',
 
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
 
         body: JSON.stringify({
 
@@ -1984,7 +1985,7 @@ const TradingPage = () => {
 
         method: 'POST',
 
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
 
         body: JSON.stringify({
 
@@ -2108,7 +2109,7 @@ const TradingPage = () => {
 
         method: 'POST',
 
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
 
         body: JSON.stringify({
 
@@ -2176,7 +2177,7 @@ const TradingPage = () => {
 
         method: 'POST',
 
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
 
         body: JSON.stringify({ tradeId })
 
@@ -2291,7 +2292,7 @@ const TradingPage = () => {
 
         method: 'PUT',
 
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
 
         body: JSON.stringify(requestBody)
 

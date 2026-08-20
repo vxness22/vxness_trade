@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { API_URL } from "../config/api";
 import priceStreamService from "../services/priceStream";
+import { authHeaders } from "../utils/authFetch";
 import { vxnessDatafeed, setQuoteAdjuster } from "../services/chartingDatafeed";
 import logoImage from "../assets/logo.png";
 
@@ -769,7 +770,7 @@ export default function ChartingLibraryChart({
         };
         const res = await fetch(`${API_URL}/trade/modify`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(),
           body: JSON.stringify(body),
         });
         const data = await res.json().catch(() => ({}));
@@ -792,7 +793,7 @@ export default function ChartingLibraryChart({
           throw new Error("Price not available");
         const res = await fetch(`${API_URL}/trade/close`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(),
           body: JSON.stringify({ tradeId: p.id, bid: t.bid, ask: t.ask }),
         });
         const data = await res.json().catch(() => ({}));
