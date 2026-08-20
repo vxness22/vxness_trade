@@ -142,6 +142,34 @@ const RES_SECONDS = {
   '60': 3600, '120': 7200, '180': 10800, '240': 14400,
 }
 
+/**
+ * The authoritative bars for the tail of a series, straight from the klines that
+ * history is drawn from.
+ *
+ * The forming candle has to be built from the price socket to stay live, but that
+ * socket carries roughly one quote a second while the kline behind it is cut from
+ * the provider's full tick stream. The extremes that land between our quotes are
+ * simply never seen, so a locally-built candle is always a little too short:
+ * measured on XAUUSD 1m, three consecutive candles came out 3.34 / 2.24 / 2.27
+ * against the kline's 3.53 / 2.34 / 2.51 — the high a touch low, the low a touch
+ * high, every single minute.
+ *
+ * A closed candle has no reason to keep that error, so we re-read it and correct
+ * it. The kline for a minute is published the instant it closes and does not move
+ * afterwards (checked at 0,1,2,3,5,8,12,20,30,45s — identical every time), which
+ * is why the correction can ride the rollover instead of trailing it.
+ */
+async function fetchTailBars(symbol, resolution, spanSec) {
+  const to = Math.floor(Date.now() / 1000)
+  const params = new URLSearchParams({
+    symbol, resolution: String(resolution), from: String(to - spanSec), to: String(to),
+  })
+  const res = await fetch(`${API_URL}/charts/bars?${params}`)
+  if (!res.ok) throw new Error(`bars ${res.status}`)
+  const data = await res.json()
+  return Array.isArray(data?.bars) ? data.bars : []
+}
+
 /* ─── Config ─── */
 
 const CONFIG = {
@@ -282,6 +310,37 @@ export const vxnessDatafeed = {
     // lands on the bar the history left open instead of next to it.
     const barStartFor = (sec) => (tfSec ? barStartSeconds(sec, tfSec, anchor) : dailyBarSeconds(sec, anchor))
 
+    // While a correction for the bar that just closed is in flight we stop
+    // emitting. The library keeps only the newest bar it has been handed and
+    // discards anything stamped earlier, so the corrected close has to go out
+    // BEFORE the first tick of the next candle or it would be thrown away.
+    let alive = true
+    let holding = false
+
+    const emit = (b) => {
+      if (!alive) return
+      onTick({ time: b.time * 1000, open: b.open, high: b.high, low: b.low, close: b.close, volume: 0 })
+    }
+
+    // Replace a locally-built candle with the kline for the same period, then
+    // release the candle that has been forming behind it. On any failure the
+    // local candle is emitted unchanged — a slightly short candle is a far
+    // smaller problem than a chart that stops updating.
+    const reconcile = async (closed) => {
+      holding = true
+      try {
+        const span = (tfSec || 86400) * 3
+        const bars = await fetchTailBars(sym, res, span)
+        const real = bars.find((b) => b.time === closed.time)
+        emit(real ? { time: real.time, open: real.open, high: real.high, low: real.low, close: real.close } : closed)
+      } catch {
+        emit(closed)
+      } finally {
+        holding = false
+        if (bar && bar.time > closed.time) emit(bar)
+      }
+    }
+
     // Build the forming candle straight from the price stream, on the feed MID —
     // the same quote the klines behind it are made of.
     priceStreamService.subscribe(id, (prices) => {
@@ -302,8 +361,11 @@ export const vxnessDatafeed = {
       const barStart = barStartFor(Math.floor(boundaryMs / 1000))
 
       if (!bar || barStart > bar.time) {
+        const closed = bar
         // New period → open a fresh candle at the last price.
         bar = { time: barStart, open: price, high: price, low: price, close: price }
+        // Correct the one that just ended, and let it emit the new candle after.
+        if (closed && !holding) { reconcile(closed); return }
       } else if (barStart === bar.time) {
         if (price > bar.high) bar.high = price
         if (price < bar.low) bar.low = price
@@ -312,13 +374,16 @@ export const vxnessDatafeed = {
         // Out-of-order / backward tick — ignore so the candle never jumps back.
         return
       }
-      onTick({ time: bar.time * 1000, open: bar.open, high: bar.high, low: bar.low, close: bar.close, volume: 0 })
+      if (!holding) emit(bar)
     })
 
     subscriptions.set(listenerGuid, {
       symbol: sym,
       resolution: res,
-      unsubscribe: () => { try { priceStreamService.unsubscribe(id) } catch { /* ignore */ } },
+      unsubscribe: () => {
+        alive = false
+        try { priceStreamService.unsubscribe(id) } catch { /* ignore */ }
+      },
     })
   },
 
