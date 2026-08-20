@@ -41,12 +41,18 @@ class PriceStreamService {
 
     this.socket.on('priceStream', (data) => {
       const { prices, updated, timestamp } = data
-      
-      // Update local price cache
+
+      // Update local price cache. `prices` is the whole book and arrives on
+      // subscribe and on the slow resync; `updated` is the per-frame delta and
+      // carries only what moved, so it has to be merged too — it is the stream
+      // that actually keeps quotes live between snapshots.
       if (prices) {
         this.prices = { ...this.prices, ...prices }
       }
-      
+      if (updated && Object.keys(updated).length > 0) {
+        this.prices = { ...this.prices, ...updated }
+      }
+
       // Notify all subscribers
       this.subscribers.forEach((callback, id) => {
         try {
