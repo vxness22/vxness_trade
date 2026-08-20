@@ -1,11 +1,13 @@
 import { EventEmitter } from 'events'
+import { SESSION_START_HOUR_NY, barStartSeconds, dailyBarSeconds } from '../utils/sessionGrid.js'
+import { classify } from '../utils/symbolMeta.js'
 
 // In-memory OHLC bar aggregator — a faithful port of SwisDex's
 // market-data/src/bar_aggregator.py, adapted to vxness's Infoway tick feed.
 //
-// Bars are built from the tick MID ((bid+ask)/2), exactly like SwisDex. The
-// chart shifts them down to the BID on the frontend (see chartingDatafeed.js),
-// so the candle last-price == the panel BID == a buy position's current price.
+// Bars are built from the tick MID ((bid+ask)/2), exactly like SwisDex — and the
+// chart plots that mid unchanged (see chartingDatafeed.js), because it is also
+// what Infoway's klines and TradingView's own series are quoted at.
 //
 // Timeframe seconds — the canonical set used everywhere in the chart pipeline.
 export const TIMEFRAMES = {
@@ -43,9 +45,18 @@ class BarAggregator extends EventEmitter {
     const mid = (bid + ask) / 2
     const epoch = Math.floor((Number(tsMs) || Date.now()) / 1000)
 
+    // Bars start where the REST history says they start — anchored at 17:00 New
+    // York, not at UTC midnight (see utils/sessionGrid.js). A live candle on a
+    // different grid than the history behind it is the one thing this hub must
+    // never emit, since the chart would draw the forming bar beside the gap the
+    // history left rather than inside it.
+    const anchor = classify(symbol) === 'crypto' ? null : SESSION_START_HOUR_NY
+
     for (const tf of Object.keys(TIMEFRAMES)) {
       const secs = TIMEFRAMES[tf]
-      const barStart = Math.floor(epoch / secs) * secs
+      const barStart = tf === '1d'
+        ? dailyBarSeconds(epoch, anchor)
+        : barStartSeconds(epoch, secs, anchor)
       const k = this.key(symbol, tf)
       let bar = this.current.get(k)
 

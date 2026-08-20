@@ -1,16 +1,26 @@
 // Custom datafeed for the TradingView Advanced Charting Library.
 // Faithful port of SwisDex's lib/charting/datafeed.ts, wired to vxness:
-//   - history : GET /api/charts/bars (Infoway klines) — shifted to the DISPLAYED bid
-//   - live    : built from priceStream, driven by the SAME displayed bid the order
-//               panel + instrument list show, so the chart last price is exactly
-//               equal to the SELL price (one source, no separate socket, no drift).
+//   - history : GET /api/charts/bars (Infoway klines)
+//   - live    : the forming candle, built from priceStream on the same grid
 //
-// The order panel / instrument list render adjustQuotesForTradingDisplay(bid,ask,…)
-// (admin spread applied). We use that exact function via setQuoteAdjuster() so the
-// candle == the panel to the last digit. Without an adjuster we fall back to the
-// raw feed bid.
+// Both sides plot the feed MID, which is what makes the chart agree with
+// TradingView candle for candle: Infoway's klines and TradingView's OANDA series
+// are the same prices to three decimals, and the klines are mid (the latest
+// kline close equals (bid+ask)/2 of the live tick exactly).
+//
+// This used to shift everything down onto the displayed BID so the chart's last
+// price would equal the SELL button. That cost half a spread — about 0.30 on
+// gold — against every TradingView chart a trader might compare it to, which is
+// the more visible discrepancy of the two. The SELL price is still on screen in
+// the order panel and the instrument list.
 import { API_URL } from '../config/api'
 import priceStreamService from './priceStream'
+import {
+  SESSION_START_HOUR_NY,
+  barStartSeconds,
+  dailyBarSeconds,
+  isClosedSession,
+} from '../utils/sessionGrid'
 
 /* ─── Resolution maps ─── */
 
@@ -97,74 +107,39 @@ function segmentToSymbolType(symbol) {
   }
 }
 
-// Drop Saturday/Sunday candles from a NON-crypto symbol's history — those
-// markets are closed on weekends so weekend bars are just clutter. Weekday is
-// read in UTC; bar.time is bar-open in ms UTC.
-function dropWeekendBars(bars, symbol) {
-  if (getSymbolCategory(symbol) === 'crypto') return bars
-  return bars.filter((b) => {
-    const day = new Date(b.time).getUTCDay()
-    return day !== 0 && day !== 6
-  })
+// Crypto runs 24x7 and has no session to anchor to; everything else follows the
+// FX week, which opens 17:00 New York on Sunday and closes 17:00 on Friday.
+function sessionAnchorHour(symbol) {
+  return getSymbolCategory(symbol) === 'crypto' ? null : SESSION_START_HOUR_NY
 }
 
-/* ─── Live price / bid shift ─── */
-
-// Wait up to timeoutMs for a live tick for `symbol` to appear in the price store.
-function waitForPrice(symbol, timeoutMs = 2500) {
-  const tick = priceStreamService.getPrice(symbol)
-  if (tick && tick.bid > 0) return Promise.resolve(tick)
-  return new Promise((resolve) => {
-    let done = false
-    const id = `chart-df-${symbol}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
-    const finish = (v) => {
-      if (done) return
-      done = true
-      try { priceStreamService.unsubscribe(id) } catch { /* ignore */ }
-      resolve(v)
-    }
-    priceStreamService.subscribe(id, (prices) => {
-      const t = prices?.[symbol]
-      if (t && t.bid > 0) finish(t)
-    })
-    setTimeout(() => finish(null), timeoutMs)
-  })
+// Drop bars from a session the instrument is shut for.
+//
+// The old rule dropped every bar whose UTC weekday was Saturday or Sunday, which
+// also deleted the Sunday-evening open — 21:00 UTC onwards is Monday's session
+// and is real trading that TradingView shows. Asking whether the bar's SESSION
+// is a weekend one keeps that open and still drops the genuinely dead window
+// between Friday's close and Sunday's.
+function dropClosedSessionBars(bars, symbol) {
+  const anchor = sessionAnchorHour(symbol)
+  if (anchor == null) return bars
+  return bars.filter((b) => !isClosedSession(Math.floor(b.time / 1000), anchor))
 }
 
-// The order panel + instrument list display prices through this adjuster (admin
-// spread/markup). The chart component sets it so the candle uses the EXACT same
-// value. adjuster(symbol, rawBid, rawAsk) → { bid, ask }.
-let _quoteAdjuster = null
-export function setQuoteAdjuster(fn) { _quoteAdjuster = typeof fn === 'function' ? fn : null }
+/* ─── Live price ─── */
 
-// The DISPLAYED bid for a raw feed tick — exactly what the SELL button / list show.
-function displayedBid(sym, tick) {
-  if (!tick || !(tick.bid > 0)) return null
-  if (_quoteAdjuster) {
-    try { const q = _quoteAdjuster(sym, tick.bid, tick.ask); if (q && q.bid > 0) return q.bid } catch { /* fall back */ }
-  }
-  return tick.bid
-}
-
-// How far a raw MID bar must move DOWN to sit on the displayed bid (rawMid − dispBid).
-// Equals half the spread when no adjuster is set — same as the old behaviour.
-function displayShift(sym, tick) {
-  if (!tick || !(tick.bid > 0) || !(tick.ask > 0)) return 0
-  const rawMid = (tick.bid + tick.ask) / 2
-  const db = displayedBid(sym, tick)
-  return db != null ? rawMid - db : (tick.ask - tick.bid) / 2
-}
-
-function shiftBar(bar, shift, digits) {
-  if (!shift) return bar
-  const s = (v) => Number((v - shift).toFixed(digits))
-  return { ...bar, open: s(bar.open), high: s(bar.high), low: s(bar.low), close: s(bar.close) }
+// The MID of a raw feed tick — the price the klines are quoted at, so the live
+// candle continues history without a step at the join.
+function tickMid(tick) {
+  if (!tick || !(tick.bid > 0) || !(tick.ask > 0)) return null
+  return (tick.bid + tick.ask) / 2
 }
 
 // Resolution → seconds, for building the live forming bar on the timeframe grid.
+// Daily and above are handled separately, by trading date rather than by period.
 const RES_SECONDS = {
   '1': 60, '3': 180, '5': 300, '10': 600, '15': 900, '30': 1800, '45': 2700,
-  '60': 3600, '120': 7200, '180': 10800, '240': 14400, D: 86400, '1D': 86400,
+  '60': 3600, '120': 7200, '180': 10800, '240': 14400,
 }
 
 /* ─── Config ─── */
@@ -231,8 +206,14 @@ export const vxnessDatafeed = {
       name: sym,
       description: inst?.name || sym,
       type: segmentToSymbolType(sym) || 'forex',
-      session: '24x7',
-      timezone: 'Etc/UTC',
+      // The session is what the library anchors CLIENT-SIDE aggregation on, and
+      // it has to be the same 17:00-New-York day the backend buckets by —
+      // otherwise 3m/10m/45m/2h/3h (built here from our 1m/5m/15m/1h bars) and
+      // 1W/1M (built from our 1D bars) would land on a different grid than the
+      // history underneath them. '1700-1700:23456' is Sunday-evening through
+      // Friday-evening, which is also the grid TradingView's own charts use.
+      session: sessionAnchorHour(sym) == null ? '24x7' : '1700-1700:23456',
+      timezone: sessionAnchorHour(sym) == null ? 'Etc/UTC' : 'America/New_York',
       exchange: 'vxness',
       listed_exchange: 'vxness',
       format: 'price',
@@ -268,16 +249,13 @@ export const vxnessDatafeed = {
         const data = await res.json()
         const rawBars = Array.isArray(data?.bars) ? data.bars : []
         if (rawBars.length > 0) {
-          // Shift MID klines onto the DISPLAYED bid so history is continuous with
-          // the live candle (and matches the panel bid).
-          const liveTick = await waitForPrice(sym, 2500)
-          const shift = displayShift(sym, liveTick)
-          const digits = symbolDigits(sym)
-          const bars = rawBars.map((b) => shiftBar({
+          // Klines are already the feed mid, which is what the live candle uses
+          // too — nothing to reconcile, the two series are the same prices.
+          const bars = rawBars.map((b) => ({
             time: b.time * 1000, // seconds → ms
             open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume,
-          }, shift, digits))
-          onResult(dropWeekendBars(bars, sym), { noData: false })
+          }))
+          onResult(dropClosedSessionBars(bars, sym), { noData: false })
           return
         }
       }
@@ -291,18 +269,24 @@ export const vxnessDatafeed = {
   subscribeBars: (symbolInfo, resolution, onTick, listenerGuid) => {
     const sym = String(symbolInfo.ticker || symbolInfo.name).toUpperCase()
     const res = String(resolution)
-    const tfSec = RES_SECONDS[res] || 300
+    const anchor = sessionAnchorHour(sym)
+    const tfSec = RES_SECONDS[res] || null // null ⇒ daily or slower
     let bar = null
     let lastSeenTickTime = 0 // last tick.time we processed — detects a genuinely new tick
     let lastTickAt = 0 // wall-clock ms when we last saw a new tick (market-live check)
     const id = `chart-bars-${listenerGuid}`
 
-    // Build the forming candle straight from the price stream using the SAME
-    // displayed bid the order panel / instrument list render. One source ⇒ the
-    // chart last price equals the SELL price exactly, with no tick-to-tick flicker.
+    // Which bar a moment belongs to. Intraday snaps onto the session-anchored
+    // grid; daily and slower go by trading date, stamped at midnight UTC — the
+    // same two rules the backend uses to cut history, so the forming candle
+    // lands on the bar the history left open instead of next to it.
+    const barStartFor = (sec) => (tfSec ? barStartSeconds(sec, tfSec, anchor) : dailyBarSeconds(sec, anchor))
+
+    // Build the forming candle straight from the price stream, on the feed MID —
+    // the same quote the klines behind it are made of.
     priceStreamService.subscribe(id, (prices) => {
       const tick = prices?.[sym]
-      const price = displayedBid(sym, tick)
+      const price = tickMid(tick)
       if (!(price > 0)) return
       const now = Date.now()
       const tickMs = (tick && tick.time) || now
@@ -315,7 +299,7 @@ export const vxnessDatafeed = {
       // paint fake flat candles (e.g. weekends).
       const marketLive = now - lastTickAt < 90000
       const boundaryMs = marketLive ? now : tickMs
-      const barStart = Math.floor(Math.floor(boundaryMs / 1000) / tfSec) * tfSec
+      const barStart = barStartFor(Math.floor(boundaryMs / 1000))
 
       if (!bar || barStart > bar.time) {
         // New period → open a fresh candle at the last price.

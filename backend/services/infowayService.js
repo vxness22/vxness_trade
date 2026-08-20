@@ -3,6 +3,12 @@ import dotenv from 'dotenv'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import {
+  SESSION_START_HOUR_NY,
+  barStartSeconds,
+  isSessionBreak,
+  sessionTradingDate,
+} from '../utils/sessionGrid.js'
 
 dotenv.config()
 
@@ -272,8 +278,64 @@ function dedupeRepeatedBars(candles, symbol, timeframe) {
   return out
 }
 
+// Hourly bars are the raw material every timeframe at or above 4h is built from,
+// so they are cached per symbol. Infoway caps a kline response at 500 rows and
+// walks backward from the requested end, hence the paging.
+const HOURLY_PAGE = 500
+const HOURLY_MAX_PAGES = 12 // ~6000 trading hours ≈ 260 daily bars in one request
+const HOURLY_TAIL_TTL_MS = 45_000
+const HOURLY_CACHE_SYMBOLS = 40
+const HOURLY_CACHE_BARS = 20_000 // ≈ 2.3 years of trading hours per symbol
+
+// Metals pause between 17:00 and 18:00 New York and TradingView draws nothing
+// there. Infoway almost always agrees, but the rare bar it does emit in that
+// hour lands on the first slot of the trading day and therefore becomes the
+// daily candle's OPEN — see isSessionBreak() for the measurement. Dropping it
+// costs nothing (the market was shut) and keeps the daily bar honest.
+function dropSessionBreakBars(candles, symbol) {
+  if (!METALS_SYMBOLS.includes(symbol)) return candles
+  return candles.filter((c) => !isSessionBreak(Math.floor(c.time.getTime() / 1000)))
+}
+
+/**
+ * Fold a sorted bar series into larger bars. `bucketOf(seconds)` returns the
+ * epoch-second stamp of the bar a source bar belongs to; consecutive sources
+ * sharing a stamp collapse into one candle. Open comes from the first source in
+ * the bucket and close from the last, which is what makes the result identical
+ * to TradingView's once the bucket boundaries agree.
+ */
+function foldBars(bars, bucketOf) {
+  const out = []
+  let cur = null
+  for (const b of bars) {
+    const stamp = bucketOf(Math.floor(b.time.getTime() / 1000))
+    if (!cur || cur.stamp !== stamp) {
+      cur = {
+        stamp,
+        time: new Date(stamp * 1000),
+        open: b.open,
+        high: b.high,
+        low: b.low,
+        close: b.close,
+        tickVolume: b.tickVolume || 0,
+      }
+      out.push(cur)
+    } else {
+      if (b.high > cur.high) cur.high = b.high
+      if (b.low < cur.low) cur.low = b.low
+      cur.close = b.close
+      cur.tickVolume += b.tickVolume || 0
+    }
+  }
+  for (const c of out) delete c.stamp
+  return out
+}
+
 class InfowayService {
   constructor() {
+    // symbol -> { bars: Map<epochSec, bar>, tailFetchedAt: ms }, least-recently
+    // used first (see hourlyCacheFor).
+    this.hourlyCache = new Map()
     this.forexWs = null
     this.cryptoWs = null
     this.prices = new Map()
@@ -626,16 +688,167 @@ class InfowayService {
   getSymbols() { return SUPPORTED_SYMBOLS }
   isCrypto(symbol) { return CRYPTO_SYMBOLS.includes(symbol) }
 
-  // Historical OHLC for TradingView chart `/api/charts/history`.
+  // Historical OHLC for TradingView chart `/api/charts/history` and `/api/charts/bars`.
   // Signature mirrors the previous MetaApi method so routes/charts.js doesn't change shape:
   //   getCandles(symbol, timeframe, startTime, limit)
   //   - symbol: 'EURUSD', 'BTCUSD', ...
   //   - timeframe: '1m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1d' | '1w' | '1mn'
   //   - startTime: Date — walks BACKWARD from here
-  //   - limit: number of bars to return (max ~1000)
+  //   - limit: number of bars to return
   // Returns [{ time: Date, open, high, low, close, tickVolume }] sorted ascending.
   //
-  // Uses Infoway's batch_kline v2 API (the SAME provider as the live WS feed):
+  // 1m…1h come straight from Infoway. Everything at or above 4h is AGGREGATED from
+  // the hourly series onto the session grid instead (see utils/sessionGrid.js), for
+  // two independent reasons:
+  //
+  //   1. Infoway's own 4h series is unusable. It interleaves two different grids —
+  //      one at 00/04/08… UTC and one at 01/05/09… UTC — so 169 of 365 bars in a
+  //      60-day window land off any single grid and the chart draws roughly twice
+  //      the candles it should. Measured on XAUUSD, 2026-08-20.
+  //   2. Its daily series buckets by UTC midnight, while TradingView's day runs
+  //      17:00→17:00 New York. That is not a cosmetic difference: XAUUSD's 19-Aug
+  //      close was 4511.73 by UTC day and 4523.05 by session day.
+  //
+  // Aggregating the hourly bars over the session grid reproduces TradingView's
+  // OANDA series exactly — the two feeds agree to three decimals, so once the
+  // buckets line up the candles are identical.
+  async getCandles(symbol, timeframe, startTime, limit = 500) {
+    if (!INFOWAY_API_KEY) return []
+    if (!TF_TO_KLINETYPE[timeframe]) return []
+
+    const endSec = Math.floor(
+      (startTime instanceof Date ? startTime.getTime() : Number(startTime) || Date.now()) / 1000
+    )
+
+    switch (timeframe) {
+      case '4h':
+        return this.buildSessionBars(symbol, 14400, endSec, limit)
+      case '1d':
+        return this.buildCalendarBars(symbol, 'day', endSec, limit)
+      case '1w':
+        return this.buildCalendarBars(symbol, 'week', endSec, limit)
+      case '1mn':
+        return this.buildCalendarBars(symbol, 'month', endSec, limit)
+      default:
+        return this.fetchKlines(symbol, timeframe, startTime, limit)
+    }
+  }
+
+  // Crypto never closes, so it has no session to anchor to and stays on the plain
+  // UTC grid — which is also how TradingView draws it. Everything else anchors at
+  // 17:00 New York.
+  sessionAnchorHour(symbol) {
+    return CRYPTO_SYMBOLS.includes(symbol) ? null : SESSION_START_HOUR_NY
+  }
+
+  // 4h (and any other intraday multiple of an hour) folded onto the session grid.
+  async buildSessionBars(symbol, periodSec, endSec, limit) {
+    const anchor = this.sessionAnchorHour(symbol)
+    const hoursNeeded = Math.ceil((limit + 2) * (periodSec / 3600))
+    const hourly = await this.hourlySeries(symbol, endSec, hoursNeeded)
+    if (!hourly.length) return []
+    return foldBars(hourly, (sec) => barStartSeconds(sec, periodSec, anchor)).slice(-limit)
+  }
+
+  // Daily / weekly / monthly. The bucket is chosen by the SESSION's trading date,
+  // so the Sunday-evening open belongs to Monday exactly as TradingView folds it,
+  // and the bar is stamped at midnight UTC of that date — the Charting Library's
+  // documented convention for anything daily or slower.
+  async buildCalendarBars(symbol, grain, endSec, limit) {
+    const anchor = this.sessionAnchorHour(symbol)
+    // Trading hours per bucket: a gold/FX day is ~23h and the week is 5 of them.
+    const HOURS_PER = { day: 23, week: 115, month: 500 }
+    const hourly = await this.hourlySeries(symbol, endSec, Math.ceil((limit + 1) * HOURS_PER[grain]))
+    if (!hourly.length) return []
+
+    return foldBars(hourly, (sec) => {
+      const date = sessionTradingDate(sec, anchor)
+      if (grain === 'month') return Math.floor(Date.parse(`${date.slice(0, 7)}-01T00:00:00Z`) / 1000)
+      const daySec = Math.floor(Date.parse(`${date}T00:00:00Z`) / 1000)
+      if (grain === 'day') return daySec
+      // Week: step back to the Monday of the trading date. TradingView's week opens
+      // with the Sunday-evening session, which already carries Monday's date.
+      const mondayOffset = (new Date(daySec * 1000).getUTCDay() + 6) % 7
+      return daySec - mondayOffset * 86400
+    }).slice(-limit)
+  }
+
+  // Hourly bars ending at `endSec`, at least `hoursNeeded` of them, served from a
+  // per-symbol cache. Infoway hands back at most 500 rows per call and walks
+  // backward from `timestamp`, so deep history is paged in — but only once: the
+  // cache is what makes a daily chart affordable, since one daily bar costs 23
+  // hourly rows and a scroll-back would otherwise re-fetch the whole series.
+  async hourlySeries(symbol, endSec, hoursNeeded) {
+    const cache = this.hourlyCacheFor(symbol)
+    const nowSec = Math.floor(Date.now() / 1000)
+
+    // The newest bar is still forming, so re-fetch the tail on a short TTL.
+    if (endSec > nowSec - 3600 && Date.now() - cache.tailFetchedAt > HOURLY_TAIL_TTL_MS) {
+      const page = await this.fetchKlines(symbol, '1h', new Date(), HOURLY_PAGE)
+      if (page.length) {
+        for (const c of page) cache.bars.set(Math.floor(c.time.getTime() / 1000), c)
+        cache.tailFetchedAt = Date.now()
+      }
+    }
+
+    const covered = () => {
+      let n = 0
+      for (const t of cache.bars.keys()) if (t <= endSec) n += 1
+      return n
+    }
+
+    let pages = 0
+    while (covered() < hoursNeeded && pages < HOURLY_MAX_PAGES) {
+      // Walk back from the oldest bar we hold that is still at or before endSec.
+      let oldest = Infinity
+      for (const t of cache.bars.keys()) if (t <= endSec && t < oldest) oldest = t
+      const cursor = Number.isFinite(oldest) ? oldest - 3600 : endSec
+      // The provider already told us it has nothing this far back; asking again
+      // would burn a round-trip on every daily request from here on.
+      if (cache.driesUpAt != null && cursor <= cache.driesUpAt) break
+
+      const page = await this.fetchKlines(symbol, '1h', new Date(cursor * 1000), HOURLY_PAGE)
+      pages += 1
+      let added = 0
+      for (const c of page) {
+        const t = Math.floor(c.time.getTime() / 1000)
+        if (!cache.bars.has(t)) added += 1
+        cache.bars.set(t, c)
+      }
+      if (!added) { cache.driesUpAt = cursor; break }
+    }
+    if (pages >= HOURLY_MAX_PAGES) {
+      console.warn(`[Infoway] ${symbol}: hourly paging hit the ${HOURLY_MAX_PAGES}-page cap; older bars will be missing`)
+    }
+
+    this.trimHourlyCache(cache)
+    return [...cache.bars.keys()]
+      .filter((t) => t <= endSec)
+      .sort((a, b) => a - b)
+      .map((t) => cache.bars.get(t))
+  }
+
+  hourlyCacheFor(symbol) {
+    let cache = this.hourlyCache.get(symbol)
+    if (!cache) cache = { bars: new Map(), tailFetchedAt: 0, driesUpAt: null }
+    // Re-insert so the Map's insertion order doubles as a least-recently-used list.
+    this.hourlyCache.delete(symbol)
+    this.hourlyCache.set(symbol, cache)
+    while (this.hourlyCache.size > HOURLY_CACHE_SYMBOLS) {
+      this.hourlyCache.delete(this.hourlyCache.keys().next().value)
+    }
+    return cache
+  }
+
+  trimHourlyCache(cache) {
+    if (cache.bars.size <= HOURLY_CACHE_BARS) return
+    const keys = [...cache.bars.keys()].sort((a, b) => a - b)
+    for (const t of keys.slice(0, cache.bars.size - HOURLY_CACHE_BARS)) cache.bars.delete(t)
+  }
+
+  // The raw kline fetch. getCandles() is the entry point callers should use.
+  //
+  // Infoway's batch_kline v2 API (the SAME provider as the live WS feed):
   //   POST https://data.infoway.io/{business}/v2/batch_kline
   //     header  apiKey: <token>
   //     body    { klineType:<1-12>, klineNum:<=500, codes:"<ONE code>",
@@ -644,86 +857,8 @@ class InfowayService {
   // respList is newest-first with STRING values; we coerce + sort ascending.
   // NOTE: query ONE code per request — a multi-code batch returns only ~2 bars
   // each. Business routing: crypto → 'crypto' + <BASE>USDT, else 'common' + code.
-  async getCandles(symbol, timeframe, startTime, limit = 500) {
-    if (!INFOWAY_API_KEY) return []
-    const klineType = TF_TO_KLINETYPE[timeframe]
-    if (!klineType) return []
-
-    // Daily bars get their recent tail rebuilt from hourly data — see
-    // rebuildRecentDailyBars() for why Infoway's own daily series cannot be
-    // trusted at the live edge.
-    if (timeframe === '1d') {
-      const daily = await this.fetchKlines(symbol, timeframe, startTime, limit)
-      return this.rebuildRecentDailyBars(symbol, daily)
-    }
-
-    return this.fetchKlines(symbol, timeframe, startTime, limit)
-  }
-
-  // Rebuilds the last DAILY_REBUILD_DAYS daily candles by aggregating the hourly
-  // series over UTC days, and keeps Infoway's own daily bars for anything older.
-  //
-  // Infoway's daily klines drift after a weekend: it folds the two-hour Sunday
-  // session in with Monday and then stamps the rest of that week one day early.
-  // Measured on XAGUSD on 2026-08-20, where its "19-Aug" bar carried that day's
-  // high and low (67.321 / 66.395) exactly — the bar was the 20th. Bars from
-  // before the weekend (10th to 14th) were correctly dated, so only the tail is
-  // wrong, and the repeated candles this used to produce were the same fault.
-  //
-  // The hourly series is correct — it is the one the intraday charts run on, and
-  // aggregating it over UTC days reproduces each day's high and low exactly. One
-  // extra kline request per daily chart load is worth a candle on the right day.
-  async rebuildRecentDailyBars(symbol, daily) {
-    const DAILY_REBUILD_DAYS = 12
-    const HOURS = DAILY_REBUILD_DAYS * 24
-    if (!Array.isArray(daily) || !daily.length) return daily
-
-    let hourly = []
-    try {
-      hourly = await this.fetchKlines(symbol, '1h', new Date(), Math.min(500, HOURS + 24))
-    } catch (e) {
-      console.error(`[Infoway] ${symbol} daily rebuild: hourly fetch failed — serving raw daily:`, e.message)
-      return daily
-    }
-    if (!hourly.length) return daily
-
-    const dayKey = (d) => new Date(d).toISOString().slice(0, 10)
-    const buckets = new Map()
-    for (const h of hourly) {
-      const k = dayKey(h.time)
-      const b = buckets.get(k)
-      if (!b) {
-        buckets.set(k, { open: h.open, high: h.high, low: h.low, close: h.close, volume: h.tickVolume || 0 })
-      } else {
-        if (h.high > b.high) b.high = h.high
-        if (h.low < b.low) b.low = h.low
-        b.close = h.close
-        b.volume += h.tickVolume || 0
-      }
-    }
-    // The oldest bucket is dropped: the hourly window starts partway through that
-    // day, so aggregating it would replace a complete daily bar with a partial
-    // one. Infoway's own bar is kept for it instead. The newest bucket is also
-    // partial — that one is today, and a partial candle for today is correct.
-    const keys = [...buckets.keys()].sort()
-    if (keys.length < 2) return daily
-    const usable = keys.slice(1)
-
-    const rebuiltFrom = usable[0]
-    const kept = daily.filter((c) => dayKey(c.time) < rebuiltFrom)
-    const rebuilt = usable.map((k) => {
-      const b = buckets.get(k)
-      return {
-        time: new Date(`${k}T00:00:00.000Z`),
-        open: b.open, high: b.high, low: b.low, close: b.close,
-        tickVolume: b.volume,
-      }
-    })
-
-    return [...kept, ...rebuilt]
-  }
-
-  // The raw kline fetch. getCandles() is the entry point callers should use.
+  // `timestamp` is the END of the window and the response walks backward from it,
+  // which is what hourlySeries() pages on.
   async fetchKlines(symbol, timeframe, startTime, limit = 500) {
     if (!INFOWAY_API_KEY) return []
     const klineType = TF_TO_KLINETYPE[timeframe]
@@ -768,7 +903,7 @@ class InfowayService {
       })).filter((c) => Number.isFinite(c.open) && c.time instanceof Date && !isNaN(c.time))
 
       candles.sort((a, b) => a.time - b.time)
-      return dedupeRepeatedBars(candles, symbol, timeframe)
+      return dedupeRepeatedBars(dropSessionBreakBars(candles, symbol), symbol, timeframe)
     } catch (err) {
       console.error(`[Infoway] batch_kline ${code} ${timeframe} error:`, err.message)
       return []
@@ -790,4 +925,4 @@ class InfowayService {
 
 const infowayService = new InfowayService()
 export default infowayService
-export { SUPPORTED_SYMBOLS, CRYPTO_SYMBOLS, FALLBACK_PRICES }
+export { SUPPORTED_SYMBOLS, CRYPTO_SYMBOLS, FALLBACK_PRICES, foldBars }

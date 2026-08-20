@@ -14,7 +14,7 @@ import { createPortal } from "react-dom";
 import { API_URL } from "../config/api";
 import priceStreamService from "../services/priceStream";
 import { authHeaders } from "../utils/authFetch";
-import { vxnessDatafeed, setQuoteAdjuster } from "../services/chartingDatafeed";
+import { vxnessDatafeed } from "../services/chartingDatafeed";
 import logoImage from "../assets/logo.png";
 
 function tvCtor() {
@@ -189,7 +189,6 @@ export default function ChartingLibraryChart({
   theme = "dark",
   positions = [],
   onRefresh,
-  getQuote,
 }) {
   const containerRef = useRef(null);
   const overlayRef = useRef(null);
@@ -211,13 +210,6 @@ export default function ChartingLibraryChart({
     setDialogValue(d.input?.defaultValue ?? "");
     setDialog(d);
   };
-
-  // Feed the datafeed the SAME price adjuster the panel/instrument list use, so the
-  // chart candle == the SELL price exactly (admin spread applied). Cleared on unmount.
-  useEffect(() => {
-    setQuoteAdjuster(typeof getQuote === "function" ? getQuote : null);
-    return () => setQuoteAdjuster(null);
-  }, [getQuote]);
 
   // Hide the TradingView branding logo once the chart (and its iframe) exist.
   // Retried for ~10s (the logo renders shortly after ready), and re-run on resize
