@@ -331,6 +331,24 @@ function foldBars(bars, bucketOf) {
   return out
 }
 
+/**
+ * Drop the first folded bar when the source ran out mid-bucket.
+ *
+ * The hourly series starts wherever the provider's paging happened to stop, which
+ * is almost never a bucket boundary — so the oldest daily bar gets built from a
+ * few leftover hours and shows the wrong open and low. On XAUUSD an hourly series
+ * beginning 21:00 put the 27-Feb daily open at 5263.46 against TradingView's
+ * 5182.04, while every bar after it matched exactly.
+ *
+ * The test is simply whether the hour BEFORE our earliest bar would have landed in
+ * the same bucket. If it would, we are missing part of that bucket and the bar is
+ * a lie; if it would not, the bucket genuinely starts here and the bar is whole.
+ */
+function dropTruncatedFirstBar(folded, bucketOf, firstSourceSec) {
+  if (folded.length < 2) return folded
+  return bucketOf(firstSourceSec - 3600) === bucketOf(firstSourceSec) ? folded.slice(1) : folded
+}
+
 class InfowayService {
   constructor() {
     // symbol -> { bars: Map<epochSec, bar>, tailFetchedAt: ms }, least-recently
@@ -747,7 +765,9 @@ class InfowayService {
     const hoursNeeded = Math.ceil((limit + 2) * (periodSec / 3600))
     const hourly = await this.hourlySeries(symbol, endSec, hoursNeeded)
     if (!hourly.length) return []
-    return foldBars(hourly, (sec) => barStartSeconds(sec, periodSec, anchor)).slice(-limit)
+    const bucketOf = (sec) => barStartSeconds(sec, periodSec, anchor)
+    const firstSec = Math.floor(hourly[0].time.getTime() / 1000)
+    return dropTruncatedFirstBar(foldBars(hourly, bucketOf), bucketOf, firstSec).slice(-limit)
   }
 
   // Daily / weekly / monthly. The bucket is chosen by the SESSION's trading date,
@@ -761,7 +781,7 @@ class InfowayService {
     const hourly = await this.hourlySeries(symbol, endSec, Math.ceil((limit + 1) * HOURS_PER[grain]))
     if (!hourly.length) return []
 
-    return foldBars(hourly, (sec) => {
+    const bucketOf = (sec) => {
       const date = sessionTradingDate(sec, anchor)
       if (grain === 'month') return Math.floor(Date.parse(`${date.slice(0, 7)}-01T00:00:00Z`) / 1000)
       const daySec = Math.floor(Date.parse(`${date}T00:00:00Z`) / 1000)
@@ -770,7 +790,9 @@ class InfowayService {
       // with the Sunday-evening session, which already carries Monday's date.
       const mondayOffset = (new Date(daySec * 1000).getUTCDay() + 6) % 7
       return daySec - mondayOffset * 86400
-    }).slice(-limit)
+    }
+    const firstSec = Math.floor(hourly[0].time.getTime() / 1000)
+    return dropTruncatedFirstBar(foldBars(hourly, bucketOf), bucketOf, firstSec).slice(-limit)
   }
 
   // Hourly bars ending at `endSec`, at least `hoursNeeded` of them, served from a
