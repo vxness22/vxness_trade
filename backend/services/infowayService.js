@@ -236,6 +236,42 @@ const TF_TO_KLINETYPE = {
 // A couple of platform codes differ from Infoway's for the kline API.
 const KLINE_CODE_OVERRIDE = { NATGAS: 'NGAS', US100: 'NAS100' }
 
+// Infoway sometimes repeats a kline row on the next slot — the same bar arrives
+// stamped for two consecutive periods. On the daily series for XAUUSD that put
+// four phantom candles into a 54-bar window (three of them a Sunday carrying
+// Monday's OHLC, plus a Thu/Fri repeat), so the chart showed a candle that never
+// traded and no longer lined up with TradingView.
+//
+// Two consecutive bars carrying the SAME open, high, low AND close is not real
+// price action — as long as the bar actually has range. A bar where high == low
+// is a no-tick period and CAN legitimately repeat in a quiet market, so those are
+// left alone; dropping them would punch holes in intraday history.
+//
+// The later timestamp is kept: for the Sunday/Monday case Monday is the real
+// trading day, which is also how TradingView folds the Sunday session.
+function dedupeRepeatedBars(candles, symbol, timeframe) {
+  if (candles.length < 2) return candles
+
+  const out = []
+  let dropped = 0
+  for (let i = 0; i < candles.length; i++) {
+    const cur = candles[i]
+    const next = candles[i + 1]
+    const identical = next &&
+      cur.open === next.open && cur.high === next.high &&
+      cur.low === next.low && cur.close === next.close
+    // keep the LATER of an identical pair, and only treat it as a duplicate when
+    // the bar has real range
+    if (identical && cur.high > cur.low) { dropped += 1; continue }
+    out.push(cur)
+  }
+
+  if (dropped > 0) {
+    console.warn(`[Infoway] ${symbol} ${timeframe}: dropped ${dropped} repeated kline row(s) from the provider`)
+  }
+  return out
+}
+
 class InfowayService {
   constructor() {
     this.forexWs = null
@@ -652,7 +688,7 @@ class InfowayService {
       })).filter((c) => Number.isFinite(c.open) && c.time instanceof Date && !isNaN(c.time))
 
       candles.sort((a, b) => a.time - b.time)
-      return candles
+      return dedupeRepeatedBars(candles, symbol, timeframe)
     } catch (err) {
       console.error(`[Infoway] batch_kline ${code} ${timeframe} error:`, err.message)
       return []
