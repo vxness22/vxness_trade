@@ -648,6 +648,86 @@ class InfowayService {
     if (!INFOWAY_API_KEY) return []
     const klineType = TF_TO_KLINETYPE[timeframe]
     if (!klineType) return []
+
+    // Daily bars get their recent tail rebuilt from hourly data — see
+    // rebuildRecentDailyBars() for why Infoway's own daily series cannot be
+    // trusted at the live edge.
+    if (timeframe === '1d') {
+      const daily = await this.fetchKlines(symbol, timeframe, startTime, limit)
+      return this.rebuildRecentDailyBars(symbol, daily)
+    }
+
+    return this.fetchKlines(symbol, timeframe, startTime, limit)
+  }
+
+  // Rebuilds the last DAILY_REBUILD_DAYS daily candles by aggregating the hourly
+  // series over UTC days, and keeps Infoway's own daily bars for anything older.
+  //
+  // Infoway's daily klines drift after a weekend: it folds the two-hour Sunday
+  // session in with Monday and then stamps the rest of that week one day early.
+  // Measured on XAGUSD on 2026-08-20, where its "19-Aug" bar carried that day's
+  // high and low (67.321 / 66.395) exactly — the bar was the 20th. Bars from
+  // before the weekend (10th to 14th) were correctly dated, so only the tail is
+  // wrong, and the repeated candles this used to produce were the same fault.
+  //
+  // The hourly series is correct — it is the one the intraday charts run on, and
+  // aggregating it over UTC days reproduces each day's high and low exactly. One
+  // extra kline request per daily chart load is worth a candle on the right day.
+  async rebuildRecentDailyBars(symbol, daily) {
+    const DAILY_REBUILD_DAYS = 12
+    const HOURS = DAILY_REBUILD_DAYS * 24
+    if (!Array.isArray(daily) || !daily.length) return daily
+
+    let hourly = []
+    try {
+      hourly = await this.fetchKlines(symbol, '1h', new Date(), Math.min(500, HOURS + 24))
+    } catch (e) {
+      console.error(`[Infoway] ${symbol} daily rebuild: hourly fetch failed — serving raw daily:`, e.message)
+      return daily
+    }
+    if (!hourly.length) return daily
+
+    const dayKey = (d) => new Date(d).toISOString().slice(0, 10)
+    const buckets = new Map()
+    for (const h of hourly) {
+      const k = dayKey(h.time)
+      const b = buckets.get(k)
+      if (!b) {
+        buckets.set(k, { open: h.open, high: h.high, low: h.low, close: h.close, volume: h.tickVolume || 0 })
+      } else {
+        if (h.high > b.high) b.high = h.high
+        if (h.low < b.low) b.low = h.low
+        b.close = h.close
+        b.volume += h.tickVolume || 0
+      }
+    }
+    // The oldest bucket is dropped: the hourly window starts partway through that
+    // day, so aggregating it would replace a complete daily bar with a partial
+    // one. Infoway's own bar is kept for it instead. The newest bucket is also
+    // partial — that one is today, and a partial candle for today is correct.
+    const keys = [...buckets.keys()].sort()
+    if (keys.length < 2) return daily
+    const usable = keys.slice(1)
+
+    const rebuiltFrom = usable[0]
+    const kept = daily.filter((c) => dayKey(c.time) < rebuiltFrom)
+    const rebuilt = usable.map((k) => {
+      const b = buckets.get(k)
+      return {
+        time: new Date(`${k}T00:00:00.000Z`),
+        open: b.open, high: b.high, low: b.low, close: b.close,
+        tickVolume: b.volume,
+      }
+    })
+
+    return [...kept, ...rebuilt]
+  }
+
+  // The raw kline fetch. getCandles() is the entry point callers should use.
+  async fetchKlines(symbol, timeframe, startTime, limit = 500) {
+    if (!INFOWAY_API_KEY) return []
+    const klineType = TF_TO_KLINETYPE[timeframe]
+    if (!klineType) return []
     const business = CRYPTO_SYMBOLS.includes(symbol) ? 'crypto' : 'common'
     const code = KLINE_CODE_OVERRIDE[symbol] || toInfowaySymbol(symbol)
     const endMs = startTime instanceof Date ? startTime.getTime() : Number(startTime) || Date.now()
