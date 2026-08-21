@@ -1723,11 +1723,12 @@ router.put('/trades/modify', async (req, res) => {
 
 
 
-      sl !== undefined ? parseFloat(sl) : null,
+      // undefined keeps the bracket as it is; null clears it. See modifyTrade.
+      sl !== undefined ? (sl === null || sl === '' ? null : parseFloat(sl)) : undefined,
 
 
 
-      tp !== undefined ? parseFloat(tp) : null,
+      tp !== undefined ? (tp === null || tp === '' ? null : parseFloat(tp)) : undefined,
 
 
 

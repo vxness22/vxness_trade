@@ -521,10 +521,13 @@ router.put('/modify', webAuth, async (req, res) => {
       }
     }
 
+    // A key the caller did not send is left alone; a key sent as null or "" is a
+    // removal. Collapsing both to null is what stopped the chart's ✕ working.
+    const sent = (k) => Object.prototype.hasOwnProperty.call(req.body, k)
     const trade = await tradeEngine.modifyTrade(
       tradeId,
-      parsedSl !== null && !isNaN(parsedSl) ? parsedSl : null,
-      parsedTp !== null && !isNaN(parsedTp) ? parsedTp : null
+      sent('sl') ? (Number.isFinite(parsedSl) ? parsedSl : null) : undefined,
+      sent('tp') ? (Number.isFinite(parsedTp) ? parsedTp : null) : undefined
     )
 
     // Mirror SL/TP modification to follower trades
@@ -535,10 +538,15 @@ router.put('/modify', webAuth, async (req, res) => {
     
     if (master) {
       try {
+        // Mirror the master's RESULTING brackets, not the request. The request
+        // may name only the leg that changed, and under modifyTrade's contract a
+        // null means "clear" — forwarding an absent leg as null would wipe the
+        // follower's other bracket. trade.sl / trade.tp are what the master
+        // actually ended up with.
         await copyTradingEngine.mirrorSlTpModification(
           tradeId,
-          parsedSl,
-          parsedTp
+          trade.sl ?? null,
+          trade.tp ?? null
         )
         console.log(`Mirrored SL/TP modification to follower trades for ${tradeId}`)
       } catch (copyError) {

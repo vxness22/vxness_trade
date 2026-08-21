@@ -866,7 +866,14 @@ class TradeEngine {
 
   // Modify trade SL/TP
 
-  async modifyTrade(tradeId, sl = null, tp = null, adminId = null) {
+  // undefined = leave this bracket alone.  null = REMOVE it.  A number = set it.
+  //
+  // The two used to be the same thing: the guard below read `if (sl !== null)`,
+  // so a null was taken as "not supplied" and skipped. That made removal
+  // impossible — the cross on the chart's stop-loss line sent null, the endpoint
+  // answered 200, and the old level was back on the next poll. Callers that mean
+  // "not supplied" now pass undefined, which is what they always meant.
+  async modifyTrade(tradeId, sl = undefined, tp = undefined, adminId = null) {
 
     const trade = await Trade.findById(tradeId)
 
@@ -880,24 +887,20 @@ class TradeEngine {
 
 
 
-    // Update both stopLoss/takeProfit and sl/tp fields for compatibility
+    // A value that is not a number above zero is not a level; it clears instead.
+    const level = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : null)
 
-    // Handle NaN values - treat as null
-
-    if (sl !== null && !isNaN(sl)) {
-
-      trade.stopLoss = sl
-
-      trade.sl = sl
-
+    // Both spellings are written together. The SL/TP sweep reads
+    // `trade.sl || trade.stopLoss`, so leaving one of them behind would
+    // resurrect a bracket the trader had just cleared.
+    if (sl !== undefined) {
+      trade.stopLoss = level(sl)
+      trade.sl = level(sl)
     }
 
-    if (tp !== null && !isNaN(tp)) {
-
-      trade.takeProfit = tp
-
-      trade.tp = tp
-
+    if (tp !== undefined) {
+      trade.takeProfit = level(tp)
+      trade.tp = level(tp)
     }
 
 
