@@ -41,6 +41,9 @@ private:
     QString v1Base() const;          // restBase with /api/algo -> /api/v1
     bool    toWallet() const;        // true = account -> wallet
     void    setStatus(const QString& text, bool error);
+    // A message that OUTLIVES the refresh a transfer triggers - see the note in
+    // WalletDialog.cpp.
+    void    flash(const QString& text);
     double  availableOnAccount() const;   // transferable amount for the selection
 
     Config m_cfg;
@@ -54,6 +57,9 @@ private:
     QPushButton*    m_transferBtn;
     QLabel*         m_status;
 
+    // True while a transfer's confirmation is on screen. Nothing routine is
+    // allowed to overwrite the status line during that window.
+    bool   m_flashing = false;
     double m_walletBalance = 0.0;
     // Per live account: balance, and free = balance - margin_used (transferable).
     struct AccountFunds { double balance = 0.0; double free = 0.0; double marginUsed = 0.0; };

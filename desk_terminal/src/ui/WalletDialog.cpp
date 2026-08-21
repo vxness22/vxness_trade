@@ -16,6 +16,8 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QUrl>
+#include <QTimer>
+#include <QSignalBlocker>
 
 WalletDialog::WalletDialog(const Config& cfg, QWidget* parent)
     : QDialog(parent), m_cfg(cfg), m_net(new QNetworkAccessManager(this)) {
@@ -124,6 +126,26 @@ QString WalletDialog::v1Base() const {
 
 bool WalletDialog::toWallet() const { return m_direction->currentData().toBool(); }
 
+// A confirmation the refresh cannot wipe.
+//
+// A successful transfer immediately reloads the wallet, and that reload
+// rewrites the account list and re-runs onDirectionChanged(). Both used to be
+// free to replace the status line, so the "Moved $200" the trader was owed
+// lasted a fraction of a second - the money moved and the screen said nothing
+// about it, which is the one moment a trading app has to be explicit.
+//
+// It holds for eight seconds, then the panel goes back to describing what can
+// be moved next.
+void WalletDialog::flash(const QString& text) {
+    m_flashing = true;
+    setStatus(text, false);
+    QTimer::singleShot(8000, this, [this]() {
+        if (!m_flashing) return;
+        m_flashing = false;
+        onDirectionChanged();          // back to the ordinary hint
+    });
+}
+
 void WalletDialog::setStatus(const QString& text, bool error) {
     m_status->setStyleSheet(QString("color:%1;").arg(error ? Theme::p().down : Theme::p().up));
     m_status->setText(text);
@@ -169,6 +191,16 @@ void WalletDialog::loadWallet() {
 
         const QString keep = m_account->currentData().toString();
         m_funds.clear();
+        // Rebuilt with the signals held.
+        //
+        // clear() sets the index to -1 and every addItem() moves it again, and
+        // each of those reached onAccountChanged -> onDirectionChanged with an
+        // empty selection, which reads "nothing transferable" and wrote that
+        // over whatever the status line was saying. Since loadWallet() runs
+        // right after a transfer, the sentence it landed on was the
+        // confirmation the trader had just been given: the money moved, and the
+        // screen said the wallet was empty.
+        QSignalBlocker blockAccounts(m_account);
         m_account->clear();
         // Only live accounts come back here — the backend refuses wallet
         // transfers on demo accounts, so a demo account must not be offered.
@@ -226,7 +258,7 @@ void WalletDialog::onDirectionChanged() {
     m_amount->setEnabled(any);
     m_maxBtn->setEnabled(any);
     m_transferBtn->setEnabled(any && m_account->count() > 0);
-    if (!any && !m_cfg.token.trimmed().isEmpty())
+    if (!m_flashing && !any && !m_cfg.token.trimmed().isEmpty())
         setStatus(out ? tr("Nothing transferable on this account right now.")
                       : tr("The main wallet is empty."), false);
 }
@@ -243,6 +275,7 @@ void WalletDialog::doTransfer() {
 
     m_transferBtn->setEnabled(false);
     m_transferBtn->setText(tr("Transferring…"));
+    m_flashing = false;                // a new transfer supersedes the last one
     m_status->clear();
 
     QJsonObject body;
@@ -267,9 +300,9 @@ void WalletDialog::doTransfer() {
                               .arg(apiDetail(o, r->errorString())), true);
             return;
         }
-        setStatus(out ? tr("✓ Moved $%L1 to your main wallet").arg(amount, 0, 'f', 2)
-                      : tr("✓ Moved $%L1 to %2").arg(amount, 0, 'f', 2)
-                            .arg(m_account->currentText().section(' ', 0, 0)), false);
+        flash(out ? tr("✓ Moved $%L1 to your main wallet").arg(amount, 0, 'f', 2)
+                  : tr("✓ Moved $%L1 to account %2").arg(amount, 0, 'f', 2)
+                        .arg(m_account->currentText().section(' ', 0, 0)));
         emit transferred();
         loadWallet();   // balances on both sides have moved
     });

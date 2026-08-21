@@ -33,12 +33,12 @@ import { Monitor } from "lucide-react"
 // certificate: desk_terminal/sign.ps1 and make-installer.ps1 are already wired
 // for one, and the day it exists this can go back to handing out the .exe
 // directly -- see "Code signing" in desk_terminal/README.md.
-export const WINDOWS_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.exe?v=1.1.4"
+export const WINDOWS_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.exe?v=1.1.5"
 
-// The same build as a zip, for a visitor whose browser refuses the .exe. A zip
-// is not treated as an executable, so it downloads without the warning; they
-// extract one file and run the same installer.
-export const WINDOWS_ZIP_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.zip?v=1.1.4"
+// The same build as a zip. Not linked from the panel - the button hands out the
+// installer - but it stays published for a visitor whose browser refuses the
+// .exe, and support can send this link.
+export const WINDOWS_ZIP_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.zip?v=1.1.5"
 
 // Flip to the .dmg URL once a macOS build has been produced and uploaded — the
 // installer can only be built and notarised on a Mac.
@@ -122,22 +122,6 @@ export function DesktopTerminalDownload() {
             <WindowsLogo className="h-6 w-6 shrink-0" />
             <span className="text-[15px] font-medium">Download for Windows</span>
           </a>
-
-          {/* The way out for a blocked download, in one line. The installer is
-              unsigned until a certificate exists, and Chrome refuses unsigned
-              executables it has no reputation for - a zip is not an executable,
-              so it comes down cleanly. */}
-          <p className="px-5 pb-1 text-[11px] leading-relaxed text-white/40">
-            Blocked by your browser?{" "}
-            <a
-              href={WINDOWS_ZIP_URL}
-              className="underline decoration-white/25 underline-offset-2 hover:text-white/70"
-              onClick={() => setIsOpen(false)}
-            >
-              Download the .zip
-            </a>{" "}
-            and run the setup inside it.
-          </p>
 
           {MACOS_URL ? (
             <a
