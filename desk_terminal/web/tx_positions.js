@@ -678,6 +678,34 @@
       // Always drag against the LIVE record — `p` is the snapshot the pill was
       // built from and its open price may have been re-polled since.
       var live = function () { return self._pos[String(p.id)] || p; };
+
+      // The bracket's OWN line follows the cursor as well.
+      //
+      // Only the preview used to move, which left the real dashed line parked at
+      // the old level right beside it — two lines for one bracket, and the one
+      // that looks official pointing at the price you are dragging away from.
+      //
+      // Throttled to one chart write per frame: pointermove fires several times
+      // faster than the chart can usefully redraw, and each move is a
+      // getShapeById + setPoints round trip into the library.
+      //
+      // _drawn is updated with it because it records where the line actually IS.
+      // That is what lets a later _sync() — an abandoned drag, a refused level,
+      // the next poll — notice the line is off its true price and put it back.
+      var key = String(p.id) + "|" + kind;
+      var lineRaf = 0, lineWant = 0;
+      var trackLine = function (price) {
+        lineWant = price;
+        if (lineRaf) return;
+        lineRaf = requestAnimationFrame(function () {
+          lineRaf = 0;
+          var g = self._shapes[String(p.id)];
+          if (g && g[kind] && lineWant > 0) {
+            self._moveLine(g[kind], lineWant);
+            self._drawn[key] = lineWant;
+          }
+        });
+      };
       var d = self._digits(p.symbol);
       var entryY = function () {
         var g = self._geom();
@@ -685,6 +713,7 @@
         return self._paneY(Number(live().open_price) || 0, g) + self._calibOffset;
       };
       var cleanup = function () {
+        if (lineRaf) { cancelAnimationFrame(lineRaf); lineRaf = 0; }
         [zone, line, lbl].forEach(function (x) {
           try { self._overlay.removeChild(x); } catch (err) {}
         });
@@ -705,6 +734,7 @@
           zone.style.top = Math.min(ey, cy) + "px";
           zone.style.height = Math.abs(ey - cy) + "px";
         }
+        if (price > 0) trackLine(Number(price));
       };
 
       el.onpointerup = function (ev) {
@@ -712,7 +742,10 @@
         try { el.releasePointerCapture(ev.pointerId); } catch (err) {}
         cleanup();
 
-        if (!moved) { self._promptBracket(live(), kind); return; }   // plain click
+        // A plain click is not a move: the line may have been nudged a pixel or
+        // two on the way, so put it back on the level the position actually
+        // carries before opening the type-a-price dialog.
+        if (!moved) { self._sync(); self._promptBracket(live(), kind); return; }
 
         var r = self._host.getBoundingClientRect();
         var price = self._priceForY(ev.clientY - r.top);
@@ -769,7 +802,23 @@
     // sat there for seconds after the drag was released.
     var live = this._pos[id];
     if (live) live[kind] = level;
-    if (level > 0) this._drawn[id + "|" + kind] = level;
+
+    // Redraw the LINE now too, not just the pill.
+    //
+    // The pill rides the rAF loop, so it lands on the new level the instant the
+    // drag is released; the dashed line is a chart shape and only _sync() ever
+    // moves one. Without this call that wait is the next positions poll, so the
+    // line sat seconds behind a pill claiming a level it was not drawn at.
+    //
+    // _sync() re-reads the poll's own (still stale) positions, but _pendingSet
+    // was set immediately above and it overrides this bracket there, so the
+    // line is drawn at the level being sent.
+    //
+    // And _drawn is deliberately NOT pre-set to the new level here. It records
+    // where the line actually IS; writing the target into it made _sync's dirty
+    // check compare equal and skip the move altogether, which is why the line
+    // never followed the pill at all.
+    this._sync();
 
     this._bridge.modifyBracket(id, kind, level);
   };
