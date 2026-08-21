@@ -15,7 +15,30 @@ import { Monitor } from "lucide-react"
 // the worst kind of stale, because the download succeeds and looks correct.
 // The query string is part of Cloudflare's cache key, so bumping it forces a
 // MISS and pulls the new binary through. Same trick as tvchart.css?v=3.
-export const WINDOWS_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.exe?v=1.1.4"
+// The button hands out a ZIP, not the .exe, and that is not cosmetic.
+//
+// Chrome refuses an unsigned installer: "Unverified download blocked", or
+// "This file can't be verified" where the visitor has Safe Browsing off. It is
+// judging the SIGNATURE, and neither terminal.exe nor the setup has one; at
+// 109 MB the file is also over Chrome's deep-scan limit, so it cannot look
+// inside and decide for itself either. The build that was published in August
+// downloaded cleanly only because it had spent weeks accumulating reputation --
+// every new release starts that clock again at zero.
+//
+// A .zip is not treated as an executable, so it downloads without any of that.
+// The trader extracts one file and runs it, which is the same setup they were
+// going to run anyway.
+//
+// THIS IS A WORKAROUND, NOT THE FIX. The fix is an OV/EV code-signing
+// certificate: desk_terminal/sign.ps1 and make-installer.ps1 are already wired
+// for one, and the day it exists this can go back to handing out the .exe
+// directly -- see "Code signing" in desk_terminal/README.md.
+export const WINDOWS_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.zip?v=1.1.4"
+
+// Kept for anyone who would rather take the installer straight, and because the
+// file is still published under this name. Expect a browser warning on it until
+// the build is signed.
+export const WINDOWS_EXE_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.exe?v=1.1.4"
 
 // Flip to the .dmg URL once a macOS build has been produced and uploaded — the
 // installer can only be built and notarised on a Mac.
@@ -97,8 +120,25 @@ export function DesktopTerminalDownload() {
             onClick={() => setIsOpen(false)}
           >
             <WindowsLogo className="h-6 w-6 shrink-0" />
-            <span className="text-[15px] font-medium">Download for Windows</span>
+            <span className="flex-1 text-[15px] font-medium">Download for Windows</span>
+            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/50">
+              Zip
+            </span>
           </a>
+
+          {/* Says what to do with it, in the two words it takes: a trader who
+              expected an installer and got an archive should not have to guess. */}
+          <p className="px-5 pb-1 text-[11px] leading-relaxed text-white/40">
+            Extract the zip and run{" "}
+            <span className="text-white/60">VxnessTerminal-Setup.exe</span>.{" "}
+            <a
+              href={WINDOWS_EXE_URL}
+              className="underline decoration-white/25 underline-offset-2 hover:text-white/70"
+              onClick={() => setIsOpen(false)}
+            >
+              Direct .exe
+            </a>
+          </p>
 
           {MACOS_URL ? (
             <a
