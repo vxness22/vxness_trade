@@ -167,6 +167,13 @@ if ($stillMissing) {
 }
 Write-Host "==> CRT deployed: $($crt -join ', ')" -ForegroundColor Green
 
+# Sign terminal.exe here, before anything packages it: the signature has to
+# travel INTO the installer, or the file on the trader's disk is unsigned and
+# SmartScreen judges it on every launch. A no-op on a machine with no
+# certificate configured — see sign.ps1.
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $src "sign.ps1") "$build\terminal.exe"
+if ($LASTEXITCODE -ne 0) { throw "signing terminal.exe failed" }
+
 # Copy the web assets next to the exe for a self-contained run.
 # NOTE: the destination MUST be removed first. `Copy-Item -Recurse src\web dst\web`
 # copies the folder *into* dst\web when it already exists (creating dst\web\web)

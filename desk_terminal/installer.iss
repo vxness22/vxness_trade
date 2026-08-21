@@ -46,6 +46,19 @@ Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 
+; Code signing, when make-installer.ps1 was given a certificate (it passes
+; /DSIGN and the tool itself on the ISCC command line).
+;
+; Declared behind #ifdef on purpose: naming a SignTool that ISCC has not been
+; given aborts the compile, and a developer building an unsigned test installer
+; has no certificate. SignedUninstaller covers the one file that cannot be
+; signed from outside — the uninstaller is generated on the trader's machine
+; during the install, so Inno has to sign it as it builds it in.
+#ifdef SIGN
+SignTool=signtool
+SignedUninstaller=yes
+#endif
+
 ; ── Installing over a RUNNING terminal ───────────────────────────────
 ; Symptom this fixes:
 ;     resources\icudtl.dat
