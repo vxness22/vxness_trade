@@ -15,7 +15,7 @@ const POPULAR_INSTRUMENTS = {
   Metals: ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD'],
   Commodities: ['USOIL', 'UKOIL', 'NGAS', 'COPPER'],
   Crypto: ['BTCUSD', 'ETHUSD', 'BNBUSD', 'SOLUSD', 'XRPUSD', 'ADAUSD', 'DOGEUSD', 'DOTUSD', 'MATICUSD', 'LTCUSD', 'AVAXUSD', 'LINKUSD', 'SHIBUSD', 'UNIUSD', 'ATOMUSD'],
-  Indices: ['US30', 'US500', 'NAS100', 'GER40', 'UK100', 'JPN225', 'FRA40', 'AUS200', 'HK50', 'ESP35']
+  Indices: ['US30', 'US500', 'NAS100', 'GER40', 'UK100', 'JPN225', 'FRA40', 'AUS200', 'HK50']
 }
 
 // Fetch price from Infoway with fallback
@@ -150,7 +150,7 @@ function getInstrumentName(symbol) {
     // Indices
     'US30': 'Dow Jones 30', 'US500': 'S&P 500', 'NAS100': 'Nasdaq 100',
     'GER40': 'DAX 40', 'UK100': 'FTSE 100', 'JPN225': 'Nikkei 225',
-    'FRA40': 'CAC 40', 'AUS200': 'ASX 200', 'HK50': 'Hang Seng 50', 'ESP35': 'IBEX 35',
+    'FRA40': 'CAC 40', 'AUS200': 'ASX 200', 'HK50': 'Hang Seng 50',
     // Commodities
     'USOIL': 'US Oil', 'UKOIL': 'UK Oil', 'NGAS': 'Natural Gas', 'COPPER': 'Copper',
     'ALUMINUM': 'Aluminum', 'NICKEL': 'Nickel',

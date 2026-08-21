@@ -65,14 +65,18 @@ const METALS_SYMBOLS = ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD']
 // ========== COMMODITIES (4) ==========
 const COMMODITIES_SYMBOLS = ['USOIL', 'UKOIL', 'NGAS', 'COPPER']
 
-// ========== INDICES (10) ==========
-// Only the codes Infoway actually answers for. Probed against the live kline API
-// on 2026-08-21: SPX500 and EU50 come back "All product not exists", so they are
-// deliberately absent rather than listed and permanently blank. US100 is carried
-// by KLINE_CODE_OVERRIDE below, which maps it onto Infoway's NAS100.
+// ========== INDICES (9) ==========
+// Only the codes Infoway both answers for AND streams. Probed on 2026-08-21:
+// SPX500 and EU50 return "All product not exists" from the kline API, and ESP35
+// returns history but never ticks on the WebSocket — its quote sat on the static
+// fallback with no timestamp while the other nine updated within 32 seconds. A
+// listed instrument whose price never moves is worse than an absent one, because
+// a trader can open against the stale number, so it is left out too.
+//
+// US100 is carried by KLINE_CODE_OVERRIDE below, which maps it onto NAS100.
 const INDICES_SYMBOLS = [
   'US30', 'US500', 'NAS100', 'GER40', 'UK100',
-  'JPN225', 'FRA40', 'AUS200', 'HK50', 'ESP35'
+  'JPN225', 'FRA40', 'AUS200', 'HK50'
 ]
 
 // ========== CRYPTO (44) ==========
@@ -186,7 +190,6 @@ const FALLBACK_PRICES = {
   'FRA40': { bid: 8455.00, ask: 8457.00 },
   'AUS200': { bid: 9050.00, ask: 9053.00 },
   'HK50': { bid: 26020.00, ask: 26026.00 },
-  'ESP35': { bid: 23290.00, ask: 23296.00 },
 
   'USOIL': { bid: 62.30, ask: 62.35 },
   'UKOIL': { bid: 65.80, ask: 65.85 },
