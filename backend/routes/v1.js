@@ -21,6 +21,7 @@ import tradeEngine from '../services/tradeEngine.js'
 import { contractSize as symbolContractSize } from '../utils/symbolMeta.js'
 import { resolveTradeSegment } from '../utils/tradeSegment.js'
 import { jwtAuth, ownedAccount, signAccessToken, fail } from '../utils/terminalAuth.js'
+import { validatePendingBrackets } from '../utils/bracketGuard.js'
 
 const router = express.Router()
 
@@ -465,6 +466,13 @@ router.post('/orders', jwtAuth, async (req, res) => {
 
     const sl = Number(body.stop_loss) > 0 ? Number(body.stop_loss) : null
     const tp = Number(body.take_profit) > 0 ? Number(body.take_profit) : null
+
+    // The trigger price is what this order will open at, so that — not today's
+    // market — is what its brackets have to sit around. A stop on the wrong side
+    // of it survives until the order fills and is then hit on the sweep's next
+    // look, so the position appears and disappears within minutes of each other.
+    const bracketErr = validatePendingBrackets(side, sl, tp, price)
+    if (bracketErr) return fail(res, 400, bracketErr)
 
     const tradeId = await Trade.generateTradeId()
     const order = await Trade.create({

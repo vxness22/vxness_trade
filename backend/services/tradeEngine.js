@@ -976,11 +976,33 @@ class TradeEngine {
 
     const stopOutLevel = settings.stopOutLevel || 20
 
+    // Stop-out is the CONFIGURED level and nothing tighter.
+
+    //
+
+    // `freeMargin < 0` used to sit in this test, and free margin is equity minus
+
+    // used margin — so it is negative exactly when margin level is under 100%.
+
+    // That fired a full liquidation at 100%, while the setting behind it says 50
+
+    // and the margin call it is supposed to follow says 80. The configured level
+
+    // could never be reached, because this clause had already closed everything
+
+    // on the way down. A drawdown a trader was funded to survive took the whole
+
+    // book instead, which is what "the trades close by themselves" describes.
+
+    //
+
+    // Equity at or below zero stays: there is no margin left to run on, and the
+
+    // account is past the point any level would protect.
+
     const shouldStopOut = 
 
       summary.equity <= 0 || 
-
-      summary.freeMargin < 0 ||
 
       (summary.marginLevel > 0 && summary.marginLevel <= stopOutLevel)
 
@@ -1040,7 +1062,7 @@ class TradeEngine {
 
         closedTrades,
 
-        reason: summary.equity <= 0 ? 'EQUITY_ZERO' : summary.freeMargin < 0 ? 'NEGATIVE_FREE_MARGIN' : 'MARGIN_LEVEL',
+        reason: summary.equity <= 0 ? 'EQUITY_ZERO' : 'MARGIN_LEVEL',
 
         finalEquity: summary.equity,
 

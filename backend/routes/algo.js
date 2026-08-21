@@ -18,6 +18,7 @@ import { resolveTradeSegment } from '../utils/tradeSegment.js'
 import { isMarketOpen } from '../utils/marketHours.js'
 import { algoAuth, fail } from '../utils/terminalAuth.js'
 import { loadSpreadTable, applySpread, digitsFor } from '../utils/terminalQuotes.js'
+import { validateBrackets } from '../utils/bracketGuard.js'
 
 const router = express.Router()
 
@@ -219,6 +220,14 @@ router.post('/trade', async (req, res) => {
 
     const sl = Number(req.body?.sl) > 0 ? Number(req.body.sl) : null
     const tp = Number(req.body?.tp) > 0 ? Number(req.body.tp) : null
+
+    // A bracket the market has already passed is fired by the SL/TP sweep on its
+    // next look, so the position closes itself minutes after opening. This route
+    // accepted any level above zero, which is how a GBPUSD BUY came to carry a
+    // stop of 4372 — see utils/bracketGuard.js. Judged against the server's own
+    // quote, the same one the fill is priced at.
+    const bracketErr = validateBrackets(action, sl, tp, price)
+    if (bracketErr) return fail(res, 400, bracketErr)
 
     const trade = await tradeEngine.openTrade(
       req.user._id,

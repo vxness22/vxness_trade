@@ -13,6 +13,7 @@ import infowayService from '../services/infowayService.js'
 import { resolveTradeSegment } from '../utils/tradeSegment.js'
 import { commissionDollarAmount } from '../utils/commissionMath.js'
 import { isMarketOpen } from '../utils/marketHours.js'
+import { validateBrackets } from '../utils/bracketGuard.js'
 import { pnlUsd } from '../utils/symbolMeta.js'
 import { webAuth, ownedAccount, ownedTrade, denyAccount, denyTrade } from '../utils/webAuth.js'
 
@@ -132,6 +133,24 @@ router.post('/open', webAuth, async (req, res) => {
         message: 'Market is closed on weekends for this instrument. Trading will resume when the market reopens.',
         code: 'MARKET_CLOSED_WEEKEND'
       })
+    }
+
+    // Brackets have to be usable before the position exists, not only when one
+    // is edited later. Opening carried sl/tp through on a `> 0` test alone, so a
+    // level the market had already passed went straight into the trade and the
+    // SL/TP sweep closed it the moment the three-minute hold lapsed — a position
+    // that vanished a few minutes after it opened, with nothing to explain it.
+    // Checked here, above the challenge branch, so both engines are covered.
+    {
+      const parsedSl = sl ? parseFloat(sl) : null
+      const parsedTp = tp ? parseFloat(tp) : null
+      // The request's own bid/ask is what this order is being priced at, and it
+      // is already validated above.
+      const bracketErr = validateBrackets(side, parsedSl, parsedTp,
+                                          { bid: parseFloat(bid), ask: parseFloat(ask) })
+      if (bracketErr) {
+        return res.status(400).json({ success: false, message: bracketErr, code: 'BRACKET_WRONG_SIDE' })
+      }
     }
 
     // Check if this is a challenge account first
