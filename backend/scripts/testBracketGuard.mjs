@@ -44,6 +44,18 @@ check('brackets sent as 0 (means none)',
 check('EURUSD BUY  @1.14000, SL 1.13900 / TP 1.14200',
       validateBrackets('BUY', 1.13900, 1.14200, q(1.14000, 0.00012)), false)
 
+console.log('\nRight side but nowhere near the instrument — must be REJECTED\n')
+// Found by the end-to-end run against the live API: 1.35 sits BELOW a gold BUY,
+// so the side test was happy and a real position opened carrying it.
+check('XAUUSD BUY  @4580.73 with SL 1.35',
+      validateBrackets('BUY', 1.35, null, q(4580.73)), true)
+check('XAUUSD SELL @4580.73 with TP 1.35',
+      validateBrackets('SELL', null, 1.35, q(4580.73)), true)
+check('GBPUSD SELL @1.34940 with SL 4372',
+      validateBrackets('SELL', 4372, null, q(1.34940, 0.00016)), true)
+check('a genuinely wide stop stays allowed (BUY @4580, SL 4100)',
+      validateBrackets('BUY', 4100, null, q(4580.73)), false)
+
 console.log('\nTake profit on the wrong side — must be REJECTED\n')
 check('XAUUSD BUY  @4383.68 with TP 4370 (below)',
       validateBrackets('BUY', null, 4370, q(4383.68)), true)
