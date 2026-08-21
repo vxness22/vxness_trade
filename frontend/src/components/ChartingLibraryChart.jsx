@@ -967,6 +967,24 @@ export default function ChartingLibraryChart({
       return { el, badge, price, pnl, lots, x };
     };
 
+    // The line itself, as something you can grab.
+    //
+    // Dragging used to work only on the pill's badge and price segments — a
+    // target about 60px wide at the far left of the chart — while the line it
+    // controls runs the full width. Everyone aims at the line, and nothing
+    // happened. This is a transparent strip pinned to the same y, spanning the
+    // pane, carrying the identical press-drag-release behaviour.
+    //
+    // Thin on purpose: it sits over the chart, so anything taller starts eating
+    // crosshair and drawing clicks at that price. It also sits BELOW the pill
+    // (z-index 5 vs 6) so the pill's own ✕ and segments still take their clicks.
+    const mkDragStrip = () => {
+      const el = document.createElement("div");
+      el.style.cssText = `position:absolute;left:0;right:0;height:11px;transform:translateY(-50%);display:none;pointer-events:auto;z-index:5;background:transparent;`;
+      overlay.appendChild(el);
+      return el;
+    };
+
     for (const p of myPos) {
       const sideColor = p.side === "BUY" ? GREEN : RED;
       // Entry pill
@@ -992,7 +1010,21 @@ export default function ChartingLibraryChart({
       slPill.el.style.borderColor = RED;
       attachDrag(slPill.badge, p, "sl");
       attachDrag(slPill.price, p, "sl");
-      slPill.x.remove(); // no ✕ icon on SL (client request) — clear it via click-to-type
+      const slStrip = mkDragStrip();
+      attachDrag(slStrip, p, "sl");
+      slPill.x.title = `Remove stop loss on ${p.side} ${p.quantity} ${symU}`;
+      slPill.x.onclick = (e) => {
+        e.stopPropagation();
+        // Asked before removing. Dropping a stop leaves a live position with
+        // nothing under it, and this is one click away from the drag handle.
+        openDialog({
+          title: "Remove stop loss",
+          body: `Remove the stop loss on ${p.side} ${p.quantity} ${symU}? The position stays open with no stop.`,
+          confirmLabel: "Remove",
+          danger: true,
+          onConfirm: () => saveBracket(p, "sl", null),
+        });
+      };
       // TP pill
       const tpPill = mkSegPill();
       tpPill.badge.textContent = "TP";
@@ -1000,9 +1032,20 @@ export default function ChartingLibraryChart({
       tpPill.el.style.borderColor = GREEN;
       attachDrag(tpPill.badge, p, "tp");
       attachDrag(tpPill.price, p, "tp");
-      tpPill.x.remove(); // no ✕ icon on TP (client request) — clear it via click-to-type
+      const tpStrip = mkDragStrip();
+      attachDrag(tpStrip, p, "tp");
+      tpPill.x.title = `Remove take profit on ${p.side} ${p.quantity} ${symU}`;
+      tpPill.x.onclick = (e) => {
+        e.stopPropagation();
+        openDialog({
+          title: "Remove take profit",
+          body: `Remove the take profit on ${p.side} ${p.quantity} ${symU}? The position stays open.`,
+          confirmLabel: "Remove",
+          onConfirm: () => saveBracket(p, "tp", null),
+        });
+      };
 
-      rows.push({ id: p.id, entryPrice: p.openPrice, entryPill, slPill, tpPill });
+      rows.push({ id: p.id, entryPrice: p.openPrice, entryPill, slPill, tpPill, slStrip, tpStrip });
     }
     if (rows.length === 0) {
       try {
@@ -1018,8 +1061,10 @@ export default function ChartingLibraryChart({
       raf = requestAnimationFrame(sync);
       const g = geom();
       if (!g || calibOffset == null) {
-        for (const r of rows)
+        for (const r of rows) {
           for (const pill of [r.entryPill, r.slPill, r.tpPill]) pill.el.style.display = "none";
+          for (const strip of [r.slStrip, r.tpStrip]) strip.style.display = "none";
+        }
         return;
       }
       const h = containerRef.current?.clientHeight || g.h;
@@ -1047,9 +1092,21 @@ export default function ChartingLibraryChart({
         }
         // SL / TP: full pill on its line when set; badge-only drag-to-create
         // handle on the right (at the entry line) when unset.
-        const bracket = (pill, kind, val) => {
+        const bracket = (pill, kind, val, strip) => {
           const set = val > 0;
-          if (!put(pill, set ? val : r.entryPrice)) return;
+          const visible = put(pill, set ? val : r.entryPrice);
+          // The strip tracks the pill: same y when the bracket is set and on
+          // screen, gone otherwise. An unset bracket draws no line, so there is
+          // nothing to grab and the strip must not sit there swallowing clicks.
+          if (strip) {
+            if (set && visible) {
+              strip.style.top = pill.el.style.top;
+              strip.style.display = "block";
+            } else {
+              strip.style.display = "none";
+            }
+          }
+          if (!visible) return;
           if (set) {
             pill.el.style.left = `${LEFT_PX}px`;
             pill.el.style.right = "auto";
@@ -1071,8 +1128,8 @@ export default function ChartingLibraryChart({
             pill.x.style.display = "none";
           }
         };
-        bracket(r.slPill, "sl", lp.sl);
-        bracket(r.tpPill, "tp", lp.tp);
+        bracket(r.slPill, "sl", lp.sl, r.slStrip);
+        bracket(r.tpPill, "tp", lp.tp, r.tpStrip);
       }
     };
     raf = requestAnimationFrame(sync);
@@ -1088,6 +1145,13 @@ export default function ChartingLibraryChart({
         for (const pill of [r.entryPill, r.slPill, r.tpPill]) {
           try {
             overlay.removeChild(pill.el);
+          } catch {
+            /* noop */
+          }
+        }
+        for (const strip of [r.slStrip, r.tpStrip]) {
+          try {
+            overlay.removeChild(strip);
           } catch {
             /* noop */
           }
