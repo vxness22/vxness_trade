@@ -33,12 +33,12 @@ import { Monitor } from "lucide-react"
 // certificate: desk_terminal/sign.ps1 and make-installer.ps1 are already wired
 // for one, and the day it exists this can go back to handing out the .exe
 // directly -- see "Code signing" in desk_terminal/README.md.
-export const WINDOWS_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.zip?v=1.1.4"
+export const WINDOWS_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.exe?v=1.1.4"
 
-// Kept for anyone who would rather take the installer straight, and because the
-// file is still published under this name. Expect a browser warning on it until
-// the build is signed.
-export const WINDOWS_EXE_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.exe?v=1.1.4"
+// The same build as a zip, for a visitor whose browser refuses the .exe. A zip
+// is not treated as an executable, so it downloads without the warning; they
+// extract one file and run the same installer.
+export const WINDOWS_ZIP_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.zip?v=1.1.4"
 
 // Flip to the .dmg URL once a macOS build has been produced and uploaded — the
 // installer can only be built and notarised on a Mac.
@@ -120,24 +120,23 @@ export function DesktopTerminalDownload() {
             onClick={() => setIsOpen(false)}
           >
             <WindowsLogo className="h-6 w-6 shrink-0" />
-            <span className="flex-1 text-[15px] font-medium">Download for Windows</span>
-            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/50">
-              Zip
-            </span>
+            <span className="text-[15px] font-medium">Download for Windows</span>
           </a>
 
-          {/* Says what to do with it, in the two words it takes: a trader who
-              expected an installer and got an archive should not have to guess. */}
+          {/* The way out for a blocked download, in one line. The installer is
+              unsigned until a certificate exists, and Chrome refuses unsigned
+              executables it has no reputation for - a zip is not an executable,
+              so it comes down cleanly. */}
           <p className="px-5 pb-1 text-[11px] leading-relaxed text-white/40">
-            Extract the zip and run{" "}
-            <span className="text-white/60">VxnessTerminal-Setup.exe</span>.{" "}
+            Blocked by your browser?{" "}
             <a
-              href={WINDOWS_EXE_URL}
+              href={WINDOWS_ZIP_URL}
               className="underline decoration-white/25 underline-offset-2 hover:text-white/70"
               onClick={() => setIsOpen(false)}
             >
-              Direct .exe
-            </a>
+              Download the .zip
+            </a>{" "}
+            and run the setup inside it.
           </p>
 
           {MACOS_URL ? (
