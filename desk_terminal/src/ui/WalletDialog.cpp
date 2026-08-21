@@ -150,8 +150,15 @@ void WalletDialog::loadWallet() {
         const int http = r->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         const QJsonObject o = QJsonDocument::fromJson(r->readAll()).object();
         if (r->error() != QNetworkReply::NoError || http >= 400) {
-            setStatus(tr("Couldn't load wallet: %1")
-                      .arg(apiDetail(o, r->errorString())), true);
+            // A 404 carrying no {"detail": ...} is the gateway itself saying it
+            // has no such route — the wallet endpoints are newer than some
+            // deployments. Qt renders that as "server replied:" with nothing
+            // after the colon, which reads like a bug in the terminal. Name it.
+            setStatus(http == 404 && o.isEmpty()
+                        ? tr("This server does not offer wallet transfers yet. "
+                             "It needs the platform update that adds them.")
+                        : tr("Couldn't load wallet: %1")
+                              .arg(apiDetail(o, r->errorString())), true);
             return;
         }
 
@@ -253,8 +260,11 @@ void WalletDialog::doTransfer() {
         const int http = r->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         const QJsonObject o = QJsonDocument::fromJson(r->readAll()).object();
         if (r->error() != QNetworkReply::NoError || http >= 400) {
-            setStatus(tr("Transfer failed: %1")
-                      .arg(apiDetail(o, r->errorString())), true);
+            setStatus(http == 404 && o.isEmpty()
+                        ? tr("This server does not offer wallet transfers yet. "
+                             "It needs the platform update that adds them.")
+                        : tr("Transfer failed: %1")
+                              .arg(apiDetail(o, r->errorString())), true);
             return;
         }
         setStatus(out ? tr("✓ Moved $%L1 to your main wallet").arg(amount, 0, 'f', 2)

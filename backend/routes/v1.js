@@ -14,6 +14,7 @@ import User from '../models/User.js'
 import Trade from '../models/Trade.js'
 import TradingAccount from '../models/TradingAccount.js'
 import Transaction from '../models/Transaction.js'
+import Wallet from '../models/Wallet.js'
 import AlgoKey from '../models/AlgoKey.js'
 import TerminalRefreshToken, { REFRESH_TTL_DAYS } from '../models/TerminalRefreshToken.js'
 import infowayService, { SUPPORTED_SYMBOLS } from '../services/infowayService.js'
@@ -647,6 +648,220 @@ router.get('/wallet/transactions', jwtAuth, async (req, res) => {
         created_at: t.createdAt?.toISOString?.() || '',
         status: t.status,
       })),
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+/* ─────────────────────────  wallet  ───────────────────────── */
+
+// The main wallet is the Wallet collection, and only that one.
+//
+// Two stores of "main wallet balance" exist in this codebase and they do not
+// agree. Deposits credit Wallet, the website's wallet page reads Wallet, and
+// the transfer a web trader actually performs (POST /api/trading-accounts/:id
+// /transfer) moves Wallet — while the older /api/wallet-transfer routes move
+// User.walletBalance, which nothing on the site displays. Reading the other one
+// here would show a trader $0.00 next to a funded wallet, so this follows the
+// balance the platform actually spends.
+async function mainWalletBalance(userId) {
+  const w = await Wallet.findOne({ userId })
+  return w ? w.balance || 0 : 0
+}
+
+const isDemoAccount = (a) => !!(a.isDemo || a.accountTypeId?.isDemo)
+const money = (n) => Math.round((Number(n) || 0) * 100) / 100
+
+// Equity and margin for one account, by the same arithmetic as the terminal's
+// own footer: equity = balance + credit + floating P&L, free = equity - used.
+async function accountFunds(account) {
+  const open = await Trade.find({ tradingAccountId: account._id, status: 'OPEN' })
+  let used = 0
+  let floating = 0
+  for (const t of open) {
+    used += t.marginUsed || 0
+    const q = liveQuote(t.symbol)
+    if (q) floating += tradeEngine.calculateFloatingPnl(t, q.bid, q.ask)
+  }
+  const equity = (account.balance || 0) + (account.credit || 0) + floating
+  return { used, equity, free: equity - used }
+}
+
+// What may actually leave an account: its free margin, but never more than the
+// cash in it. Credit is the platform's money — it can support a position and it
+// cannot be withdrawn.
+const withdrawable = (account, funds) =>
+  money(Math.max(0, Math.min(funds.free, account.balance || 0)))
+
+// GET /api/v1/wallet/summary — the main wallet, and the accounts money can move
+// between. Demo accounts are deliberately absent: their balance is play money
+// the platform mints, and it must never find a route into a real wallet.
+router.get('/wallet/summary', jwtAuth, async (req, res) => {
+  try {
+    const accounts = await TradingAccount.find({
+      userId: req.user._id,
+      status: 'Active',
+    }).populate('accountTypeId', 'name isDemo minDeposit').sort({ createdAt: -1 })
+
+    const live = []
+    for (const a of accounts) {
+      if (isDemoAccount(a)) continue
+      const f = await accountFunds(a)
+      live.push({
+        id: String(a._id),
+        account_number: a.accountId,
+        currency: 'USD',
+        balance: money(a.balance),
+        credit: money(a.credit),
+        margin_used: money(f.used),
+        equity: money(f.equity),
+        free_margin: withdrawable(a, f),
+      })
+    }
+
+    res.json({
+      main_wallet_balance: money(await mainWalletBalance(req.user._id)),
+      live_accounts: live,
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// POST /api/v1/wallet/transfer-main-to-trading — {to_account_id, amount}
+router.post('/wallet/transfer-main-to-trading', jwtAuth, async (req, res) => {
+  try {
+    const amount = money(req.body?.amount)
+    if (!(amount > 0)) return fail(res, 400, 'amount must be greater than 0')
+
+    const account = await ownedAccount(req.user._id, req.body?.to_account_id)
+    if (!account) return fail(res, 404, 'Trading account not found for this user')
+    if (isDemoAccount(account)) {
+      return fail(res, 400, 'Wallet transfers are not available on a demo account')
+    }
+    if (account.status !== 'Active') return fail(res, 400, `Account is ${account.status}`)
+
+    // The account type's minimum applies to the first money in, exactly as it
+    // does on the website.
+    const min = account.accountTypeId?.minDeposit
+    if (!(account.balance > 0) && min > 0 && amount < min) {
+      return fail(res, 400, `Minimum first deposit for the ` +
+        `${account.accountTypeId?.name || 'this'} account is $${min}`)
+    }
+
+    // The debit is CONDITIONAL and atomic.
+    //
+    // Read-the-balance-then-write-it-back is what the rest of the platform does,
+    // and two transfers landing together lose money that way: both read the same
+    // balance, both write their own result, and one debit disappears. Making the
+    // balance test the update's own filter means the check and the deduction
+    // cannot be separated by another write.
+    const wallet = await Wallet.findOneAndUpdate(
+      { userId: req.user._id, balance: { $gte: amount } },
+      { $inc: { balance: -amount } },
+      { new: true }
+    )
+    if (!wallet) return fail(res, 400, 'Insufficient balance in the main wallet')
+
+    let credited
+    try {
+      credited = await TradingAccount.findOneAndUpdate(
+        { _id: account._id, userId: req.user._id, status: 'Active' },
+        { $inc: { balance: amount } },
+        { new: true }
+      )
+      if (!credited) throw new Error('The trading account could not be credited')
+    } catch (e) {
+      // Put it back. The wallet has already been debited at this point, and
+      // returning an error without this would simply delete the money.
+      await Wallet.updateOne({ _id: wallet._id }, { $inc: { balance: amount } })
+      return fail(res, 500, e.message)
+    }
+
+    // The same ledger row the website writes, so one transfer reads identically
+    // in the web wallet history and in the terminal's Transactions tab.
+    await Transaction.create({
+      userId: req.user._id,
+      type: 'Transfer_To_Account',
+      amount,
+      paymentMethod: 'Internal',
+      tradingAccountId: account._id,
+      tradingAccountName: account.accountId,
+      description: 'Main wallet to trading account',
+      status: 'Completed',
+      transactionRef: `TRF${Date.now()}`,
+    })
+
+    res.json({
+      message: `Transferred $${amount.toFixed(2)} to ${account.accountId}`,
+      main_wallet_balance: money(wallet.balance),
+      account_balance: money(credited.balance),
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// POST /api/v1/wallet/transfer-trading-to-main — {from_account_id, amount}
+router.post('/wallet/transfer-trading-to-main', jwtAuth, async (req, res) => {
+  try {
+    const amount = money(req.body?.amount)
+    if (!(amount > 0)) return fail(res, 400, 'amount must be greater than 0')
+
+    const account = await ownedAccount(req.user._id, req.body?.from_account_id)
+    if (!account) return fail(res, 404, 'Trading account not found for this user')
+    if (isDemoAccount(account)) {
+      return fail(res, 400, 'Wallet transfers are not available on a demo account')
+    }
+    if (account.status !== 'Active') return fail(res, 400, `Account is ${account.status}`)
+
+    // Free margin, not balance: money backing an open position cannot leave, or
+    // the next tick against the trader closes it out for want of margin.
+    const funds = await accountFunds(account)
+    const max = withdrawable(account, funds)
+    if (amount > max) {
+      return fail(res, 400, `Only $${max.toFixed(2)} is free to move — the rest is ` +
+        `margin on open positions.`)
+    }
+
+    const debited = await TradingAccount.findOneAndUpdate(
+      { _id: account._id, userId: req.user._id, balance: { $gte: amount } },
+      { $inc: { balance: -amount } },
+      { new: true }
+    )
+    if (!debited) return fail(res, 400, 'Insufficient balance on the trading account')
+
+    let wallet
+    try {
+      // upsert: a user who has never had a wallet row still has one after their
+      // first withdrawal from an account.
+      wallet = await Wallet.findOneAndUpdate(
+        { userId: req.user._id },
+        { $inc: { balance: amount } },
+        { new: true, upsert: true }
+      )
+    } catch (e) {
+      await TradingAccount.updateOne({ _id: account._id }, { $inc: { balance: amount } })
+      return fail(res, 500, e.message)
+    }
+
+    await Transaction.create({
+      userId: req.user._id,
+      type: 'Transfer_From_Account',
+      amount,
+      paymentMethod: 'Internal',
+      tradingAccountId: account._id,
+      tradingAccountName: account.accountId,
+      description: 'Trading account to main wallet',
+      status: 'Completed',
+      transactionRef: `TRF${Date.now()}`,
+    })
+
+    res.json({
+      message: `Transferred $${amount.toFixed(2)} to the main wallet`,
+      main_wallet_balance: money(wallet.balance),
+      account_balance: money(debited.balance),
     })
   } catch (e) {
     fail(res, 500, e.message)
