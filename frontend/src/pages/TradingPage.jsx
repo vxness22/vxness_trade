@@ -294,7 +294,7 @@ const TradingPage = () => {
         ? (isDemoAccount ? true : false) // approved=false: demo can view, real is locked
         : null // approved=false but account not loaded yet → keep showing loader
 
-  const categories = ['All', 'Starred', 'Forex', 'Metals', 'Crypto']
+  const categories = ['All', 'Starred', 'Forex', 'Metals', 'Indices', 'Crypto']
 
 
 

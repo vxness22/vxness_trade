@@ -2,6 +2,7 @@ import dotenv from 'dotenv'
 dotenv.config()
 import express from 'express'
 import infowayService, { SUPPORTED_SYMBOLS, CRYPTO_SYMBOLS, FALLBACK_PRICES } from '../services/infowayService.js'
+import { classify } from '../utils/symbolMeta.js'
 
 const router = express.Router()
 
@@ -13,7 +14,8 @@ const POPULAR_INSTRUMENTS = {
   Forex: ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'NZDUSD', 'USDCAD', 'EURGBP', 'EURJPY', 'GBPJPY', 'EURCHF', 'EURAUD', 'AUDCAD', 'AUDJPY', 'CADJPY'],
   Metals: ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD'],
   Commodities: ['USOIL', 'UKOIL', 'NGAS', 'COPPER'],
-  Crypto: ['BTCUSD', 'ETHUSD', 'BNBUSD', 'SOLUSD', 'XRPUSD', 'ADAUSD', 'DOGEUSD', 'DOTUSD', 'MATICUSD', 'LTCUSD', 'AVAXUSD', 'LINKUSD', 'SHIBUSD', 'UNIUSD', 'ATOMUSD']
+  Crypto: ['BTCUSD', 'ETHUSD', 'BNBUSD', 'SOLUSD', 'XRPUSD', 'ADAUSD', 'DOGEUSD', 'DOTUSD', 'MATICUSD', 'LTCUSD', 'AVAXUSD', 'LINKUSD', 'SHIBUSD', 'UNIUSD', 'ATOMUSD'],
+  Indices: ['US30', 'US500', 'NAS100', 'GER40', 'UK100', 'JPN225', 'FRA40', 'AUS200', 'HK50', 'ESP35']
 }
 
 // Fetch price from Infoway with fallback
@@ -29,6 +31,11 @@ async function getLpPrice(symbol) {
   }
 }
 
+// Same answer as everywhere else — see INDEX_SYMBOLS in utils/symbolMeta.js.
+function isIndexSymbol(symbol) {
+  return classify(symbol) === 'index'
+}
+
 // Helper function to categorize symbols (must align with Charges.segment: Forex, Metals, Crypto, Indices, Commodities)
 function categorizeSymbol(symbol) {
   if (!symbol) return 'Forex'
@@ -42,8 +49,7 @@ function categorizeSymbol(symbol) {
   if (infowayService.isCrypto(symbol)) {
     return 'Crypto'
   }
-  const indexSymbols = ['US30', 'US500', 'NAS100', 'SPX500', 'GER40', 'UK100', 'USTEC', 'DE30', 'DJ30', 'US100']
-  if (indexSymbols.includes(s)) return 'Indices'
+  if (isIndexSymbol(s)) return 'Indices'
   return 'Forex'
 }
 
@@ -141,6 +147,10 @@ function getInstrumentName(symbol) {
     'XAUJPY': 'Gold/JPY', 'XAUCAD': 'Gold/CAD', 'XAUNZD': 'Gold/NZD',
     'XAGEUR': 'Silver/EUR', 'XAGGBP': 'Silver/GBP', 'XAGAUD': 'Silver/AUD', 'XAGCHF': 'Silver/CHF',
     'XAGJPY': 'Silver/JPY', 'XAGCAD': 'Silver/CAD', 'XAGNZD': 'Silver/NZD',
+    // Indices
+    'US30': 'Dow Jones 30', 'US500': 'S&P 500', 'NAS100': 'Nasdaq 100',
+    'GER40': 'DAX 40', 'UK100': 'FTSE 100', 'JPN225': 'Nikkei 225',
+    'FRA40': 'CAC 40', 'AUS200': 'ASX 200', 'HK50': 'Hang Seng 50', 'ESP35': 'IBEX 35',
     // Commodities
     'USOIL': 'US Oil', 'UKOIL': 'UK Oil', 'NGAS': 'Natural Gas', 'COPPER': 'Copper',
     'ALUMINUM': 'Aluminum', 'NICKEL': 'Nickel',
@@ -184,6 +194,10 @@ function getInstrumentName(symbol) {
 
 // Helper to get digits for symbol
 function getDigits(symbol) {
+  // Indices are quoted in points; two decimals is what the feed carries and what
+  // every reference platform shows for them. Checked before the JPY rule, or
+  // JPN225 would be read as a yen pair and shown to three.
+  if (isIndexSymbol(symbol)) return 2
   if (symbol.includes('JPY')) return 3
   // Metals (gold/silver/platinum/palladium) show 2 decimals, like TradingView.
   if (/^X(AU|AG|PT|PD)/.test(symbol)) return 2
@@ -193,6 +207,7 @@ function getDigits(symbol) {
 
 // Helper to get contract size
 function getContractSize(symbol) {
+  if (isIndexSymbol(symbol)) return 1        // 1 unit = 1 index point
   if (infowayService.isCrypto(symbol)) return 1
   if (symbol === 'XAUUSD' || symbol === 'XAGUSD') return 100
   return 100000

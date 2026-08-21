@@ -152,7 +152,7 @@ const MobileTradingApp = () => {
 
 
 
-  const categories = ['All', 'Starred', 'Forex', 'Metals', 'Commodities', 'Crypto']
+  const categories = ['All', 'Starred', 'Forex', 'Metals', 'Indices', 'Commodities', 'Crypto']
 
 
 

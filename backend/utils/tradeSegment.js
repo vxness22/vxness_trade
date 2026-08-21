@@ -1,8 +1,5 @@
 import infowayService from '../services/infowayService.js'
-
-const INDEX_SYMBOLS = new Set([
-  'US30', 'US500', 'NAS100', 'SPX500', 'GER40', 'UK100', 'USTEC', 'DE30', 'DJ30', 'US100'
-])
+import { classify } from './symbolMeta.js'
 
 /**
  * Derives Charges.segment from symbol (source of truth for commission / swap / close fees).
@@ -18,6 +15,10 @@ export function resolveTradeSegment(symbol, clientSegment = null) {
     return 'Commodities'
   }
   if (infowayService.isCrypto(s)) return 'Crypto'
-  if (INDEX_SYMBOLS.has(s)) return 'Indices'
+  // Asked of symbolMeta rather than a second list kept here. The two used to be
+  // maintained separately and fell out of step — JPN225, FRA40, AUS200, HK50 and
+  // ESP35 were all indices to symbolMeta and Forex to this function, which put
+  // them under the wrong Charges segment and the wrong instrument tab.
+  if (classify(s) === 'index') return 'Indices'
   return 'Forex'
 }

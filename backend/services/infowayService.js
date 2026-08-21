@@ -65,6 +65,16 @@ const METALS_SYMBOLS = ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD']
 // ========== COMMODITIES (4) ==========
 const COMMODITIES_SYMBOLS = ['USOIL', 'UKOIL', 'NGAS', 'COPPER']
 
+// ========== INDICES (10) ==========
+// Only the codes Infoway actually answers for. Probed against the live kline API
+// on 2026-08-21: SPX500 and EU50 come back "All product not exists", so they are
+// deliberately absent rather than listed and permanently blank. US100 is carried
+// by KLINE_CODE_OVERRIDE below, which maps it onto Infoway's NAS100.
+const INDICES_SYMBOLS = [
+  'US30', 'US500', 'NAS100', 'GER40', 'UK100',
+  'JPN225', 'FRA40', 'AUS200', 'HK50', 'ESP35'
+]
+
 // ========== CRYPTO (44) ==========
 const CRYPTO_SYMBOLS = [
   'BTCUSD', 'ETHUSD', 'LTCUSD', 'XRPUSD', 'BCHUSD', 'BNBUSD', 'ADAUSD', 'DOTUSD',
@@ -90,7 +100,7 @@ const fromInfowaySymbol = (infowaySymbol) => {
   return infowaySymbol
 }
 
-const SUPPORTED_SYMBOLS = [...FOREX_SYMBOLS, ...METALS_SYMBOLS, ...COMMODITIES_SYMBOLS, ...CRYPTO_SYMBOLS]
+const SUPPORTED_SYMBOLS = [...FOREX_SYMBOLS, ...METALS_SYMBOLS, ...COMMODITIES_SYMBOLS, ...INDICES_SYMBOLS, ...CRYPTO_SYMBOLS]
 
 // Fallback static prices for all 116 supported symbols.
 // USED ONLY when Infoway WebSocket isn't streaming a symbol.
@@ -166,6 +176,17 @@ const FALLBACK_PRICES = {
   'XAGUSD': { bid: 32.85, ask: 32.87 },
   'XPTUSD': { bid: 1075.00, ask: 1076.00 },
   'XPDUSD': { bid: 980.00, ask: 981.00 },
+
+  'US30': { bid: 52940.00, ask: 52948.00 },
+  'US500': { bid: 7670.00, ask: 7670.80 },
+  'NAS100': { bid: 29410.00, ask: 29414.00 },
+  'GER40': { bid: 26025.00, ask: 26029.00 },
+  'UK100': { bid: 10750.00, ask: 10753.00 },
+  'JPN225': { bid: 66130.00, ask: 66145.00 },
+  'FRA40': { bid: 8455.00, ask: 8457.00 },
+  'AUS200': { bid: 9050.00, ask: 9053.00 },
+  'HK50': { bid: 26020.00, ask: 26026.00 },
+  'ESP35': { bid: 23290.00, ask: 23296.00 },
 
   'USOIL': { bid: 62.30, ask: 62.35 },
   'UKOIL': { bid: 65.80, ask: 65.85 },
@@ -450,7 +471,7 @@ class InfowayService {
         this.forexLastMessageAt = Date.now()
         console.log('[Infoway] Forex WebSocket connected')
         try {
-          const allForexSymbols = [...FOREX_SYMBOLS, ...METALS_SYMBOLS, ...COMMODITIES_SYMBOLS]
+          const allForexSymbols = [...FOREX_SYMBOLS, ...METALS_SYMBOLS, ...COMMODITIES_SYMBOLS, ...INDICES_SYMBOLS]
           this.subscribeToDepth(ws, allForexSymbols)
         } catch (e) {
           console.error('[Infoway] Forex subscribe error:', e.message)
@@ -947,4 +968,4 @@ class InfowayService {
 
 const infowayService = new InfowayService()
 export default infowayService
-export { SUPPORTED_SYMBOLS, CRYPTO_SYMBOLS, FALLBACK_PRICES, foldBars }
+export { SUPPORTED_SYMBOLS, CRYPTO_SYMBOLS, INDICES_SYMBOLS, FALLBACK_PRICES, foldBars }

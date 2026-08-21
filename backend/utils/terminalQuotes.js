@@ -10,7 +10,7 @@
 // several times a second per symbol; recomputing there would hammer Mongo.
 
 import Charges from '../models/Charges.js'
-import { pipSize } from './symbolMeta.js'
+import { pipSize, classify } from './symbolMeta.js'
 import { resolveTradeSegment } from './tradeSegment.js'
 
 const CACHE_TTL_MS = 30_000
@@ -71,8 +71,16 @@ export function applySpread(symbol, bid, ask, entry) {
 }
 
 // Number of decimals the terminal should render for a symbol. Derived from
-// pipSize so it can never drift from the spread/commission scaling.
+// pipSize so it can never drift from the spread/commission scaling — except for
+// indices, where the two genuinely want different units.
+//
+// An index's natural spread unit is the whole point (admin types "2" for a
+// two-point spread on US30), so pipSize is 1 there. Its natural DISPLAY is two
+// decimals — the feed carries 52968.73 and every reference platform shows it
+// that way. Deriving digits from pipSize would round that to 52969 and throw
+// away a real part of the quote, so this one class is stated outright.
 export function digitsFor(symbol) {
+  if (classify(symbol) === 'index') return 2
   const ps = pipSize(symbol)
   if (!(ps > 0)) return 5
   return Math.max(0, Math.round(Math.log10(1 / ps)))

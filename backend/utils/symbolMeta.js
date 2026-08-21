@@ -27,9 +27,16 @@ const COMMODITY_SYMBOLS = new Set([
   'USOIL', 'UKOIL', 'BRENT', 'WTI', 'NGAS', 'COPPER',
 ])
 
+// The single source of truth for "this is an index". Everything that needs the
+// answer — contract size, pip size, the Charges segment, the instrument tab —
+// reads it from here through classify(). It used to be duplicated in
+// utils/tradeSegment.js and routes/prices.js with a different membership, and
+// the lists drifted: ESP35 was missing from this one, so it was priced as a
+// forex pair with a contract size of 100,000. A 0.01 lot would have carried
+// $23m of notional instead of $233.
 const INDEX_SYMBOLS = new Set([
   'US30', 'US500', 'NAS100', 'US100', 'GER40', 'UK100', 'DJ30', 'DAX', 'FTSE', 'SPX', 'NDX',
-  'JPN225', 'AUS200', 'HK50', 'FRA40', 'EU50', 'USTEC', 'DE30', 'SPX500',
+  'JPN225', 'AUS200', 'HK50', 'FRA40', 'ESP35', 'EU50', 'USTEC', 'DE30', 'SPX500',
 ])
 
 export function classify(symbol) {
