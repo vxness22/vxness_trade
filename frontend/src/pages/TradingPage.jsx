@@ -24,6 +24,7 @@ import { isMarketOpen, marketClosedReason } from '../utils/marketHours'
 import ChartingLibraryChart from '../components/ChartingLibraryChart'
 
 import KycTradeRequiredModal from '../components/KycTradeRequiredModal'
+import { formatPrice as sharedFormatPrice } from '../utils/formatPrice'
 
 
 
@@ -428,22 +429,13 @@ const TradingPage = () => {
 
 
 
+  // Decimals come from utils/formatPrice so the quote box, the blotter and every
+  // other screen agree. This carried its own rule, which had no case for indices
+  // and printed US30 to five decimals — wide enough to spill out of its box.
   const formatTradePrice = (symbol, price) => {
-
     const n = Number(price)
-
     if (!Number.isFinite(n) || n <= 0) return '...'
-
-    const sym = symbol || ''
-
-    if (sym.includes('JPY')) return n.toFixed(3)
-
-    if (/^X(AU|AG|PT|PD)/.test(sym)) return n.toFixed(2) // metals → 2 (gold/silver/platinum/palladium), like TradingView
-
-    if (['BTCUSD', 'ETHUSD'].includes(sym)) return n.toFixed(2)
-
-    return n.toFixed(5)
-
+    return sharedFormatPrice(n, symbol || '')
   }
 
 
@@ -3709,12 +3701,7 @@ const TradingPage = () => {
                 // Flat list of every individual trade (with its currency's total trade-count badge)
                 const allTrades = groups.flatMap(g => g.trades.map(t => ({ ...t, symbolCount: g.trades.length })))
 
-                const formatPrice = (symbol, price) => {
-                  if (!price) return '-'
-                  if (symbol.includes('JPY')) return price.toFixed(3)
-                  if (['BTCUSD', 'ETHUSD', 'XAUUSD', 'XAGUSD'].includes(symbol)) return price.toFixed(2)
-                  return price.toFixed(5)
-                }
+                const formatPrice = (symbol, price) => (price ? sharedFormatPrice(price, symbol) : '-')
 
                 const toggleSymbol = (symbol) => setExpandedNettingSymbols(prev => {
                   const next = new Set(prev)
@@ -3906,17 +3893,7 @@ const TradingPage = () => {
 
                     tradeHistory.map(trade => {
 
-                      const formatPrice = (price) => {
-
-                        if (!price) return '-'
-
-                        if (trade.symbol.includes('JPY')) return price.toFixed(3)
-
-                        if (['BTCUSD', 'ETHUSD', 'XAUUSD', 'XAGUSD'].includes(trade.symbol)) return price.toFixed(2)
-
-                        return price.toFixed(5)
-
-                      }
+                      const formatPrice = (price) => (price ? sharedFormatPrice(price, trade.symbol) : '-')
 
                       
 
