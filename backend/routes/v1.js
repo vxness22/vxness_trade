@@ -170,6 +170,12 @@ function positionJson(t) {
   const profit = q ? tradeEngine.calculateFloatingPnl(t, q.bid, q.ask) : 0
   return {
     id: String(t._id),
+    // The ticket the rest of the platform knows this trade by (T…), which is
+    // what admin, support and the statements all quote. `id` stays the Mongo
+    // _id because every write route below addresses the trade by it; without
+    // this field a desktop client could only show that _id, so the same trade
+    // carried two different "ticket numbers" depending on where it was read.
+    ticket: t.tradeId || '',
     symbol: t.symbol,
     side: t.side,
     lots: t.quantity,
@@ -386,6 +392,7 @@ const ORDER_TYPE = {
 function orderJson(t) {
   return {
     id: String(t._id),
+    ticket: t.tradeId || '',
     symbol: t.symbol,
     order_type: t.orderType.endsWith('_LIMIT') ? 'limit' : 'stop',
     side: t.side.toLowerCase(),
@@ -589,6 +596,7 @@ router.get('/portfolio/trades', jwtAuth, async (req, res) => {
     res.json({
       items: trades.map(t => ({
         id: String(t._id),
+        ticket: t.tradeId || '',
         symbol: t.symbol,
         side: t.side,
         lots: t.quantity,
