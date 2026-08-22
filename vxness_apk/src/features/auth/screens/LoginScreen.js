@@ -4,8 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, RadialGradient, Stop, Rect } from 'react-native-svg';
 
 import { AuthContext } from '../../../app/providers/AuthContext';
-import { Screen, showToast } from '../../../components/vantage';
-import { space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
+import { Screen, showToast } from '../../../components/vx';
+import { space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 
 // Screen-local palette - pure black canvas + the Vxness green accent.
 const THEME = '#2FBF71';

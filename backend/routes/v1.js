@@ -23,6 +23,7 @@ import { contractSize as symbolContractSize } from '../utils/symbolMeta.js'
 import { resolveTradeSegment } from '../utils/tradeSegment.js'
 import { jwtAuth, ownedAccount, signAccessToken, fail } from '../utils/terminalAuth.js'
 import { validatePendingBrackets } from '../utils/bracketGuard.js'
+import { isMarketOpen, marketClosedReason } from '../utils/marketHours.js'
 
 const router = express.Router()
 
@@ -282,6 +283,19 @@ router.post('/positions/:id/close', jwtAuth, async (req, res) => {
     const found = await ownedOpenTrade(req.user._id, req.params.id)
     if (!found) return fail(res, 404, 'Open position not found')
     const { trade } = found
+
+    // A closed market cannot be traded on, in either direction.
+    //
+    // Opening was already guarded on every path; closing was not guarded here,
+    // and this is the path the desktop terminal and the mobile app both use.
+    // The cached quote does not disappear when the week ends - it just stops
+    // moving - so a close on Saturday would have filled at Friday's price,
+    // hours after the market last agreed to it. The web route
+    // (routes/trade.js) has always refused this; /api/v1 now says the same.
+    if (!isMarketOpen(trade.symbol)) {
+      return fail(res, 400, marketClosedReason(trade.symbol) ||
+        `Market is closed for ${trade.symbol}.`)
+    }
 
     const q = liveQuote(trade.symbol)
     if (!q) return fail(res, 503, `No live price for ${trade.symbol}. Please try again.`)

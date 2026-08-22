@@ -17,7 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as SecureStore from 'expo-secure-store';
 import { useTheme } from '../../../app/providers/ThemeContext';
 import { useAccount } from '../../../app/providers/AccountContext';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vantage/BottomNavPill';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 import ApiService from '../../../services/api/ApiService';
 import logger from '../../../utils/logger';
 
@@ -211,7 +211,7 @@ const AccountsScreen = ({ navigation, route }) => {
       logger.log('AccountsScreen - Fetching accounts with token auth');
       const data = await ApiService.getAccounts();
       const items = data.items || data || [];
-      // Map TrustEdge account fields to expected format (show both demo and live, like web)
+      // Map the platform account fields to expected format (show both demo and live, like web)
       const mappedAccounts = items.map((a) => ({
         ...a,
         id: a.id || a._id,
@@ -258,7 +258,7 @@ const AccountsScreen = ({ navigation, route }) => {
     setShowAccountTransferModal(true);
   };
 
-  // Transfer from wallet to account - TrustEdge uses wallet deposit
+  // Transfer from wallet to account - the platform uses wallet deposit
   const handleTransferFunds = async () => {
     if (!selectedAccount || !selectedAccount._id) {
       Alert.alert('Error', 'No account selected');
@@ -306,7 +306,7 @@ const AccountsScreen = ({ navigation, route }) => {
     setIsTransferring(false);
   };
 
-  // Withdraw from account to wallet - TrustEdge uses wallet withdraw
+  // Withdraw from account to wallet - the platform uses wallet withdraw
   const handleWithdrawFromAccount = async () => {
     if (!transferAmount || parseFloat(transferAmount) <= 0) {
       Alert.alert('Error', 'Please enter a valid amount');

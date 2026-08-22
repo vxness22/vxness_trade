@@ -4,7 +4,7 @@ import { WebView } from 'react-native-webview';
 import * as SecureStore from 'expo-secure-store';
 
 import { API_URL } from '../../../constants';
-import { vantage } from '../../../theme/vantageTheme';
+import { vx } from '../../../theme/vxTheme';
 import { getInstruments } from '../../../utils/instrumentsCache';
 import logger from '../../../utils/logger';
 
@@ -18,7 +18,7 @@ import logger from '../../../utils/logger';
  *
  * Bridge:
  *   WebView → RN : {type:'getBars'|'resolveSymbol'|'ready'|'bridgeReady', ...}
- *   RN → WebView : window.SC.onBars(id, bars) | onSymbol(id, info) | pushTick(bar)
+ *   RN → WebView : window.VX.onBars(id, bars) | onSymbol(id, info) | pushTick(bar)
  */
 const LOCAL_HTML =
   Platform.OS === 'android'
@@ -37,7 +37,7 @@ export default function NativeChart({ symbol = 'EURUSD', interval = '60', theme,
   const posPollRef = useRef(null);
   const acctRef = useRef(accountId);
   const curRef = useRef({ symbol: String(symbol).toUpperCase(), resolution: String(interval) });
-  const dark = theme ? theme !== 'light' : vantage.isDark;
+  const dark = theme ? theme !== 'light' : vx.isDark;
   acctRef.current = accountId;
 
   // Load token + instruments once.
@@ -87,7 +87,7 @@ export default function NativeChart({ symbol = 'EURUSD', interval = '60', theme,
       const s = String(i.symbol || '').toUpperCase();
       if (s) map[s] = { digits: Number(i.digits) || 5, contract_size: Number(i.contract_size) || 100000 };
     });
-    inject(`window.SC && window.SC.setInstruments(${JSON.stringify(map)});`);
+    inject(`window.VX && window.VX.setInstruments(${JSON.stringify(map)});`);
   }, [inject]);
 
   // Fetch this account's OPEN positions and feed them to the chart (entry + SL/TP
@@ -101,7 +101,7 @@ export default function NativeChart({ symbol = 'EURUSD', interval = '60', theme,
       if (!res.ok) return;
       const raw = await res.json();
       const list = Array.isArray(raw) ? raw : (Array.isArray(raw?.items) ? raw.items : []);
-      inject(`window.SC && window.SC.setPositions(${JSON.stringify(list)});`);
+      inject(`window.VX && window.VX.setPositions(${JSON.stringify(list)});`);
     } catch (e) { /* transient */ }
   }, [authHeaders, inject]);
 
@@ -166,7 +166,7 @@ export default function NativeChart({ symbol = 'EURUSD', interval = '60', theme,
         // case doesn't trigger a redundant re-resolve/flicker.
         const cur = curRef.current;
         if (cur.symbol && String(cur.symbol).toUpperCase() !== String(m.symbol || '').toUpperCase()) {
-          inject(`window.SC && window.SC.setSymbol && window.SC.setSymbol(${JSON.stringify(String(cur.symbol).toUpperCase())});`);
+          inject(`window.VX && window.VX.setSymbol && window.VX.setSymbol(${JSON.stringify(String(cur.symbol).toUpperCase())});`);
         }
       }
       return;
@@ -196,12 +196,12 @@ export default function NativeChart({ symbol = 'EURUSD', interval = '60', theme,
     }
     if (m.type === 'resolveSymbol') {
       const info = resolveSymbolInfo(m.symbol);
-      inject(`window.SC && window.SC.onSymbol(${m.id}, ${JSON.stringify(info)});`);
+      inject(`window.VX && window.VX.onSymbol(${m.id}, ${JSON.stringify(info)});`);
       return;
     }
     if (m.type === 'getBars') {
       const bars = await fetchBars(m.symbol, m.resolution, m.from, m.to);
-      inject(`window.SC && window.SC.onBars(${m.id}, ${JSON.stringify(bars)});`);
+      inject(`window.VX && window.VX.onBars(${m.id}, ${JSON.stringify(bars)});`);
       // Track what the chart is currently showing so the live poll matches.
       curRef.current = { symbol: String(m.symbol).toUpperCase(), resolution: String(m.resolution) };
       return;
@@ -221,7 +221,7 @@ export default function NativeChart({ symbol = 'EURUSD', interval = '60', theme,
       const bars = await fetchBars(sym, resolution, from, to);
       const nb = bars[bars.length - 1];
       if (nb && isFinite(nb.close)) {
-        inject(`window.SC && window.SC.pushTick(${JSON.stringify({ symbol: sym, resolution, ...nb })});`);
+        inject(`window.VX && window.VX.pushTick(${JSON.stringify({ symbol: sym, resolution, ...nb })});`);
       }
     };
     pollRef.current = setInterval(tick, 4000);
@@ -237,11 +237,11 @@ export default function NativeChart({ symbol = 'EURUSD', interval = '60', theme,
   useEffect(() => {
     const s = String(symbol).toUpperCase();
     curRef.current = { ...curRef.current, symbol: s };
-    if (readyRef.current) inject(`window.SC && window.SC.setSymbol && window.SC.setSymbol(${JSON.stringify(s)});`);
+    if (readyRef.current) inject(`window.VX && window.VX.setSymbol && window.VX.setSymbol(${JSON.stringify(s)});`);
   }, [symbol, inject]);
   useEffect(() => {
     curRef.current = { ...curRef.current, resolution: String(interval) };
-    if (readyRef.current) inject(`window.SC && window.SC.setInterval && window.SC.setInterval(${JSON.stringify(String(interval))});`);
+    if (readyRef.current) inject(`window.VX && window.VX.setInterval && window.VX.setInterval(${JSON.stringify(String(interval))});`);
   }, [interval, inject]);
 
   const beforeLoad = `
@@ -263,7 +263,7 @@ export default function NativeChart({ symbol = 'EURUSD', interval = '60', theme,
   // URL-driven web chart, which never showed the wrong symbol.
   //
   // Captured ONCE at mount so the URI stays STABLE — later symbol/interval
-  // changes go through the live window.SC.setSymbol()/setInterval() bridge
+  // changes go through the live window.VX.setSymbol()/setInterval() bridge
   // (no reload = FundedZone-fast). If the URI changed per symbol the WebView
   // would reload the whole 26 MB library on every switch.
   const bootRef = useRef(null);
@@ -296,13 +296,13 @@ export default function NativeChart({ symbol = 'EURUSD', interval = '60', theme,
         onLoadEnd={() => {
           // Backup: ensure the chart boots even if the pre-load config injection
           // lost the race (it did on small/fast WebViews → stuck "1 script running").
-          try { webRef.current?.injectJavaScript(beforeLoad + '\nwindow.SC && window.SC.setConfig && window.SC.setConfig(window.__SC_CONFIG); window.SC && window.SC.boot && window.SC.boot(); true;'); } catch (e) {}
+          try { webRef.current?.injectJavaScript(beforeLoad + '\nwindow.VX && window.VX.setConfig && window.VX.setConfig(window.__SC_CONFIG); window.VX && window.VX.boot && window.VX.boot(); true;'); } catch (e) {}
         }}
         onMessage={onMessage}
         onError={(e) => logger.error('NativeChart webview error', e?.nativeEvent)}
         startInLoadingState
         renderLoading={() => (
-          <View style={styles.loader}><ActivityIndicator size="large" color={vantage.accent} /></View>
+          <View style={styles.loader}><ActivityIndicator size="large" color={vx.accent} /></View>
         )}
       />
     </View>
@@ -310,7 +310,7 @@ export default function NativeChart({ symbol = 'EURUSD', interval = '60', theme,
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: vantage.bg },
-  web: { flex: 1, backgroundColor: vantage.bg },
-  loader: { position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: vantage.bg },
+  wrap: { flex: 1, backgroundColor: vx.bg },
+  web: { flex: 1, backgroundColor: vx.bg },
+  loader: { position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: vx.bg },
 });

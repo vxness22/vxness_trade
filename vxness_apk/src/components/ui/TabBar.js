@@ -1,12 +1,12 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import { vantage } from '../../theme/vantageTheme';
+import { vx } from '../../theme/vxTheme';
 
 const colors = {
-  primary: vantage.accent,
-  bgSecondary: vantage.bgRaised,
-  border: vantage.border,
-  textSecondary: vantage.textSecondary,
+  primary: vx.accent,
+  bgSecondary: vx.bgRaised,
+  border: vx.border,
+  textSecondary: vx.textSecondary,
 };
 
 export default function TabBar({ tabs, activeTab, onTabPress, scrollable = false }) {

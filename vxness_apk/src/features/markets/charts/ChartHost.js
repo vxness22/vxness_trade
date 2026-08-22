@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { View } from 'react-native';
 import NativeChart from './NativeChart';
-import { vantage } from '../../../theme/vantageTheme';
+import { vx } from '../../../theme/vxTheme';
 
 /**
  * Persistent chart host — ONE NativeChart WebView, mounted once for the whole
@@ -55,7 +55,7 @@ export function ChartHostProvider({ children }) {
 
   const positioned = cfg && cfg.visible && cfg.rect && cfg.rect.width > 0;
   const style = positioned
-    ? { position: 'absolute', left: cfg.rect.x, top: cfg.rect.y, width: cfg.rect.width, height: cfg.rect.height, zIndex: 30, backgroundColor: vantage.bg }
+    ? { position: 'absolute', left: cfg.rect.x, top: cfg.rect.y, width: cfg.rect.width, height: cfg.rect.height, zIndex: 30, backgroundColor: vx.bg }
     : OFFSCREEN;
 
   return (

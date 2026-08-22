@@ -1,8 +1,8 @@
-# Plan E — Vantage Redesign: Funds Screen + Payment Gateways (Phase 5)
+# Plan E — Vxness Redesign: Funds Screen + Payment Gateways (Phase 5)
 
 > Subagent-driven execution.
 
-**Goal:** Replace the Funds placeholder with the real Vantage-style funds tab, wired to all 3 payment gateways already in the Vxness backend (Razorpay, on-chain USDT, manual bank/UPI) plus withdraw / transfer / transaction history. **This is the phase that wires the actual payment integrations the user originally asked for.**
+**Goal:** Replace the Funds placeholder with the real Vxness-style funds tab, wired to all 3 payment gateways already in the Vxness backend (Razorpay, on-chain USDT, manual bank/UPI) plus withdraw / transfer / transaction history. **This is the phase that wires the actual payment integrations the user originally asked for.**
 
 **Architecture:** `FundsScreen` (overview) + 4 deposit sub-screens + 2 withdraw sub-screens + transfer + history. All hit the existing backend; new methods are added to `ApiService`. Razorpay is integrated via WebView (no native dep). On-chain USDT renders QR code via `react-native-qrcode-svg`. Manual deposits/withdrawals upload proof via `expo-image-picker`.
 
@@ -141,11 +141,11 @@ import { ScrollView, RefreshControl, View, Text, StyleSheet } from 'react-native
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
-import { Screen, BalanceBlock, QuickActionTile, Card } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { Screen, BalanceBlock, QuickActionTile, Card } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 import ApiService from '../../services/ApiService';
 import { useHiddenBalance } from '../../utils/hiddenBalance';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../components/vantage/BottomNavPill';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../components/vx/BottomNavPill';
 
 export default function FundsScreen() {
   const nav = useNavigation();
@@ -185,7 +185,7 @@ export default function FundsScreen() {
       </View>
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: BOTTOM_NAV_PILL_HEIGHT + space.huge }]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vantage.accent} colors={[vantage.accent]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vx.accent} colors={[vx.accent]} />}
       >
         <View style={styles.balanceWrap}>
           <BalanceBlock
@@ -214,10 +214,10 @@ export default function FundsScreen() {
         </View>
 
         <View style={styles.tilesRow}>
-          <QuickActionTile icon={<Ionicons name="arrow-down-circle" size={26} color={vantage.up} />} label="Deposit" onPress={() => nav.navigate('Deposit')} />
-          <QuickActionTile icon={<Ionicons name="arrow-up-circle" size={26} color={vantage.down} />} label="Withdraw" onPress={() => nav.navigate('Withdraw')} />
-          <QuickActionTile icon={<Ionicons name="swap-horizontal" size={26} color={vantage.textPrimary} />} label="Transfer" onPress={() => nav.navigate('Transfer')} />
-          <QuickActionTile icon={<Ionicons name="receipt-outline" size={26} color={vantage.textPrimary} />} label="History" onPress={() => nav.navigate('TransactionHistory')} />
+          <QuickActionTile icon={<Ionicons name="arrow-down-circle" size={26} color={vx.up} />} label="Deposit" onPress={() => nav.navigate('Deposit')} />
+          <QuickActionTile icon={<Ionicons name="arrow-up-circle" size={26} color={vx.down} />} label="Withdraw" onPress={() => nav.navigate('Withdraw')} />
+          <QuickActionTile icon={<Ionicons name="swap-horizontal" size={26} color={vx.textPrimary} />} label="Transfer" onPress={() => nav.navigate('Transfer')} />
+          <QuickActionTile icon={<Ionicons name="receipt-outline" size={26} color={vx.textPrimary} />} label="History" onPress={() => nav.navigate('TransactionHistory')} />
         </View>
 
         <View style={styles.recentSection}>
@@ -235,7 +235,7 @@ function TxRow({ tx }) {
   const isDeposit = String(tx.type || tx.kind || '').toLowerCase().includes('deposit');
   const isWithdraw = String(tx.type || tx.kind || '').toLowerCase().includes('withdraw');
   const sign = isDeposit ? '+' : (isWithdraw ? '−' : '');
-  const color = isDeposit ? vantage.up : (isWithdraw ? vantage.down : vantage.textPrimary);
+  const color = isDeposit ? vx.up : (isWithdraw ? vx.down : vx.textPrimary);
   const amount = Math.abs(Number(tx.amount ?? 0));
   const method = tx.payment_method || tx.method || tx.gateway || tx.type || 'Transaction';
   const status = String(tx.status || '').toLowerCase();
@@ -253,7 +253,7 @@ function TxRow({ tx }) {
       </View>
       <View style={{ alignItems: 'flex-end' }}>
         <Text style={[txStyles.amount, { color }]}>{sign}${amount.toFixed(2)}</Text>
-        <Text style={[txStyles.status, status === 'completed' ? { color: vantage.up } : status === 'failed' ? { color: vantage.down } : null]}>
+        <Text style={[txStyles.status, status === 'completed' ? { color: vx.up } : status === 'failed' ? { color: vx.down } : null]}>
           {status || 'pending'}
         </Text>
       </View>
@@ -263,24 +263,24 @@ function TxRow({ tx }) {
 
 const styles = StyleSheet.create({
   headerWrap: { paddingHorizontal: space.lg, paddingTop: space.sm },
-  title: { color: vantage.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
+  title: { color: vx.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
   scroll: {},
   balanceWrap: { paddingHorizontal: space.lg, paddingTop: space.md },
-  splitRow: { flexDirection: 'row', gap: space.lg, marginTop: space.md, padding: space.md, backgroundColor: vantage.bgElevated, borderRadius: 12 },
-  splitLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
-  splitVal: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold, marginTop: 2 },
+  splitRow: { flexDirection: 'row', gap: space.lg, marginTop: space.md, padding: space.md, backgroundColor: vx.bgElevated, borderRadius: 12 },
+  splitLab: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
+  splitVal: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold, marginTop: 2 },
   tilesRow: { flexDirection: 'row', paddingHorizontal: space.lg, paddingVertical: space.lg, gap: space.md },
   recentSection: { paddingHorizontal: space.lg, paddingTop: space.md },
-  sectionTitle: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, marginBottom: space.sm },
-  empty: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, padding: space.lg, textAlign: 'center' },
+  sectionTitle: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, marginBottom: space.sm },
+  empty: { color: vx.textMuted, fontFamily, fontSize: sizes.body, padding: space.lg, textAlign: 'center' },
 });
 
 const txStyles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: space.sm, borderBottomColor: vantage.border, borderBottomWidth: StyleSheet.hairlineWidth },
-  method: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
-  date: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: space.sm, borderBottomColor: vx.border, borderBottomWidth: StyleSheet.hairlineWidth },
+  method: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
+  date: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
   amount: { fontFamily, fontSize: sizes.body, fontWeight: weights.heavy },
-  status: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2, textTransform: 'capitalize' },
+  status: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2, textTransform: 'capitalize' },
 });
 ```
 
@@ -296,8 +296,8 @@ import { ScrollView, View, Text, TextInput, Pressable, StyleSheet } from 'react-
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import { Screen, Card, PillButton, IconButton } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { Screen, Card, PillButton, IconButton } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 const QUICK_AMOUNTS = [100, 500, 1000, 5000];
 
@@ -314,7 +314,7 @@ export default function DepositScreen() {
   return (
     <Screen edges={['top']}>
       <View style={styles.header}>
-        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
+        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
         <Text style={styles.title}>Deposit</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -326,7 +326,7 @@ export default function DepositScreen() {
           onChangeText={setAmount}
           keyboardType="decimal-pad"
           placeholder="0.00"
-          placeholderTextColor={vantage.textMuted}
+          placeholderTextColor={vx.textMuted}
           style={styles.amountInput}
         />
         <View style={styles.quickRow}>
@@ -346,13 +346,13 @@ export default function DepositScreen() {
           >
             <View style={styles.methodRow}>
               <View style={styles.methodIcon}>
-                <Ionicons name={m.icon} size={26} color={vantage.accent} />
+                <Ionicons name={m.icon} size={26} color={vx.accent} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.methodTitle}>{m.title}</Text>
                 <Text style={styles.methodSub}>{m.subtitle}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={vantage.textMuted} />
+              <Ionicons name="chevron-forward" size={18} color={vx.textMuted} />
             </View>
           </Card>
         ))}
@@ -363,21 +363,21 @@ export default function DepositScreen() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
-  label: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
   amountInput: {
-    backgroundColor: vantage.bgElevated, borderRadius: radius.md,
+    backgroundColor: vx.bgElevated, borderRadius: radius.md,
     paddingHorizontal: space.md, paddingVertical: space.lg,
-    color: vantage.textPrimary, fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy,
+    color: vx.textPrimary, fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy,
   },
   quickRow: { flexDirection: 'row', gap: space.sm, marginTop: space.sm, flexWrap: 'wrap' },
-  quickChip: { paddingHorizontal: space.lg, paddingVertical: space.sm, backgroundColor: vantage.bgRaised, borderRadius: radius.pill },
-  quickTxt: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
+  quickChip: { paddingHorizontal: space.lg, paddingVertical: space.sm, backgroundColor: vx.bgRaised, borderRadius: radius.pill },
+  quickTxt: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
   methodCard: { marginBottom: space.sm },
   methodRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  methodIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: vantage.accentMuted, alignItems: 'center', justifyContent: 'center' },
-  methodTitle: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
-  methodSub: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  methodIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: vx.accentMuted, alignItems: 'center', justifyContent: 'center' },
+  methodTitle: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
+  methodSub: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
 });
 ```
 
@@ -396,8 +396,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { WebView } from 'react-native-webview';
 
-import { Screen, Card, PillButton, IconButton, showToast } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { Screen, Card, PillButton, IconButton, showToast } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 import ApiService from '../../services/ApiService';
 
 export default function DepositRazorpay() {
@@ -473,7 +473,7 @@ export default function DepositRazorpay() {
           javaScriptEnabled
           domStorageEnabled
           startInLoadingState
-          renderLoading={() => <ActivityIndicator color={vantage.accent} style={{ marginTop: 100 }} />}
+          renderLoading={() => <ActivityIndicator color={vx.accent} style={{ marginTop: 100 }} />}
         />
       </Screen>
     );
@@ -484,7 +484,7 @@ export default function DepositRazorpay() {
       <Screen edges={['top']}>
         <Header onBack={() => nav.goBack()} title="Verifying…" />
         <View style={{ alignItems: 'center', padding: space.huge }}>
-          <ActivityIndicator color={vantage.accent} size="large" />
+          <ActivityIndicator color={vx.accent} size="large" />
           <Text style={styles.subText}>Confirming your payment…</Text>
         </View>
       </Screen>
@@ -521,7 +521,7 @@ export default function DepositRazorpay() {
 function Header({ onBack, title }) {
   return (
     <View style={styles.header}>
-      <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={onBack} />
+      <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={onBack} />
       <Text style={styles.title}>{title}</Text>
       <View style={{ width: 40 }} />
     </View>
@@ -565,17 +565,17 @@ setTimeout(function(){ rzp.open(); }, 100);
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
-  subText: { color: vantage.textSecondary, fontFamily, fontSize: sizes.body, marginTop: space.md },
-  error: { color: vantage.down, fontFamily, fontSize: sizes.label, marginTop: space.sm, textAlign: 'center' },
-  helper: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, textAlign: 'center', marginTop: space.sm },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  subText: { color: vx.textSecondary, fontFamily, fontSize: sizes.body, marginTop: space.md },
+  error: { color: vx.down, fontFamily, fontSize: sizes.label, marginTop: space.sm, textAlign: 'center' },
+  helper: { color: vx.textMuted, fontFamily, fontSize: sizes.label, textAlign: 'center', marginTop: space.sm },
 });
 
 const rowStyles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: space.sm },
-  border: { borderBottomColor: vantage.border, borderBottomWidth: StyleSheet.hairlineWidth },
-  label: { color: vantage.textMuted, fontFamily, fontSize: sizes.body },
-  value: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
+  border: { borderBottomColor: vx.border, borderBottomWidth: StyleSheet.hairlineWidth },
+  label: { color: vx.textMuted, fontFamily, fontSize: sizes.body },
+  value: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
 });
 ```
 
@@ -593,8 +593,8 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 
-import { Screen, Card, PillButton, IconButton, showToast } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { Screen, Card, PillButton, IconButton, showToast } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 import ApiService from '../../services/ApiService';
 
 const CHAINS = [
@@ -651,7 +651,7 @@ export default function DepositOnchain() {
   return (
     <Screen edges={['top']}>
       <View style={styles.header}>
-        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
+        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
         <Text style={styles.title}>USDT Deposit</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -661,7 +661,7 @@ export default function DepositOnchain() {
         <View style={styles.chainRow}>
           {CHAINS.map((c) => (
             <Pressable key={c.key} onPress={() => setChain(c.key)} style={[styles.chainChip, chain === c.key && styles.chainChipActive]}>
-              <Text style={[styles.chainTxt, chain === c.key && { color: vantage.textPrimary, fontWeight: weights.bold }]}>{c.key}</Text>
+              <Text style={[styles.chainTxt, chain === c.key && { color: vx.textPrimary, fontWeight: weights.bold }]}>{c.key}</Text>
             </Pressable>
           ))}
         </View>
@@ -673,7 +673,7 @@ export default function DepositOnchain() {
             </View>
           ) : (
             <View style={[styles.qrBox, { alignItems: 'center', justifyContent: 'center' }]}>
-              <Text style={{ color: vantage.textMuted, fontFamily }}>No address available</Text>
+              <Text style={{ color: vx.textMuted, fontFamily }}>No address available</Text>
             </View>
           )}
         </View>
@@ -681,12 +681,12 @@ export default function DepositOnchain() {
         {address ? (
           <Pressable onPress={copyAddr} style={styles.addrRow} accessibilityRole="button">
             <Text style={styles.addr} numberOfLines={1}>{address}</Text>
-            <Ionicons name="copy-outline" size={18} color={vantage.accent} />
+            <Ionicons name="copy-outline" size={18} color={vx.accent} />
           </Pressable>
         ) : null}
 
         <Card style={styles.warn}>
-          <Ionicons name="alert-circle-outline" size={20} color={vantage.accent} />
+          <Ionicons name="alert-circle-outline" size={20} color={vx.accent} />
           <Text style={styles.warnTxt}>
             Send only USDT-{chain} to this address. Sending other tokens or wrong network = permanent loss.
           </Text>
@@ -697,7 +697,7 @@ export default function DepositOnchain() {
           value={txHash}
           onChangeText={setTxHash}
           placeholder="0x..."
-          placeholderTextColor={vantage.textMuted}
+          placeholderTextColor={vx.textMuted}
           style={styles.input}
           autoCapitalize="none"
           autoCorrect={false}
@@ -709,7 +709,7 @@ export default function DepositOnchain() {
           onChangeText={setAmount}
           keyboardType="decimal-pad"
           placeholder="0.00"
-          placeholderTextColor={vantage.textMuted}
+          placeholderTextColor={vx.textMuted}
           style={styles.input}
         />
 
@@ -729,19 +729,19 @@ export default function DepositOnchain() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
-  label: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
   chainRow: { flexDirection: 'row', gap: space.sm, marginBottom: space.lg },
-  chainChip: { flex: 1, paddingVertical: space.sm, backgroundColor: vantage.bgElevated, borderRadius: radius.pill, borderWidth: 1, borderColor: vantage.border, alignItems: 'center' },
-  chainChipActive: { backgroundColor: vantage.bgRaised, borderColor: vantage.accent },
-  chainTxt: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  chainChip: { flex: 1, paddingVertical: space.sm, backgroundColor: vx.bgElevated, borderRadius: radius.pill, borderWidth: 1, borderColor: vx.border, alignItems: 'center' },
+  chainChipActive: { backgroundColor: vx.bgRaised, borderColor: vx.accent },
+  chainTxt: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
   qrWrap: { alignItems: 'center', marginVertical: space.md },
   qrBox: { padding: space.lg, backgroundColor: '#FFFFFF', borderRadius: 12, width: 232, height: 232 },
-  addrRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: vantage.bgElevated, padding: space.md, borderRadius: radius.md, gap: space.sm, marginVertical: space.md },
-  addr: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
-  warn: { flexDirection: 'row', gap: space.md, backgroundColor: vantage.accentMuted, marginTop: space.sm },
-  warnTxt: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.label },
-  input: { backgroundColor: vantage.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
+  addrRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: vx.bgElevated, padding: space.md, borderRadius: radius.md, gap: space.sm, marginVertical: space.md },
+  addr: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  warn: { flexDirection: 'row', gap: space.md, backgroundColor: vx.accentMuted, marginTop: space.sm },
+  warnTxt: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.label },
+  input: { backgroundColor: vx.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vx.textPrimary, fontFamily, fontSize: sizes.body },
 });
 ```
 
@@ -758,8 +758,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 
-import { Screen, Card, PillButton, IconButton, showToast } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { Screen, Card, PillButton, IconButton, showToast } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 import ApiService from '../../services/ApiService';
 
 export default function DepositManual() {
@@ -825,7 +825,7 @@ export default function DepositManual() {
   return (
     <Screen edges={['top']}>
       <View style={styles.header}>
-        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
+        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
         <Text style={styles.title}>Manual Deposit</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -855,10 +855,10 @@ export default function DepositManual() {
         ) : null}
 
         <Text style={styles.label}>Amount (USD)</Text>
-        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={vantage.textMuted} style={styles.input} />
+        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={vx.textMuted} style={styles.input} />
 
         <Text style={[styles.label, { marginTop: space.md }]}>Your transaction reference</Text>
-        <TextInput value={transactionId} onChangeText={setTransactionId} placeholder="UTR / UPI ref" placeholderTextColor={vantage.textMuted} style={styles.input} autoCapitalize="none" />
+        <TextInput value={transactionId} onChangeText={setTransactionId} placeholder="UTR / UPI ref" placeholderTextColor={vx.textMuted} style={styles.input} autoCapitalize="none" />
 
         <Text style={[styles.label, { marginTop: space.md }]}>Payment proof (screenshot)</Text>
         <Pressable onPress={pickProof} style={styles.proofBtn} accessibilityRole="button">
@@ -866,7 +866,7 @@ export default function DepositManual() {
             <Image source={{ uri: proof.uri }} style={styles.proofImg} resizeMode="cover" />
           ) : (
             <View style={styles.proofPlaceholder}>
-              <Ionicons name="image-outline" size={28} color={vantage.textMuted} />
+              <Ionicons name="image-outline" size={28} color={vx.textMuted} />
               <Text style={styles.proofTxt}>Tap to choose image</Text>
             </View>
           )}
@@ -897,19 +897,19 @@ function Detail({ label, value }) {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
-  label: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
-  sectionTitle: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold, marginBottom: space.sm },
-  input: { backgroundColor: vantage.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
+  sectionTitle: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold, marginBottom: space.sm },
+  input: { backgroundColor: vx.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vx.textPrimary, fontFamily, fontSize: sizes.body },
   detailBlock: { paddingVertical: space.sm },
-  detailBorder: { borderBottomColor: vantage.border, borderBottomWidth: StyleSheet.hairlineWidth },
+  detailBorder: { borderBottomColor: vx.border, borderBottomWidth: StyleSheet.hairlineWidth },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  detailLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
-  detailVal: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
-  proofBtn: { backgroundColor: vantage.bgElevated, borderRadius: radius.md, overflow: 'hidden', minHeight: 140, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: vantage.border, borderStyle: 'dashed' },
+  detailLab: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
+  detailVal: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
+  proofBtn: { backgroundColor: vx.bgElevated, borderRadius: radius.md, overflow: 'hidden', minHeight: 140, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: vx.border, borderStyle: 'dashed' },
   proofImg: { width: '100%', height: 200 },
   proofPlaceholder: { alignItems: 'center', padding: space.lg, gap: space.sm },
-  proofTxt: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  proofTxt: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
 });
 ```
 
@@ -927,8 +927,8 @@ import { ScrollView, View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import { Screen, Card, IconButton } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { Screen, Card, IconButton } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 const METHODS = [
   { key: 'crypto', icon: 'link-outline', title: 'Crypto Withdrawal', subtitle: 'TRC20 / BEP20 / ERC20', route: 'WithdrawCrypto' },
@@ -940,7 +940,7 @@ export default function WithdrawScreen() {
   return (
     <Screen edges={['top']}>
       <View style={styles.header}>
-        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
+        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
         <Text style={styles.title}>Withdraw</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -949,12 +949,12 @@ export default function WithdrawScreen() {
         {METHODS.map((m) => (
           <Card key={m.key} onPress={() => nav.navigate(m.route)} style={styles.card}>
             <View style={styles.row}>
-              <View style={styles.iconWrap}><Ionicons name={m.icon} size={26} color={vantage.accent} /></View>
+              <View style={styles.iconWrap}><Ionicons name={m.icon} size={26} color={vx.accent} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitle}>{m.title}</Text>
                 <Text style={styles.cardSub}>{m.subtitle}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={vantage.textMuted} />
+              <Ionicons name="chevron-forward" size={18} color={vx.textMuted} />
             </View>
           </Card>
         ))}
@@ -965,13 +965,13 @@ export default function WithdrawScreen() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
-  label: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
   card: { marginBottom: space.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  iconWrap: { width: 44, height: 44, borderRadius: 22, backgroundColor: vantage.accentMuted, alignItems: 'center', justifyContent: 'center' },
-  cardTitle: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
-  cardSub: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  iconWrap: { width: 44, height: 44, borderRadius: 22, backgroundColor: vx.accentMuted, alignItems: 'center', justifyContent: 'center' },
+  cardTitle: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
+  cardSub: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
 });
 ```
 
@@ -983,8 +983,8 @@ import { ScrollView, View, Text, TextInput, Pressable, StyleSheet } from 'react-
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import { Screen, PillButton, IconButton, showToast } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { Screen, PillButton, IconButton, showToast } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 import ApiService from '../../services/ApiService';
 
 const CHAINS = [
@@ -1023,7 +1023,7 @@ export default function WithdrawCrypto() {
   return (
     <Screen edges={['top']}>
       <View style={styles.header}>
-        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
+        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
         <Text style={styles.title}>Crypto Withdrawal</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -1032,16 +1032,16 @@ export default function WithdrawCrypto() {
         <View style={styles.chainRow}>
           {CHAINS.map((c) => (
             <Pressable key={c.key} onPress={() => setChain(c.key)} style={[styles.chainChip, chain === c.key && styles.chainChipActive]}>
-              <Text style={[styles.chainTxt, chain === c.key && { color: vantage.textPrimary, fontWeight: weights.bold }]}>{c.key}</Text>
+              <Text style={[styles.chainTxt, chain === c.key && { color: vx.textPrimary, fontWeight: weights.bold }]}>{c.key}</Text>
             </Pressable>
           ))}
         </View>
 
         <Text style={[styles.label, { marginTop: space.md }]}>Destination address</Text>
-        <TextInput value={address} onChangeText={setAddress} placeholder="T... / 0x..." placeholderTextColor={vantage.textMuted} style={styles.input} autoCapitalize="none" autoCorrect={false} />
+        <TextInput value={address} onChangeText={setAddress} placeholder="T... / 0x..." placeholderTextColor={vx.textMuted} style={styles.input} autoCapitalize="none" autoCorrect={false} />
 
         <Text style={[styles.label, { marginTop: space.md }]}>Amount (USDT)</Text>
-        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={vantage.textMuted} style={styles.input} />
+        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={vx.textMuted} style={styles.input} />
 
         <Text style={styles.warn}>Triple-check the address. Crypto withdrawals are irreversible.</Text>
 
@@ -1053,14 +1053,14 @@ export default function WithdrawCrypto() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
-  label: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
   chainRow: { flexDirection: 'row', gap: space.sm },
-  chainChip: { flex: 1, paddingVertical: space.sm, backgroundColor: vantage.bgElevated, borderRadius: radius.pill, borderWidth: 1, borderColor: vantage.border, alignItems: 'center' },
-  chainChipActive: { backgroundColor: vantage.bgRaised, borderColor: vantage.accent },
-  chainTxt: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
-  input: { backgroundColor: vantage.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
-  warn: { color: vantage.down, fontFamily, fontSize: sizes.label, marginTop: space.md, textAlign: 'center' },
+  chainChip: { flex: 1, paddingVertical: space.sm, backgroundColor: vx.bgElevated, borderRadius: radius.pill, borderWidth: 1, borderColor: vx.border, alignItems: 'center' },
+  chainChipActive: { backgroundColor: vx.bgRaised, borderColor: vx.accent },
+  chainTxt: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
+  input: { backgroundColor: vx.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vx.textPrimary, fontFamily, fontSize: sizes.body },
+  warn: { color: vx.down, fontFamily, fontSize: sizes.label, marginTop: space.md, textAlign: 'center' },
 });
 ```
 
@@ -1073,8 +1073,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 
-import { Screen, PillButton, IconButton, showToast } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { Screen, PillButton, IconButton, showToast } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 import ApiService from '../../services/ApiService';
 
 export default function WithdrawManual() {
@@ -1114,22 +1114,22 @@ export default function WithdrawManual() {
   return (
     <Screen edges={['top']}>
       <View style={styles.header}>
-        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
+        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
         <Text style={styles.title}>UPI / Bank Withdraw</Text>
         <View style={{ width: 40 }} />
       </View>
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.huge }}>
         <Text style={styles.label}>UPI ID</Text>
-        <TextInput value={upiId} onChangeText={setUpiId} placeholder="name@bank" placeholderTextColor={vantage.textMuted} style={styles.input} autoCapitalize="none" autoCorrect={false} />
+        <TextInput value={upiId} onChangeText={setUpiId} placeholder="name@bank" placeholderTextColor={vx.textMuted} style={styles.input} autoCapitalize="none" autoCorrect={false} />
 
         <Text style={[styles.label, { marginTop: space.md }]}>Amount (USD)</Text>
-        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={vantage.textMuted} style={styles.input} />
+        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={vx.textMuted} style={styles.input} />
 
         <Text style={[styles.label, { marginTop: space.md }]}>UPI QR (optional)</Text>
         <Pressable onPress={pickQr} style={styles.proofBtn}>
           {qr ? <Image source={{ uri: qr.uri }} style={styles.proofImg} resizeMode="cover" /> : (
             <View style={styles.proofPlaceholder}>
-              <Ionicons name="qr-code-outline" size={28} color={vantage.textMuted} />
+              <Ionicons name="qr-code-outline" size={28} color={vx.textMuted} />
               <Text style={styles.proofTxt}>Tap to attach QR</Text>
             </View>
           )}
@@ -1143,13 +1143,13 @@ export default function WithdrawManual() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
-  label: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
-  input: { backgroundColor: vantage.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
-  proofBtn: { backgroundColor: vantage.bgElevated, borderRadius: radius.md, overflow: 'hidden', minHeight: 140, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: vantage.border, borderStyle: 'dashed' },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
+  input: { backgroundColor: vx.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vx.textPrimary, fontFamily, fontSize: sizes.body },
+  proofBtn: { backgroundColor: vx.bgElevated, borderRadius: radius.md, overflow: 'hidden', minHeight: 140, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: vx.border, borderStyle: 'dashed' },
   proofImg: { width: '100%', height: 200 },
   proofPlaceholder: { alignItems: 'center', padding: space.lg, gap: space.sm },
-  proofTxt: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  proofTxt: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
 });
 ```
 
@@ -1165,8 +1165,8 @@ import { ScrollView, View, Text, TextInput, Pressable, StyleSheet } from 'react-
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import { Screen, Sheet, MenuRow, PillButton, IconButton, Card, showToast } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { Screen, Sheet, MenuRow, PillButton, IconButton, Card, showToast } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 import ApiService from '../../services/ApiService';
 
 export default function TransferScreen() {
@@ -1206,7 +1206,7 @@ export default function TransferScreen() {
   return (
     <Screen edges={['top']}>
       <View style={styles.header}>
-        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
+        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
         <Text style={styles.title}>Transfer</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -1214,28 +1214,28 @@ export default function TransferScreen() {
         <Text style={styles.label}>From</Text>
         <Pressable onPress={() => setPicking('from')} style={styles.pickRow}>
           <Text style={styles.pickTxt}>{fromAccount ? labelOf(fromAccount) : 'Select source account'}</Text>
-          <Ionicons name="chevron-down" size={18} color={vantage.textMuted} />
+          <Ionicons name="chevron-down" size={18} color={vx.textMuted} />
         </Pressable>
 
         <Text style={[styles.label, { marginTop: space.md }]}>To</Text>
         <Pressable onPress={() => setPicking('to')} style={styles.pickRow}>
           <Text style={styles.pickTxt}>{toAccount ? labelOf(toAccount) : 'Select destination account'}</Text>
-          <Ionicons name="chevron-down" size={18} color={vantage.textMuted} />
+          <Ionicons name="chevron-down" size={18} color={vx.textMuted} />
         </Pressable>
 
         <Text style={[styles.label, { marginTop: space.md }]}>Amount</Text>
-        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={vantage.textMuted} style={styles.input} />
+        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={vx.textMuted} style={styles.input} />
 
         <PillButton label={submitting ? 'Transferring…' : 'Submit Transfer'} variant="primary" size="lg" loading={submitting} disabled={!fromAccount || !toAccount || !(Number(amount) > 0) || submitting} onPress={submit} style={{ marginTop: space.xl }} />
       </ScrollView>
 
       <Sheet visible={picking != null} onClose={() => setPicking(null)} title={picking === 'from' ? 'From account' : 'To account'}>
         {accounts.length === 0 ? (
-          <Text style={{ color: vantage.textMuted, fontFamily, padding: space.lg, textAlign: 'center' }}>No accounts.</Text>
+          <Text style={{ color: vx.textMuted, fontFamily, padding: space.lg, textAlign: 'center' }}>No accounts.</Text>
         ) : accounts.map((a) => (
           <MenuRow
             key={a.id || a._id}
-            icon={<Ionicons name="card-outline" size={20} color={vantage.textPrimary} />}
+            icon={<Ionicons name="card-outline" size={20} color={vx.textPrimary} />}
             label={labelOf(a)}
             value={a.balance != null ? `${Number(a.balance).toFixed(2)} ${a.currency || 'USD'}` : ''}
             onPress={() => {
@@ -1253,11 +1253,11 @@ function labelOf(a) { return `${a.is_demo ? 'Demo' : 'Live'} #${a.account_number
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
-  label: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
-  pickRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: vantage.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md },
-  pickTxt: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
-  input: { backgroundColor: vantage.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
+  pickRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: vx.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md },
+  pickTxt: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.body },
+  input: { backgroundColor: vx.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vx.textPrimary, fontFamily, fontSize: sizes.body },
 });
 ```
 
@@ -1273,8 +1273,8 @@ import { View, Text, FlatList, RefreshControl, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import { Screen, IconButton, CategoryTabs } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { Screen, IconButton, CategoryTabs } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 import ApiService from '../../services/ApiService';
 
 const FILTER_OPTIONS = [
@@ -1329,7 +1329,7 @@ export default function TransactionHistoryScreen() {
   return (
     <Screen edges={['top']}>
       <View style={styles.header}>
-        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
+        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
         <Text style={styles.title}>Transactions</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -1342,7 +1342,7 @@ export default function TransactionHistoryScreen() {
         ListFooterComponent={loading && page > 1 ? <Text style={styles.loading}>Loading…</Text> : null}
         onEndReached={onEndReached}
         onEndReachedThreshold={0.3}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vantage.accent} colors={[vantage.accent]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vx.accent} colors={[vx.accent]} />}
       />
     </Screen>
   );
@@ -1352,7 +1352,7 @@ function Row({ tx }) {
   const t = String(tx.type || tx.kind || '').toLowerCase();
   const isDeposit = t.includes('deposit');
   const isWithdraw = t.includes('withdraw');
-  const color = isDeposit ? vantage.up : (isWithdraw ? vantage.down : vantage.textPrimary);
+  const color = isDeposit ? vx.up : (isWithdraw ? vx.down : vx.textPrimary);
   const sign = isDeposit ? '+' : (isWithdraw ? '−' : '');
   const amount = Math.abs(Number(tx.amount ?? 0));
   const method = tx.payment_method || tx.method || tx.gateway || tx.type || 'Transaction';
@@ -1367,7 +1367,7 @@ function Row({ tx }) {
       </View>
       <View style={{ alignItems: 'flex-end' }}>
         <Text style={[rowStyles.amount, { color }]}>{sign}${amount.toFixed(2)}</Text>
-        <Text style={[rowStyles.status, status === 'completed' && { color: vantage.up }, status === 'failed' && { color: vantage.down }]}>{status || 'pending'}</Text>
+        <Text style={[rowStyles.status, status === 'completed' && { color: vx.up }, status === 'failed' && { color: vx.down }]}>{status || 'pending'}</Text>
       </View>
     </View>
   );
@@ -1375,17 +1375,17 @@ function Row({ tx }) {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
-  empty: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, padding: space.huge, textAlign: 'center' },
-  loading: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, padding: space.md, textAlign: 'center' },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  empty: { color: vx.textMuted, fontFamily, fontSize: sizes.body, padding: space.huge, textAlign: 'center' },
+  loading: { color: vx.textMuted, fontFamily, fontSize: sizes.label, padding: space.md, textAlign: 'center' },
 });
 
 const rowStyles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.lg, paddingVertical: space.md, borderBottomColor: vantage.border, borderBottomWidth: StyleSheet.hairlineWidth },
-  method: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
-  date: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.lg, paddingVertical: space.md, borderBottomColor: vx.border, borderBottomWidth: StyleSheet.hairlineWidth },
+  method: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
+  date: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
   amount: { fontFamily, fontSize: sizes.body, fontWeight: weights.heavy },
-  status: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2, textTransform: 'capitalize' },
+  status: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2, textTransform: 'capitalize' },
 });
 ```
 

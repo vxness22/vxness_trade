@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 const SYMBOL_COLORS = {
   XAUUSD:   { bg: '#E8A53A', initials: 'Au' },

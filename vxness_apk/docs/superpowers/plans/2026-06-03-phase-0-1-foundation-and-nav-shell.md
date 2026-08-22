@@ -1,10 +1,10 @@
-# Vantage Redesign — Phase 0 + 1: Foundation & Navigation Shell
+# Vxness Redesign — Phase 0 + 1: Foundation & Navigation Shell
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship a runnable Vxness APK with the Vantage design system in place (tokens + 25 reusable components) and the new 4-tab floating bottom-nav navigation shell hooked up to placeholder tab screens.
+**Goal:** Ship a runnable Vxness APK with the Vxness design system in place (tokens + 25 reusable components) and the new 4-tab floating bottom-nav navigation shell hooked up to placeholder tab screens.
 
-**Architecture:** Design-system-first. Build all atomic and compound components in `src/components/vantage/` against `src/theme/vantageTheme.js`. Then replace the existing single stack navigator in `App.js` with a `RootNavigator` that conditionally renders `AuthStack` (placeholder Login) or `MainTabs` (HomeTab + MarketsTab + TradeTab + FundsTab — each a stack with a placeholder root screen). Existing screens (Dashboard, MainTrading, Wallet, etc.) are NOT touched in this plan — they're replaced phase-by-phase later.
+**Architecture:** Design-system-first. Build all atomic and compound components in `src/components/vx/` against `src/theme/vxTheme.js`. Then replace the existing single stack navigator in `App.js` with a `RootNavigator` that conditionally renders `AuthStack` (placeholder Login) or `MainTabs` (HomeTab + MarketsTab + TradeTab + FundsTab — each a stack with a placeholder root screen). Existing screens (Dashboard, MainTrading, Wallet, etc.) are NOT touched in this plan — they're replaced phase-by-phase later.
 
 **Tech Stack:** React Native 0.81.5 + Expo 54 (Hermes, New Arch), `@react-navigation/native-stack` and `@react-navigation/bottom-tabs` (already in package.json), `react-native-svg` (transitive via Expo), `@expo/vector-icons` for icons. No new npm deps in this phase.
 
@@ -17,16 +17,16 @@
 ### Task 1: Create theme tokens
 
 **Files:**
-- Create: `src/theme/vantageTheme.js`
+- Create: `src/theme/vxTheme.js`
 
 - [ ] **Step 1: Write the token file**
 
-Create `src/theme/vantageTheme.js`:
+Create `src/theme/vxTheme.js`:
 
 ```js
 import { Platform } from 'react-native';
 
-export const vantage = {
+export const vx = {
   // Surfaces
   bg:           '#000000',
   bgElevated:   '#0F0F0F',
@@ -98,7 +98,7 @@ export const radius = {
 };
 
 export default {
-  vantage,
+  vx,
   fontFamily,
   weights,
   sizes,
@@ -111,14 +111,14 @@ export default {
 
 Run from APK directory:
 ```bash
-node -e "console.log(require('./src/theme/vantageTheme.js').vantage.accent)"
+node -e "console.log(require('./src/theme/vxTheme.js').vx.accent)"
 ```
 Expected output: `#2FBF71`
 
 - [ ] **Step 3: Commit (if git initialized)**
 
 ```bash
-git add src/theme/vantageTheme.js && git commit -m "feat(theme): add Vantage design tokens"
+git add src/theme/vxTheme.js && git commit -m "feat(theme): add Vxness design tokens"
 ```
 If `git` is not initialized in the APK folder, skip this step for all tasks. The plan does not require git.
 
@@ -127,12 +127,12 @@ If `git` is not initialized in the APK folder, skip this step for all tasks. The
 ### Task 2: Create dev-only ComponentGalleryScreen + initial folder structure
 
 **Files:**
-- Create: `src/components/vantage/index.js` (empty barrel — exports added per task)
+- Create: `src/components/vx/index.js` (empty barrel — exports added per task)
 - Create: `src/screens/_dev/ComponentGalleryScreen.js`
 
-- [ ] **Step 1: Create the vantage components folder with an empty barrel**
+- [ ] **Step 1: Create the vx components folder with an empty barrel**
 
-Create `src/components/vantage/index.js`:
+Create `src/components/vx/index.js`:
 
 ```js
 // Barrel export. Each new component appends one line here.
@@ -146,7 +146,7 @@ Create `src/screens/_dev/ComponentGalleryScreen.js`:
 import React, { useState } from 'react';
 import { ScrollView, View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 // Components are imported and rendered here as they're built.
 // Add a new Section() per component task.
@@ -159,11 +159,11 @@ export default function ComponentGalleryScreen() {
         <Text style={styles.subtitle}>Dev-only smoke harness</Text>
 
         <Section title="Theme tokens">
-          <Swatch color={vantage.bg} label="bg" />
-          <Swatch color={vantage.bgElevated} label="bgElevated" />
-          <Swatch color={vantage.accent} label="accent" />
-          <Swatch color={vantage.up} label="up" />
-          <Swatch color={vantage.down} label="down" />
+          <Swatch color={vx.bg} label="bg" />
+          <Swatch color={vx.bgElevated} label="bgElevated" />
+          <Swatch color={vx.accent} label="accent" />
+          <Swatch color={vx.up} label="up" />
+          <Swatch color={vx.down} label="down" />
         </Section>
 
         {/* TASKS BELOW APPEND <Section title="X"> blocks here */}
@@ -191,23 +191,23 @@ function Swatch({ color, label }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: vantage.bg },
+  root: { flex: 1, backgroundColor: vx.bg },
   scroll: { padding: space.lg, paddingBottom: space.huge },
   h1: {
-    color: vantage.textPrimary,
+    color: vx.textPrimary,
     fontFamily,
     fontSize: sizes.hero,
     fontWeight: weights.heavy,
   },
   subtitle: {
-    color: vantage.textMuted,
+    color: vx.textMuted,
     fontFamily,
     fontSize: sizes.label,
     marginBottom: space.xxl,
   },
   section: { marginBottom: space.xxxl },
   sectionTitle: {
-    color: vantage.textSecondary,
+    color: vx.textSecondary,
     fontFamily,
     fontSize: sizes.label,
     fontWeight: weights.semibold,
@@ -217,8 +217,8 @@ const styles = StyleSheet.create({
   },
   sectionBody: { gap: space.md },
   swatchRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  swatchBox: { width: 32, height: 32, borderRadius: 8, borderWidth: 1, borderColor: vantage.border },
-  swatchLabel: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
+  swatchBox: { width: 32, height: 32, borderRadius: 8, borderWidth: 1, borderColor: vx.border },
+  swatchLabel: { color: vx.textPrimary, fontFamily, fontSize: sizes.body },
 });
 ```
 
@@ -235,7 +235,7 @@ Run `npx expo start` from the APK directory. On the device or emulator, expect t
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js App.js && git commit -m "feat(gallery): add dev-only component gallery screen"
+git add src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js App.js && git commit -m "feat(gallery): add dev-only component gallery screen"
 ```
 
 ---
@@ -243,24 +243,24 @@ git add src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.
 ### Task 3: `Screen` wrapper
 
 **Files:**
-- Create: `src/components/vantage/Screen.js`
-- Modify: `src/components/vantage/index.js`
+- Create: `src/components/vx/Screen.js`
+- Modify: `src/components/vx/index.js`
 - Modify: `src/screens/_dev/ComponentGalleryScreen.js`
 
 - [ ] **Step 1: Write the component**
 
-Create `src/components/vantage/Screen.js`:
+Create `src/components/vx/Screen.js`:
 
 ```js
 import React from 'react';
 import { View, StatusBar, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { vantage } from '../../theme/vantageTheme';
+import { vx } from '../../theme/vxTheme';
 
 export default function Screen({ children, edges = ['top'], style }) {
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor={vantage.bg} translucent={false} />
+      <StatusBar barStyle="light-content" backgroundColor={vx.bg} translucent={false} />
       <SafeAreaView style={[styles.safe, style]} edges={edges}>
         {children}
       </SafeAreaView>
@@ -269,14 +269,14 @@ export default function Screen({ children, edges = ['top'], style }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: vantage.bg },
-  safe: { flex: 1, backgroundColor: vantage.bg },
+  root: { flex: 1, backgroundColor: vx.bg },
+  safe: { flex: 1, backgroundColor: vx.bg },
 });
 ```
 
 - [ ] **Step 2: Add to barrel**
 
-Append to `src/components/vantage/index.js`:
+Append to `src/components/vx/index.js`:
 ```js
 export { default as Screen } from './Screen';
 ```
@@ -286,7 +286,7 @@ export { default as Screen } from './Screen';
 In `ComponentGalleryScreen.js`, the gallery itself already uses `SafeAreaView` so no demo row needed. Add a confirmation section after `Theme tokens` section:
 ```jsx
 <Section title="Screen">
-  <Text style={{ color: vantage.textSecondary, fontFamily, fontSize: sizes.body }}>
+  <Text style={{ color: vx.textSecondary, fontFamily, fontSize: sizes.body }}>
     Screen wraps any route with bg + SafeArea + light StatusBar.
   </Text>
 </Section>
@@ -299,7 +299,7 @@ Reload Expo. Section appears, no errors in console.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/vantage/Screen.js src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vantage): add Screen wrapper component"
+git add src/components/vx/Screen.js src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vx): add Screen wrapper component"
 ```
 
 ---
@@ -307,18 +307,18 @@ git add src/components/vantage/Screen.js src/components/vantage/index.js src/scr
 ### Task 4: `Card`
 
 **Files:**
-- Create: `src/components/vantage/Card.js`
-- Modify: `src/components/vantage/index.js`
+- Create: `src/components/vx/Card.js`
+- Modify: `src/components/vx/index.js`
 - Modify: `src/screens/_dev/ComponentGalleryScreen.js`
 
 - [ ] **Step 1: Write the component**
 
-Create `src/components/vantage/Card.js`:
+Create `src/components/vx/Card.js`:
 
 ```js
 import React from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
-import { vantage, space, radius } from '../../theme/vantageTheme';
+import { vx, space, radius } from '../../theme/vxTheme';
 
 export default function Card({
   children,
@@ -329,10 +329,10 @@ export default function Card({
   style,
 }) {
   const bg =
-    variant === 'raised' ? vantage.bgRaised :
+    variant === 'raised' ? vx.bgRaised :
     variant === 'outline' ? 'transparent' :
-    vantage.bgElevated;
-  const border = variant === 'outline' ? vantage.borderStrong : 'transparent';
+    vx.bgElevated;
+  const border = variant === 'outline' ? vx.borderStrong : 'transparent';
 
   const inner = (
     <View
@@ -350,7 +350,7 @@ export default function Card({
     return (
       <Pressable
         onPress={onPress}
-        android_ripple={{ color: vantage.bgPressed, borderless: false }}
+        android_ripple={{ color: vx.bgPressed, borderless: false }}
         accessibilityRole="button"
       >
         {({ pressed }) => (
@@ -373,21 +373,21 @@ Append: `export { default as Card } from './Card';`
 
 - [ ] **Step 3: Add demo to gallery**
 
-In `ComponentGalleryScreen.js`, import `Card` from `../../components/vantage` and add:
+In `ComponentGalleryScreen.js`, import `Card` from `../../components/vx` and add:
 
 ```jsx
 <Section title="Card">
   <Card>
-    <Text style={{ color: vantage.textPrimary, fontFamily, fontSize: sizes.body }}>Elevated card (default)</Text>
+    <Text style={{ color: vx.textPrimary, fontFamily, fontSize: sizes.body }}>Elevated card (default)</Text>
   </Card>
   <Card variant="raised">
-    <Text style={{ color: vantage.textPrimary, fontFamily, fontSize: sizes.body }}>Raised card</Text>
+    <Text style={{ color: vx.textPrimary, fontFamily, fontSize: sizes.body }}>Raised card</Text>
   </Card>
   <Card variant="outline">
-    <Text style={{ color: vantage.textPrimary, fontFamily, fontSize: sizes.body }}>Outline card</Text>
+    <Text style={{ color: vx.textPrimary, fontFamily, fontSize: sizes.body }}>Outline card</Text>
   </Card>
   <Card onPress={() => console.log('card pressed')}>
-    <Text style={{ color: vantage.textPrimary, fontFamily, fontSize: sizes.body }}>Pressable card (tap me)</Text>
+    <Text style={{ color: vx.textPrimary, fontFamily, fontSize: sizes.body }}>Pressable card (tap me)</Text>
   </Card>
 </Section>
 ```
@@ -399,7 +399,7 @@ Three cards visible in gallery with different surfaces. Tap on the fourth → "c
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/vantage/Card.js src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vantage): add Card component"
+git add src/components/vx/Card.js src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vx): add Card component"
 ```
 
 ---
@@ -407,26 +407,26 @@ git add src/components/vantage/Card.js src/components/vantage/index.js src/scree
 ### Task 5: `PillButton`
 
 **Files:**
-- Create: `src/components/vantage/PillButton.js`
-- Modify: `src/components/vantage/index.js`
+- Create: `src/components/vx/PillButton.js`
+- Modify: `src/components/vx/index.js`
 - Modify: `src/screens/_dev/ComponentGalleryScreen.js`
 
 - [ ] **Step 1: Write the component**
 
-Create `src/components/vantage/PillButton.js`:
+Create `src/components/vx/PillButton.js`:
 
 ```js
 import React from 'react';
 import { Pressable, Text, ActivityIndicator, View, StyleSheet } from 'react-native';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 const VARIANTS = {
-  primary:   { bg: vantage.accent,   fg: vantage.textInverse, pressed: vantage.accentGlow },
-  secondary: { bg: vantage.bgRaised, fg: vantage.textPrimary, pressed: vantage.bgPressed },
-  sell:      { bg: vantage.sellBg,   fg: vantage.textPrimary, pressed: '#D63D5C' },
-  buy:       { bg: vantage.up,       fg: vantage.textPrimary, pressed: '#1FA958' },
-  danger:    { bg: 'transparent',    fg: vantage.down,        pressed: vantage.downMuted, borderColor: vantage.down },
-  ghost:     { bg: 'transparent',    fg: vantage.textPrimary, pressed: vantage.bgPressed },
+  primary:   { bg: vx.accent,   fg: vx.textInverse, pressed: vx.accentGlow },
+  secondary: { bg: vx.bgRaised, fg: vx.textPrimary, pressed: vx.bgPressed },
+  sell:      { bg: vx.sellBg,   fg: vx.textPrimary, pressed: '#D63D5C' },
+  buy:       { bg: vx.up,       fg: vx.textPrimary, pressed: '#1FA958' },
+  danger:    { bg: 'transparent',    fg: vx.down,        pressed: vx.downMuted, borderColor: vx.down },
+  ghost:     { bg: 'transparent',    fg: vx.textPrimary, pressed: vx.bgPressed },
 };
 
 const SIZES = {
@@ -530,7 +530,7 @@ Reload. All 9 buttons render. Each one's tap shows the pressed-color flash. Disa
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/vantage/PillButton.js src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vantage): add PillButton component with 6 variants"
+git add src/components/vx/PillButton.js src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vx): add PillButton component with 6 variants"
 ```
 
 ---
@@ -538,18 +538,18 @@ git add src/components/vantage/PillButton.js src/components/vantage/index.js src
 ### Task 6: `IconButton`
 
 **Files:**
-- Create: `src/components/vantage/IconButton.js`
-- Modify: `src/components/vantage/index.js`
+- Create: `src/components/vx/IconButton.js`
+- Modify: `src/components/vx/index.js`
 - Modify: `src/screens/_dev/ComponentGalleryScreen.js`
 
 - [ ] **Step 1: Write the component**
 
-Create `src/components/vantage/IconButton.js`:
+Create `src/components/vx/IconButton.js`:
 
 ```js
 import React from 'react';
 import { Pressable, View, StyleSheet } from 'react-native';
-import { vantage, space } from '../../theme/vantageTheme';
+import { vx, space } from '../../theme/vxTheme';
 
 const SIZES = { sm: 32, md: 40, lg: 48 };
 
@@ -563,7 +563,7 @@ export default function IconButton({
   style,
 }) {
   const dim = SIZES[size];
-  const bg = variant === 'filled' ? vantage.bgRaised : 'transparent';
+  const bg = variant === 'filled' ? vx.bgRaised : 'transparent';
   return (
     <Pressable
       onPress={onPress}
@@ -575,7 +575,7 @@ export default function IconButton({
           width: dim,
           height: dim,
           borderRadius: dim / 2,
-          backgroundColor: pressed ? vantage.bgPressed : bg,
+          backgroundColor: pressed ? vx.bgPressed : bg,
         },
         style,
       ]}
@@ -614,10 +614,10 @@ import { Ionicons } from '@expo/vector-icons';
 // ...
 <Section title="IconButton">
   <View style={{ flexDirection: 'row', gap: space.md }}>
-    <IconButton icon={<Ionicons name="search" size={20} color={vantage.textPrimary} />} accessibilityLabel="Search" onPress={() => {}} />
-    <IconButton icon={<Ionicons name="chatbubble-outline" size={20} color={vantage.textPrimary} />} badgeColor={vantage.down} accessibilityLabel="Support (unread)" onPress={() => {}} />
-    <IconButton variant="filled" icon={<Ionicons name="chevron-back" size={20} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={() => {}} />
-    <IconButton size="lg" variant="filled" icon={<Ionicons name="notifications-outline" size={22} color={vantage.textPrimary} />} accessibilityLabel="Notifications" onPress={() => {}} />
+    <IconButton icon={<Ionicons name="search" size={20} color={vx.textPrimary} />} accessibilityLabel="Search" onPress={() => {}} />
+    <IconButton icon={<Ionicons name="chatbubble-outline" size={20} color={vx.textPrimary} />} badgeColor={vx.down} accessibilityLabel="Support (unread)" onPress={() => {}} />
+    <IconButton variant="filled" icon={<Ionicons name="chevron-back" size={20} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={() => {}} />
+    <IconButton size="lg" variant="filled" icon={<Ionicons name="notifications-outline" size={22} color={vx.textPrimary} />} accessibilityLabel="Notifications" onPress={() => {}} />
   </View>
 </Section>
 ```
@@ -629,7 +629,7 @@ Reload. Four icon buttons in a row. The chat one has a red dot top-right.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/vantage/IconButton.js src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vantage): add IconButton component"
+git add src/components/vx/IconButton.js src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vx): add IconButton component"
 ```
 
 ---
@@ -639,20 +639,20 @@ git add src/components/vantage/IconButton.js src/components/vantage/index.js src
 Two small primitives bundled (each ~40 lines).
 
 **Files:**
-- Create: `src/components/vantage/CheckboxRow.js`
-- Create: `src/components/vantage/NumberStepper.js`
-- Modify: `src/components/vantage/index.js`
+- Create: `src/components/vx/CheckboxRow.js`
+- Create: `src/components/vx/NumberStepper.js`
+- Modify: `src/components/vx/index.js`
 - Modify: `src/screens/_dev/ComponentGalleryScreen.js`
 
 - [ ] **Step 1: Write CheckboxRow**
 
-Create `src/components/vantage/CheckboxRow.js`:
+Create `src/components/vx/CheckboxRow.js`:
 
 ```js
 import React from 'react';
 import { Pressable, View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { vantage, space, sizes, fontFamily } from '../../theme/vantageTheme';
+import { vx, space, sizes, fontFamily } from '../../theme/vxTheme';
 
 export default function CheckboxRow({ label, checked, onChange, disabled = false }) {
   return (
@@ -664,9 +664,9 @@ export default function CheckboxRow({ label, checked, onChange, disabled = false
     >
       <View style={[
         styles.box,
-        { backgroundColor: checked ? vantage.accent : 'transparent', borderColor: checked ? vantage.accent : vantage.borderStrong, opacity: disabled ? 0.5 : 1 },
+        { backgroundColor: checked ? vx.accent : 'transparent', borderColor: checked ? vx.accent : vx.borderStrong, opacity: disabled ? 0.5 : 1 },
       ]}>
-        {checked ? <Ionicons name="checkmark" size={14} color={vantage.textInverse} /> : null}
+        {checked ? <Ionicons name="checkmark" size={14} color={vx.textInverse} /> : null}
       </View>
       <Text style={[styles.label, { opacity: disabled ? 0.5 : 1 }]}>{label}</Text>
     </Pressable>
@@ -676,18 +676,18 @@ export default function CheckboxRow({ label, checked, onChange, disabled = false
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.sm },
   box: { width: 20, height: 20, borderRadius: 4, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  label: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
+  label: { color: vx.textPrimary, fontFamily, fontSize: sizes.body },
 });
 ```
 
 - [ ] **Step 2: Write NumberStepper**
 
-Create `src/components/vantage/NumberStepper.js`:
+Create `src/components/vx/NumberStepper.js`:
 
 ```js
 import React from 'react';
 import { View, Text, Pressable, TextInput, StyleSheet } from 'react-native';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 export default function NumberStepper({
   value,
@@ -735,20 +735,20 @@ export default function NumberStepper({
 
 const styles = StyleSheet.create({
   wrap: { gap: space.xs },
-  label: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label },
+  label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: vantage.bgRaised,
+    backgroundColor: vx.bgRaised,
     borderRadius: radius.md,
     paddingHorizontal: space.sm,
     height: 52,
   },
   btn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  btnTxt: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
+  btnTxt: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
   center: { flex: 1, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  input: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold, textAlign: 'center', minWidth: 40, padding: 0 },
-  suffix: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginLeft: space.xs },
+  input: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold, textAlign: 'center', minWidth: 40, padding: 0 },
+  suffix: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginLeft: space.xs },
 });
 ```
 
@@ -793,7 +793,7 @@ Reload. Checkbox toggles state. Stepper +/- adjusts the value with 2 decimal pla
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/components/vantage/CheckboxRow.js src/components/vantage/NumberStepper.js src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vantage): add CheckboxRow and NumberStepper"
+git add src/components/vx/CheckboxRow.js src/components/vx/NumberStepper.js src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vx): add CheckboxRow and NumberStepper"
 ```
 
 ---
@@ -801,18 +801,18 @@ git add src/components/vantage/CheckboxRow.js src/components/vantage/NumberStepp
 ### Task 8: `SegmentedTabs`
 
 **Files:**
-- Create: `src/components/vantage/SegmentedTabs.js`
-- Modify: `src/components/vantage/index.js`
+- Create: `src/components/vx/SegmentedTabs.js`
+- Modify: `src/components/vx/index.js`
 - Modify: `src/screens/_dev/ComponentGalleryScreen.js`
 
 - [ ] **Step 1: Write the component**
 
-Create `src/components/vantage/SegmentedTabs.js`:
+Create `src/components/vx/SegmentedTabs.js`:
 
 ```js
 import React from 'react';
 import { View, Pressable, Text, StyleSheet } from 'react-native';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 export default function SegmentedTabs({ value, onChange, options }) {
   return (
@@ -829,7 +829,7 @@ export default function SegmentedTabs({ value, onChange, options }) {
           >
             <Text style={[
               styles.label,
-              { color: active ? vantage.textPrimary : vantage.textMuted, fontWeight: active ? weights.heavy : weights.medium }
+              { color: active ? vx.textPrimary : vx.textMuted, fontWeight: active ? weights.heavy : weights.medium }
             ]}>
               {o.label}
             </Text>
@@ -880,7 +880,7 @@ Active tab is bold white, inactive is grey. Tap switches.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/vantage/SegmentedTabs.js src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vantage): add SegmentedTabs"
+git add src/components/vx/SegmentedTabs.js src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vx): add SegmentedTabs"
 ```
 
 ---
@@ -888,18 +888,18 @@ git add src/components/vantage/SegmentedTabs.js src/components/vantage/index.js 
 ### Task 9: `CategoryTabs`
 
 **Files:**
-- Create: `src/components/vantage/CategoryTabs.js`
-- Modify: `src/components/vantage/index.js`
+- Create: `src/components/vx/CategoryTabs.js`
+- Modify: `src/components/vx/index.js`
 - Modify: `src/screens/_dev/ComponentGalleryScreen.js`
 
 - [ ] **Step 1: Write the component**
 
-Create `src/components/vantage/CategoryTabs.js`:
+Create `src/components/vx/CategoryTabs.js`:
 
 ```js
 import React from 'react';
 import { View, Pressable, Text, ScrollView, StyleSheet } from 'react-native';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 export default function CategoryTabs({ value, onChange, options }) {
   return (
@@ -920,11 +920,11 @@ export default function CategoryTabs({ value, onChange, options }) {
           >
             <Text style={[
               styles.label,
-              { color: active ? vantage.textPrimary : vantage.textMuted, fontWeight: active ? weights.bold : weights.medium }
+              { color: active ? vx.textPrimary : vx.textMuted, fontWeight: active ? weights.bold : weights.medium }
             ]}>
               {o.label}
             </Text>
-            <View style={[styles.underline, { backgroundColor: active ? vantage.accent : 'transparent' }]} />
+            <View style={[styles.underline, { backgroundColor: active ? vx.accent : 'transparent' }]} />
           </Pressable>
         );
       })}
@@ -977,7 +977,7 @@ Horizontal scroll works. Active tab has orange underline below it. Tap switches.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/vantage/CategoryTabs.js src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vantage): add CategoryTabs"
+git add src/components/vx/CategoryTabs.js src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vx): add CategoryTabs"
 ```
 
 ---
@@ -987,18 +987,18 @@ git add src/components/vantage/CategoryTabs.js src/components/vantage/index.js s
 Pure-CSS colored circle. No images needed.
 
 **Files:**
-- Create: `src/components/vantage/SymbolIcon.js`
-- Modify: `src/components/vantage/index.js`
+- Create: `src/components/vx/SymbolIcon.js`
+- Modify: `src/components/vx/index.js`
 - Modify: `src/screens/_dev/ComponentGalleryScreen.js`
 
 - [ ] **Step 1: Write the component**
 
-Create `src/components/vantage/SymbolIcon.js`:
+Create `src/components/vx/SymbolIcon.js`:
 
 ```js
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { vantage, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { vx, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 // Curated palette per symbol/asset class
 const SYMBOL_COLORS = {
@@ -1028,7 +1028,7 @@ function hashColor(sym) {
 export default function SymbolIcon({ symbol, size = 40 }) {
   const cfg = SYMBOL_COLORS[symbol];
   const bg = cfg ? cfg.bg : hashColor(symbol);
-  const fg = cfg && cfg.fg ? cfg.fg : vantage.textPrimary;
+  const fg = cfg && cfg.fg ? cfg.fg : vx.textPrimary;
   const initials = cfg ? cfg.initials : symbol.slice(0, 2).toUpperCase();
   const fontSize = Math.max(10, Math.floor(size * 0.36));
 
@@ -1058,7 +1058,7 @@ export { default as SymbolIcon } from './SymbolIcon';
     {['XAUUSD','BTCUSD','NAS100','Nikkei225','HK50','EURUSD','UNKNOWN'].map((s) =>
       <View key={s} style={{ alignItems: 'center', gap: 4 }}>
         <SymbolIcon symbol={s} size={48} />
-        <Text style={{ color: vantage.textMuted, fontFamily, fontSize: sizes.micro }}>{s}</Text>
+        <Text style={{ color: vx.textMuted, fontFamily, fontSize: sizes.micro }}>{s}</Text>
       </View>
     )}
   </View>
@@ -1072,7 +1072,7 @@ export { default as SymbolIcon } from './SymbolIcon';
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/vantage/SymbolIcon.js src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vantage): add SymbolIcon with curated palette + hash fallback"
+git add src/components/vx/SymbolIcon.js src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vx): add SymbolIcon with curated palette + hash fallback"
 ```
 
 ---
@@ -1082,8 +1082,8 @@ git add src/components/vantage/SymbolIcon.js src/components/vantage/index.js src
 SVG mini chart, green if up else red. No external dep.
 
 **Files:**
-- Create: `src/components/vantage/Sparkline.js`
-- Modify: `src/components/vantage/index.js`
+- Create: `src/components/vx/Sparkline.js`
+- Modify: `src/components/vx/index.js`
 - Modify: `src/screens/_dev/ComponentGalleryScreen.js`
 
 - [ ] **Step 1: Verify react-native-svg is available**
@@ -1096,13 +1096,13 @@ Expected: no error (it's a transitive dep through Expo). If error, install it: `
 
 - [ ] **Step 2: Write the component**
 
-Create `src/components/vantage/Sparkline.js`:
+Create `src/components/vx/Sparkline.js`:
 
 ```js
 import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { vantage } from '../../theme/vantageTheme';
+import { vx } from '../../theme/vxTheme';
 
 export default function Sparkline({
   data = [],
@@ -1113,7 +1113,7 @@ export default function Sparkline({
 }) {
   const { path, autoColor } = useMemo(() => {
     if (!Array.isArray(data) || data.length < 2) {
-      return { path: '', autoColor: vantage.textMuted };
+      return { path: '', autoColor: vx.textMuted };
     }
     const min = Math.min(...data);
     const max = Math.max(...data);
@@ -1127,7 +1127,7 @@ export default function Sparkline({
       d += (i === 0 ? 'M' : 'L') + x.toFixed(2) + ' ' + y.toFixed(2) + ' ';
     });
     const up = data[data.length - 1] >= data[0];
-    return { path: d.trim(), autoColor: up ? vantage.up : vantage.down };
+    return { path: d.trim(), autoColor: up ? vx.up : vx.down };
   }, [data, width, height]);
 
   const stroke = color || autoColor;
@@ -1170,7 +1170,7 @@ export { default as Sparkline } from './Sparkline';
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/components/vantage/Sparkline.js src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vantage): add Sparkline SVG component"
+git add src/components/vx/Sparkline.js src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vx): add Sparkline SVG component"
 ```
 
 ---
@@ -1180,20 +1180,20 @@ git add src/components/vantage/Sparkline.js src/components/vantage/index.js src/
 Composes SymbolIcon + Sparkline + price display.
 
 **Files:**
-- Create: `src/components/vantage/InstrumentRow.js`
-- Modify: `src/components/vantage/index.js`
+- Create: `src/components/vx/InstrumentRow.js`
+- Modify: `src/components/vx/index.js`
 - Modify: `src/screens/_dev/ComponentGalleryScreen.js`
 
 - [ ] **Step 1: Write the component**
 
-Create `src/components/vantage/InstrumentRow.js`:
+Create `src/components/vx/InstrumentRow.js`:
 
 ```js
 import React, { memo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import SymbolIcon from './SymbolIcon';
 import Sparkline from './Sparkline';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 function InstrumentRow({
   symbol,
@@ -1206,13 +1206,13 @@ function InstrumentRow({
   rightExtra,
 }) {
   const positive = (changePct ?? 0) >= 0;
-  const sparkColor = positive ? vantage.up : vantage.down;
-  const rowTint = positive ? vantage.upMuted : vantage.downMuted;
+  const sparkColor = positive ? vx.up : vx.down;
+  const rowTint = positive ? vx.upMuted : vx.downMuted;
 
   return (
     <Pressable
       onPress={onPress}
-      android_ripple={{ color: vantage.bgPressed }}
+      android_ripple={{ color: vx.bgPressed }}
       accessibilityRole="button"
       style={styles.row}
     >
@@ -1227,7 +1227,7 @@ function InstrumentRow({
       </View>
       <View style={styles.right}>
         <Text style={styles.price}>{formatPrice(price)}</Text>
-        <Text style={[styles.pct, { color: positive ? vantage.up : vantage.down }]}>
+        <Text style={[styles.pct, { color: positive ? vx.up : vx.down }]}>
           {changePct != null ? `${positive ? '+' : ''}${changePct.toFixed(2)}%` : '—'}
         </Text>
       </View>
@@ -1254,11 +1254,11 @@ const styles = StyleSheet.create({
   },
   tint: { ...StyleSheet.absoluteFillObject, opacity: 0.6 },
   left: { flex: 1, minWidth: 0 },
-  name: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
-  sub: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  name: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
+  sub: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
   spark: { width: 64 },
   right: { alignItems: 'flex-end', minWidth: 90 },
-  price: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
+  price: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
   pct: { fontFamily, fontSize: sizes.label, marginTop: 2 },
 });
 
@@ -1288,7 +1288,7 @@ Three rows render with the tinted background (green-faint for positive, red-fain
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/vantage/InstrumentRow.js src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vantage): add InstrumentRow"
+git add src/components/vx/InstrumentRow.js src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vx): add InstrumentRow"
 ```
 
 ---
@@ -1296,19 +1296,19 @@ git add src/components/vantage/InstrumentRow.js src/components/vantage/index.js 
 ### Task 13: `StatCard`
 
 **Files:**
-- Create: `src/components/vantage/StatCard.js`
-- Modify: `src/components/vantage/index.js`
+- Create: `src/components/vx/StatCard.js`
+- Modify: `src/components/vx/index.js`
 - Modify: `src/screens/_dev/ComponentGalleryScreen.js`
 
 - [ ] **Step 1: Write the component**
 
-Create `src/components/vantage/StatCard.js`:
+Create `src/components/vx/StatCard.js`:
 
 ```js
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Card from './Card';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 export default function StatCard({ label, value, delta, deltaPositive }) {
   return (
@@ -1316,7 +1316,7 @@ export default function StatCard({ label, value, delta, deltaPositive }) {
       <Text style={styles.label}>{label}</Text>
       <Text style={styles.value}>{value}</Text>
       {delta != null ? (
-        <Text style={[styles.delta, { color: deltaPositive ? vantage.up : vantage.down }]}>
+        <Text style={[styles.delta, { color: deltaPositive ? vx.up : vx.down }]}>
           {delta}
         </Text>
       ) : null}
@@ -1326,8 +1326,8 @@ export default function StatCard({ label, value, delta, deltaPositive }) {
 
 const styles = StyleSheet.create({
   wrap: { minWidth: 110, gap: 2 },
-  label: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
-  value: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
+  label: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
+  value: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
   delta: { fontFamily, fontSize: sizes.label, marginTop: 2 },
 });
 ```
@@ -1355,7 +1355,7 @@ export { default as StatCard } from './StatCard';
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/vantage/StatCard.js src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vantage): add StatCard"
+git add src/components/vx/StatCard.js src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vx): add StatCard"
 ```
 
 ---
@@ -1363,18 +1363,18 @@ git add src/components/vantage/StatCard.js src/components/vantage/index.js src/s
 ### Task 14: `QuickActionTile`
 
 **Files:**
-- Create: `src/components/vantage/QuickActionTile.js`
-- Modify: `src/components/vantage/index.js`
+- Create: `src/components/vx/QuickActionTile.js`
+- Modify: `src/components/vx/index.js`
 - Modify: `src/screens/_dev/ComponentGalleryScreen.js`
 
 - [ ] **Step 1: Write the component**
 
-Create `src/components/vantage/QuickActionTile.js`:
+Create `src/components/vx/QuickActionTile.js`:
 
 ```js
 import React from 'react';
 import { Pressable, View, Text, StyleSheet } from 'react-native';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 export default function QuickActionTile({
   icon,
@@ -1403,22 +1403,22 @@ const styles = StyleSheet.create({
   icon: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: vantage.bgElevated,
+    backgroundColor: vx.bgElevated,
     borderWidth: 1,
-    borderColor: vantage.border,
+    borderColor: vx.border,
     position: 'relative',
   },
   badge: {
     position: 'absolute',
     top: -6,
     left: -10,
-    backgroundColor: vantage.accent,
+    backgroundColor: vx.accent,
     paddingHorizontal: space.xs + 2,
     paddingVertical: 1,
     borderRadius: radius.sm,
   },
-  badgeTxt: { color: vantage.textInverse, fontFamily, fontSize: sizes.micro, fontWeight: weights.heavy },
-  label: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, textAlign: 'center' },
+  badgeTxt: { color: vx.textInverse, fontFamily, fontSize: sizes.micro, fontWeight: weights.heavy },
+  label: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, textAlign: 'center' },
 });
 ```
 
@@ -1433,10 +1433,10 @@ export { default as QuickActionTile } from './QuickActionTile';
 ```jsx
 <Section title="QuickActionTile">
   <View style={{ flexDirection: 'row', gap: space.md }}>
-    <QuickActionTile icon={<Ionicons name="gift-outline" size={24} color={vantage.textPrimary} />} label="Promotion" badge="New" onPress={() => {}} />
-    <QuickActionTile icon={<Ionicons name="calendar-outline" size={24} color={vantage.textPrimary} />} label="Calendar" onPress={() => {}} />
-    <QuickActionTile icon={<Ionicons name="school-outline" size={24} color={vantage.textPrimary} />} label="Academy" onPress={() => {}} />
-    <QuickActionTile icon={<Ionicons name="people-outline" size={24} color={vantage.textPrimary} />} label="IB" onPress={() => {}} />
+    <QuickActionTile icon={<Ionicons name="gift-outline" size={24} color={vx.textPrimary} />} label="Promotion" badge="New" onPress={() => {}} />
+    <QuickActionTile icon={<Ionicons name="calendar-outline" size={24} color={vx.textPrimary} />} label="Calendar" onPress={() => {}} />
+    <QuickActionTile icon={<Ionicons name="school-outline" size={24} color={vx.textPrimary} />} label="Academy" onPress={() => {}} />
+    <QuickActionTile icon={<Ionicons name="people-outline" size={24} color={vx.textPrimary} />} label="IB" onPress={() => {}} />
   </View>
 </Section>
 ```
@@ -1446,7 +1446,7 @@ export { default as QuickActionTile } from './QuickActionTile';
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/vantage/QuickActionTile.js src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vantage): add QuickActionTile"
+git add src/components/vx/QuickActionTile.js src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vx): add QuickActionTile"
 ```
 
 ---
@@ -1456,33 +1456,33 @@ git add src/components/vantage/QuickActionTile.js src/components/vantage/index.j
 Profile-menu row primitive (icon + label + value + chevron).
 
 **Files:**
-- Create: `src/components/vantage/MenuRow.js`
-- Modify: `src/components/vantage/index.js`
+- Create: `src/components/vx/MenuRow.js`
+- Modify: `src/components/vx/index.js`
 - Modify: `src/screens/_dev/ComponentGalleryScreen.js`
 
 - [ ] **Step 1: Write the component**
 
-Create `src/components/vantage/MenuRow.js`:
+Create `src/components/vx/MenuRow.js`:
 
 ```js
 import React from 'react';
 import { Pressable, View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 export default function MenuRow({ icon, label, value, onPress, danger = false }) {
   return (
     <Pressable
       onPress={onPress}
-      android_ripple={{ color: vantage.bgPressed }}
+      android_ripple={{ color: vx.bgPressed }}
       accessibilityRole="button"
       style={styles.row}
     >
       <View style={styles.iconBox}>{icon}</View>
-      <Text style={[styles.label, danger && { color: vantage.down }]}>{label}</Text>
+      <Text style={[styles.label, danger && { color: vx.down }]}>{label}</Text>
       <View style={styles.right}>
         {value ? <Text style={styles.value}>{value}</Text> : null}
-        <Ionicons name="chevron-forward" size={16} color={vantage.textMuted} />
+        <Ionicons name="chevron-forward" size={16} color={vx.textMuted} />
       </View>
     </Pressable>
   );
@@ -1498,9 +1498,9 @@ const styles = StyleSheet.create({
     minHeight: 52,
   },
   iconBox: { width: 24, alignItems: 'center' },
-  label: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.medium },
+  label: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.medium },
   right: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  value: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  value: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
 });
 ```
 
@@ -1515,10 +1515,10 @@ export { default as MenuRow } from './MenuRow';
 ```jsx
 <Section title="MenuRow">
   <Card padding={0}>
-    <MenuRow icon={<Ionicons name="card-outline" size={20} color={vantage.textPrimary} />} label="My Accounts" onPress={() => {}} />
-    <MenuRow icon={<Ionicons name="shield-checkmark-outline" size={20} color={vantage.up} />} label="KYC" value="Verified" onPress={() => {}} />
-    <MenuRow icon={<Ionicons name="globe-outline" size={20} color={vantage.textPrimary} />} label="Language" value="English" onPress={() => {}} />
-    <MenuRow icon={<Ionicons name="log-out-outline" size={20} color={vantage.down} />} label="Log Out" danger onPress={() => {}} />
+    <MenuRow icon={<Ionicons name="card-outline" size={20} color={vx.textPrimary} />} label="My Accounts" onPress={() => {}} />
+    <MenuRow icon={<Ionicons name="shield-checkmark-outline" size={20} color={vx.up} />} label="KYC" value="Verified" onPress={() => {}} />
+    <MenuRow icon={<Ionicons name="globe-outline" size={20} color={vx.textPrimary} />} label="Language" value="English" onPress={() => {}} />
+    <MenuRow icon={<Ionicons name="log-out-outline" size={20} color={vx.down} />} label="Log Out" danger onPress={() => {}} />
   </Card>
 </Section>
 ```
@@ -1528,7 +1528,7 @@ export { default as MenuRow } from './MenuRow';
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/vantage/MenuRow.js src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vantage): add MenuRow"
+git add src/components/vx/MenuRow.js src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vx): add MenuRow"
 ```
 
 ---
@@ -1536,20 +1536,20 @@ git add src/components/vantage/MenuRow.js src/components/vantage/index.js src/sc
 ### Task 16: `StrategyCard`
 
 **Files:**
-- Create: `src/components/vantage/StrategyCard.js`
-- Modify: `src/components/vantage/index.js`
+- Create: `src/components/vx/StrategyCard.js`
+- Modify: `src/components/vx/index.js`
 - Modify: `src/screens/_dev/ComponentGalleryScreen.js`
 
 - [ ] **Step 1: Write the component**
 
-Create `src/components/vantage/StrategyCard.js`:
+Create `src/components/vx/StrategyCard.js`:
 
 ```js
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Card from './Card';
 import SymbolIcon from './SymbolIcon';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 export default function StrategyCard({
   name,
@@ -1574,7 +1574,7 @@ export default function StrategyCard({
       </View>
       <View style={styles.stats}>
         <Text style={styles.lab}>30D Return</Text>
-        <Text style={[styles.val, { color: positive ? vantage.up : vantage.down }]}>
+        <Text style={[styles.val, { color: positive ? vx.up : vx.down }]}>
           {return30d != null ? `${positive ? '+' : ''}${return30d.toFixed(2)}%` : '—'}
         </Text>
       </View>
@@ -1597,15 +1597,15 @@ function formatAum(v) {
 const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginBottom: space.md },
   headText: { flex: 1, minWidth: 0 },
-  name: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy },
-  badge: { alignSelf: 'flex-start', backgroundColor: vantage.bgPressed, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: radius.sm, marginTop: 2 },
-  badgeTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.micro, fontWeight: weights.medium },
-  full: { backgroundColor: vantage.bgPressed, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: radius.sm },
-  fullTxt: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro, fontWeight: weights.semibold },
+  name: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy },
+  badge: { alignSelf: 'flex-start', backgroundColor: vx.bgPressed, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: radius.sm, marginTop: 2 },
+  badgeTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.micro, fontWeight: weights.medium },
+  full: { backgroundColor: vx.bgPressed, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: radius.sm },
+  fullTxt: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, fontWeight: weights.semibold },
   stats: { marginTop: space.sm },
-  lab: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  lab: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
   val: { fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
-  aum: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
+  aum: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
 });
 ```
 
@@ -1631,7 +1631,7 @@ export { default as StrategyCard } from './StrategyCard';
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/vantage/StrategyCard.js src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vantage): add StrategyCard"
+git add src/components/vx/StrategyCard.js src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vx): add StrategyCard"
 ```
 
 ---
@@ -1639,18 +1639,18 @@ git add src/components/vantage/StrategyCard.js src/components/vantage/index.js s
 ### Task 17: `BuySellSplit`
 
 **Files:**
-- Create: `src/components/vantage/BuySellSplit.js`
-- Modify: `src/components/vantage/index.js`
+- Create: `src/components/vx/BuySellSplit.js`
+- Modify: `src/components/vx/index.js`
 - Modify: `src/screens/_dev/ComponentGalleryScreen.js`
 
 - [ ] **Step 1: Write the component**
 
-Create `src/components/vantage/BuySellSplit.js`:
+Create `src/components/vx/BuySellSplit.js`:
 
 ```js
 import React from 'react';
 import { View, Pressable, Text, StyleSheet } from 'react-native';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 export default function BuySellSplit({
   bid,
@@ -1665,7 +1665,7 @@ export default function BuySellSplit({
       <View style={styles.row}>
         <Pressable
           onPress={() => onChange('sell')}
-          style={[styles.half, styles.left, { backgroundColor: side === 'sell' ? vantage.sellBg : vantage.buyBg }]}
+          style={[styles.half, styles.left, { backgroundColor: side === 'sell' ? vx.sellBg : vx.buyBg }]}
           accessibilityRole="button"
           accessibilityState={{ selected: side === 'sell' }}
         >
@@ -1677,7 +1677,7 @@ export default function BuySellSplit({
         </View>
         <Pressable
           onPress={() => onChange('buy')}
-          style={[styles.half, styles.right, { backgroundColor: side === 'buy' ? vantage.up : vantage.buyBg }]}
+          style={[styles.half, styles.right, { backgroundColor: side === 'buy' ? vx.up : vx.buyBg }]}
           accessibilityRole="button"
           accessibilityState={{ selected: side === 'buy' }}
         >
@@ -1688,7 +1688,7 @@ export default function BuySellSplit({
       {changePoints != null ? (
         <View style={styles.changeRow}>
           <View style={styles.changeBar} />
-          <Text style={[styles.changeTxt, { color: changePoints >= 0 ? vantage.up : vantage.down }]}>
+          <Text style={[styles.changeTxt, { color: changePoints >= 0 ? vx.up : vx.down }]}>
             ▼ {changePoints}
           </Text>
         </View>
@@ -1714,17 +1714,17 @@ const styles = StyleSheet.create({
     top: '50%',
     transform: [{ translateX: -22 }, { translateY: -12 }],
     width: 44, height: 24,
-    backgroundColor: vantage.spreadChip,
+    backgroundColor: vx.spreadChip,
     borderRadius: 12,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: vantage.borderStrong,
+    borderWidth: 1, borderColor: vx.borderStrong,
     zIndex: 1,
   },
-  chipTxt: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
-  lab: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
-  price: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, marginTop: 2 },
+  chipTxt: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
+  lab: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
+  price: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, marginTop: 2 },
   changeRow: { flexDirection: 'row', alignItems: 'center', marginTop: space.xs, justifyContent: 'flex-end' },
-  changeBar: { flex: 1, height: 2, backgroundColor: vantage.down, marginRight: space.sm, borderRadius: 1 },
+  changeBar: { flex: 1, height: 2, backgroundColor: vx.down, marginRight: space.sm, borderRadius: 1 },
   changeTxt: { fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
 });
 ```
@@ -1753,7 +1753,7 @@ function BuySellDemo() {
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/vantage/BuySellSplit.js src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vantage): add BuySellSplit"
+git add src/components/vx/BuySellSplit.js src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vx): add BuySellSplit"
 ```
 
 ---
@@ -1763,18 +1763,18 @@ git add src/components/vantage/BuySellSplit.js src/components/vantage/index.js s
 The floating 4-tab nav. Used by `MainTabs` in Task 25.
 
 **Files:**
-- Create: `src/components/vantage/BottomNavPill.js`
-- Modify: `src/components/vantage/index.js`
+- Create: `src/components/vx/BottomNavPill.js`
+- Modify: `src/components/vx/index.js`
 - Modify: `src/screens/_dev/ComponentGalleryScreen.js`
 
 - [ ] **Step 1: Write the component**
 
-Create `src/components/vantage/BottomNavPill.js`:
+Create `src/components/vx/BottomNavPill.js`:
 
 ```js
 import React from 'react';
 import { View, Pressable, Text, StyleSheet } from 'react-native';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 // Tabs: [{ key, label, icon (active el), iconInactive (inactive el) }]
 export default function BottomNavPill({ tabs, activeKey, onChange }) {
@@ -1793,7 +1793,7 @@ export default function BottomNavPill({ tabs, activeKey, onChange }) {
               style={[styles.tab, active && styles.tabActive]}
             >
               <View style={styles.icon}>{active ? t.icon : t.iconInactive}</View>
-              <Text style={[styles.label, active && { color: vantage.textPrimary, fontWeight: weights.bold }]}>{t.label}</Text>
+              <Text style={[styles.label, active && { color: vx.textPrimary, fontWeight: weights.bold }]}>{t.label}</Text>
             </Pressable>
           );
         })}
@@ -1812,12 +1812,12 @@ const styles = StyleSheet.create({
   },
   pill: {
     flexDirection: 'row',
-    backgroundColor: vantage.bgElevated,
+    backgroundColor: vx.bgElevated,
     borderRadius: radius.pill,
     paddingHorizontal: space.xs,
     paddingVertical: space.xs,
     borderWidth: 1,
-    borderColor: vantage.border,
+    borderColor: vx.border,
     alignItems: 'stretch',
   },
   tab: {
@@ -1828,9 +1828,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     gap: 2,
   },
-  tabActive: { backgroundColor: vantage.bg },
+  tabActive: { backgroundColor: vx.bg },
   icon: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
-  label: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro, fontWeight: weights.medium },
+  label: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, fontWeight: weights.medium },
 });
 ```
 
@@ -1846,10 +1846,10 @@ export { default as BottomNavPill } from './BottomNavPill';
 function BottomNavDemo() {
   const [k, setK] = useState('home');
   const tabs = [
-    { key: 'home',    label: 'Home',    icon: <Ionicons name="triangle" size={18} color={vantage.textPrimary} />, iconInactive: <Ionicons name="triangle-outline" size={18} color={vantage.textMuted} /> },
-    { key: 'markets', label: 'Markets', icon: <Ionicons name="bar-chart" size={18} color={vantage.textPrimary} />, iconInactive: <Ionicons name="bar-chart-outline" size={18} color={vantage.textMuted} /> },
-    { key: 'trade',   label: 'Trade',   icon: <Ionicons name="swap-horizontal" size={18} color={vantage.textPrimary} />, iconInactive: <Ionicons name="swap-horizontal-outline" size={18} color={vantage.textMuted} /> },
-    { key: 'funds',   label: 'Funds',   icon: <Ionicons name="pie-chart" size={18} color={vantage.textPrimary} />, iconInactive: <Ionicons name="pie-chart-outline" size={18} color={vantage.textMuted} /> },
+    { key: 'home',    label: 'Home',    icon: <Ionicons name="triangle" size={18} color={vx.textPrimary} />, iconInactive: <Ionicons name="triangle-outline" size={18} color={vx.textMuted} /> },
+    { key: 'markets', label: 'Markets', icon: <Ionicons name="bar-chart" size={18} color={vx.textPrimary} />, iconInactive: <Ionicons name="bar-chart-outline" size={18} color={vx.textMuted} /> },
+    { key: 'trade',   label: 'Trade',   icon: <Ionicons name="swap-horizontal" size={18} color={vx.textPrimary} />, iconInactive: <Ionicons name="swap-horizontal-outline" size={18} color={vx.textMuted} /> },
+    { key: 'funds',   label: 'Funds',   icon: <Ionicons name="pie-chart" size={18} color={vx.textPrimary} />, iconInactive: <Ionicons name="pie-chart-outline" size={18} color={vx.textMuted} /> },
   ];
   return (
     <Section title="BottomNavPill">
@@ -1866,7 +1866,7 @@ function BottomNavDemo() {
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/vantage/BottomNavPill.js src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vantage): add BottomNavPill"
+git add src/components/vx/BottomNavPill.js src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vx): add BottomNavPill"
 ```
 
 ---
@@ -1874,19 +1874,19 @@ git add src/components/vantage/BottomNavPill.js src/components/vantage/index.js 
 ### Task 19: `BalanceBlock`
 
 **Files:**
-- Create: `src/components/vantage/BalanceBlock.js`
-- Modify: `src/components/vantage/index.js`
+- Create: `src/components/vx/BalanceBlock.js`
+- Modify: `src/components/vx/index.js`
 - Modify: `src/screens/_dev/ComponentGalleryScreen.js`
 
 - [ ] **Step 1: Write the component**
 
-Create `src/components/vantage/BalanceBlock.js`:
+Create `src/components/vx/BalanceBlock.js`:
 
 ```js
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 export default function BalanceBlock({
   label,
@@ -1904,7 +1904,7 @@ export default function BalanceBlock({
         <Text style={styles.label}>{label}</Text>
         {onToggleHide ? (
           <Pressable onPress={onToggleHide} hitSlop={10} accessibilityRole="button" accessibilityLabel={hidden ? 'Show balance' : 'Hide balance'}>
-            <Ionicons name={hidden ? 'eye-off-outline' : 'eye-outline'} size={14} color={vantage.textMuted} />
+            <Ionicons name={hidden ? 'eye-off-outline' : 'eye-outline'} size={14} color={vx.textMuted} />
           </Pressable>
         ) : null}
       </View>
@@ -1919,7 +1919,7 @@ export default function BalanceBlock({
       {subLabel ? (
         <View style={styles.subRow}>
           <Text style={styles.subLab}>{subLabel}</Text>
-          <Text style={[styles.subAmt, { color: subPositive ? vantage.up : vantage.down }]}>
+          <Text style={[styles.subAmt, { color: subPositive ? vx.up : vx.down }]}>
             {hidden ? '••' : (subAmount != null ? formatSigned(subAmount) : '—')}
           </Text>
           <Text style={styles.subLab}>{currency}</Text>
@@ -1941,13 +1941,13 @@ function formatSigned(v) {
 const styles = StyleSheet.create({
   wrap: { gap: 4, paddingVertical: space.sm },
   labRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
-  label: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  label: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
   amtRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
-  amount: { color: vantage.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
-  ccyChip: { backgroundColor: vantage.bgRaised, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: 6 },
-  ccyTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  amount: { color: vx.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
+  ccyChip: { backgroundColor: vx.bgRaised, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: 6 },
+  ccyTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: 2 },
-  subLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  subLab: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
   subAmt: { fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
 });
 ```
@@ -1984,7 +1984,7 @@ function BalanceDemo() {
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/vantage/BalanceBlock.js src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vantage): add BalanceBlock"
+git add src/components/vx/BalanceBlock.js src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vx): add BalanceBlock"
 ```
 
 ---
@@ -1992,20 +1992,20 @@ git add src/components/vantage/BalanceBlock.js src/components/vantage/index.js s
 ### Task 20: `Sheet` (bottom modal)
 
 **Files:**
-- Create: `src/components/vantage/Sheet.js`
-- Modify: `src/components/vantage/index.js`
+- Create: `src/components/vx/Sheet.js`
+- Modify: `src/components/vx/index.js`
 - Modify: `src/screens/_dev/ComponentGalleryScreen.js`
 
 - [ ] **Step 1: Write the component**
 
-Create `src/components/vantage/Sheet.js`:
+Create `src/components/vx/Sheet.js`:
 
 ```js
 import React from 'react';
 import { Modal, View, Pressable, StyleSheet, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 export default function Sheet({ visible, onClose, title, children, height }) {
   return (
@@ -2023,7 +2023,7 @@ export default function Sheet({ visible, onClose, title, children, height }) {
           <View style={styles.titleRow}>
             <Text style={styles.title}>{title}</Text>
             <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Close">
-              <Ionicons name="close" size={22} color={vantage.textPrimary} />
+              <Ionicons name="close" size={22} color={vx.textPrimary} />
             </Pressable>
           </View>
         ) : null}
@@ -2036,7 +2036,7 @@ export default function Sheet({ visible, onClose, title, children, height }) {
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
   sheet: {
-    backgroundColor: vantage.bgElevated,
+    backgroundColor: vx.bgElevated,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     paddingHorizontal: space.lg,
@@ -2044,9 +2044,9 @@ const styles = StyleSheet.create({
     paddingBottom: space.md,
     maxHeight: '85%',
   },
-  handle: { width: 36, height: 4, backgroundColor: vantage.borderStrong, borderRadius: 2, alignSelf: 'center', marginBottom: space.md },
+  handle: { width: 36, height: 4, backgroundColor: vx.borderStrong, borderRadius: 2, alignSelf: 'center', marginBottom: space.md },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: space.md },
-  title: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
+  title: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
   body: {},
 });
 ```
@@ -2066,8 +2066,8 @@ function SheetDemo() {
     <Section title="Sheet">
       <PillButton label="Open sheet" variant="secondary" onPress={() => setOpen(true)} />
       <Sheet visible={open} onClose={() => setOpen(false)} title="Pick account">
-        <MenuRow icon={<Ionicons name="card-outline" size={20} color={vantage.textPrimary} />} label="Live #24863411" value="$8,345.67" onPress={() => setOpen(false)} />
-        <MenuRow icon={<Ionicons name="card-outline" size={20} color={vantage.textPrimary} />} label="Demo #12345"   value="$10,000.00" onPress={() => setOpen(false)} />
+        <MenuRow icon={<Ionicons name="card-outline" size={20} color={vx.textPrimary} />} label="Live #24863411" value="$8,345.67" onPress={() => setOpen(false)} />
+        <MenuRow icon={<Ionicons name="card-outline" size={20} color={vx.textPrimary} />} label="Demo #12345"   value="$10,000.00" onPress={() => setOpen(false)} />
       </Sheet>
     </Section>
   );
@@ -2079,7 +2079,7 @@ function SheetDemo() {
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/vantage/Sheet.js src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vantage): add Sheet (bottom modal)"
+git add src/components/vx/Sheet.js src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vx): add Sheet (bottom modal)"
 ```
 
 ---
@@ -2089,19 +2089,19 @@ git add src/components/vantage/Sheet.js src/components/vantage/index.js src/scre
 Lightweight, no extra dep. Singleton mounted at root.
 
 **Files:**
-- Create: `src/components/vantage/Toast.js`
-- Modify: `src/components/vantage/index.js`
+- Create: `src/components/vx/Toast.js`
+- Modify: `src/components/vx/index.js`
 - Modify: `src/screens/_dev/ComponentGalleryScreen.js`
 
 - [ ] **Step 1: Write the component**
 
-Create `src/components/vantage/Toast.js`:
+Create `src/components/vx/Toast.js`:
 
 ```js
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, Animated, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 let queue = [];
 let listeners = new Set();
@@ -2113,10 +2113,10 @@ export function showToast({ message, kind = 'info', duration = 2500 }) {
 }
 
 const KINDS = {
-  info:    { icon: 'information-circle',     color: vantage.textPrimary },
-  success: { icon: 'checkmark-circle',       color: vantage.up },
-  error:   { icon: 'close-circle',           color: vantage.down },
-  warn:    { icon: 'alert-circle',           color: vantage.accent },
+  info:    { icon: 'information-circle',     color: vx.textPrimary },
+  success: { icon: 'checkmark-circle',       color: vx.up },
+  error:   { icon: 'close-circle',           color: vx.down },
+  warn:    { icon: 'alert-circle',           color: vx.accent },
 };
 
 export default function ToastHost() {
@@ -2168,14 +2168,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.sm,
-    backgroundColor: vantage.bgElevated,
+    backgroundColor: vx.bgElevated,
     borderRadius: radius.pill,
     paddingHorizontal: space.lg,
     paddingVertical: space.md,
     borderWidth: 1,
-    borderColor: vantage.borderStrong,
+    borderColor: vx.borderStrong,
   },
-  txt: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
+  txt: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
 });
 ```
 
@@ -2189,7 +2189,7 @@ export { default as ToastHost, showToast } from './Toast';
 
 This step's app-level integration is done in Task 24 (RootNavigator). For now add the host inside the gallery for testing.
 
-In `ComponentGalleryScreen.js` import `ToastHost, showToast` from `../../components/vantage` and add at the top of the SafeAreaView body:
+In `ComponentGalleryScreen.js` import `ToastHost, showToast` from `../../components/vx` and add at the top of the SafeAreaView body:
 
 ```jsx
 <ToastHost />
@@ -2213,7 +2213,7 @@ In `ComponentGalleryScreen.js` import `ToastHost, showToast` from `../../compone
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/components/vantage/Toast.js src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vantage): add Toast host + showToast helper"
+git add src/components/vx/Toast.js src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vx): add Toast host + showToast helper"
 ```
 
 ---
@@ -2223,22 +2223,22 @@ git add src/components/vantage/Toast.js src/components/vantage/index.js src/scre
 Five small/medium components that are visually-distinct enough that each gets its own file, but they're conceptually independent and not blocking each other — bundled into one task with separate steps.
 
 **Files:**
-- Create: `src/components/vantage/CalendarStrip.js`
-- Create: `src/components/vantage/MoversBars.js`
-- Create: `src/components/vantage/SpotlightCard.js`
-- Create: `src/components/vantage/DiscreteSlider.js`
-- Create: `src/components/vantage/EmptyState.js`
-- Modify: `src/components/vantage/index.js`
+- Create: `src/components/vx/CalendarStrip.js`
+- Create: `src/components/vx/MoversBars.js`
+- Create: `src/components/vx/SpotlightCard.js`
+- Create: `src/components/vx/DiscreteSlider.js`
+- Create: `src/components/vx/EmptyState.js`
+- Modify: `src/components/vx/index.js`
 - Modify: `src/screens/_dev/ComponentGalleryScreen.js`
 
 - [ ] **Step 1: Write CalendarStrip**
 
-Create `src/components/vantage/CalendarStrip.js`:
+Create `src/components/vx/CalendarStrip.js`:
 
 ```js
 import React from 'react';
 import { ScrollView, Pressable, View, Text, StyleSheet } from 'react-native';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
@@ -2258,7 +2258,7 @@ export default function CalendarStrip({ days, activeDate, onChange }) {
           >
             <Text style={styles.dow}>{DAY_NAMES[d.getDay()]}</Text>
             <View style={[styles.dotBg, active && styles.dotBgActive]}>
-              <Text style={[styles.dom, active && { color: vantage.textPrimary, fontWeight: weights.heavy }]}>
+              <Text style={[styles.dom, active && { color: vx.textPrimary, fontWeight: weights.heavy }]}>
                 {String(d.getDate()).padStart(2, '0')}
               </Text>
             </View>
@@ -2276,27 +2276,27 @@ function isSameDay(a, b) {
 const styles = StyleSheet.create({
   row: { gap: space.lg, paddingHorizontal: space.lg, paddingVertical: space.sm },
   cell: { alignItems: 'center', gap: space.xs, minWidth: 48 },
-  dow: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  dow: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
   dotBg: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  dotBgActive: { backgroundColor: vantage.accent },
-  dom: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
+  dotBgActive: { backgroundColor: vx.accent },
+  dom: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
 });
 ```
 
 - [ ] **Step 2: Write MoversBars**
 
-Create `src/components/vantage/MoversBars.js`:
+Create `src/components/vx/MoversBars.js`:
 
 ```js
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 export default function MoversBars({ items, direction = 'up' }) {
   // items: [{ symbol, changePct }]
   const max = Math.max(...items.map(i => Math.abs(i.changePct)), 1);
-  const color = direction === 'up' ? vantage.up : vantage.down;
+  const color = direction === 'up' ? vx.up : vx.down;
   return (
     <View style={styles.row}>
       {items.map((it, idx) => {
@@ -2312,7 +2312,7 @@ export default function MoversBars({ items, direction = 'up' }) {
                   <Stop offset="1" stopColor={color} stopOpacity="0.2" />
                 </LinearGradient>
               </Defs>
-              <Rect x="8" y="0" width="20" height="120" fill={vantage.bgPressed} rx="4" />
+              <Rect x="8" y="0" width="20" height="120" fill={vx.bgPressed} rx="4" />
               <Rect x="8" y={120 * (1 - h)} width="20" height={120 * h} fill={`url(#g${idx})`} rx="4" />
               <Rect x="6" y={120 * (1 - h) - 1} width="24" height="4" fill={color} rx="2" />
             </Svg>
@@ -2328,13 +2328,13 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: space.sm, paddingVertical: space.sm },
   col: { alignItems: 'center', gap: space.xs },
   pct: { fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
-  sym: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  sym: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
 });
 ```
 
 - [ ] **Step 3: Write SpotlightCard**
 
-Create `src/components/vantage/SpotlightCard.js`:
+Create `src/components/vx/SpotlightCard.js`:
 
 ```js
 import React from 'react';
@@ -2342,7 +2342,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Defs, RadialGradient, Stop, Circle, Text as SvgText } from 'react-native-svg';
 import Card from './Card';
 import SymbolIcon from './SymbolIcon';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 export default function SpotlightCard({ title = 'Spotlight', items, brandLabel = 'Vxness' }) {
   return (
@@ -2352,15 +2352,15 @@ export default function SpotlightCard({ title = 'Spotlight', items, brandLabel =
         <Svg width={56} height={56} style={styles.glow}>
           <Defs>
             <RadialGradient id="glow" cx="50%" cy="50%" r="50%">
-              <Stop offset="0" stopColor={vantage.accentGlow} stopOpacity="0.95" />
-              <Stop offset="1" stopColor={vantage.accent} stopOpacity="0" />
+              <Stop offset="0" stopColor={vx.accentGlow} stopOpacity="0.95" />
+              <Stop offset="1" stopColor={vx.accent} stopOpacity="0" />
             </RadialGradient>
           </Defs>
           <Circle cx="28" cy="28" r="26" fill="url(#glow)" />
           <SvgText
             x="28" y="34"
             fontSize="13" fontWeight="800"
-            fill={vantage.textPrimary}
+            fill={vx.textPrimary}
             textAnchor="middle"
           >{brandLabel}</SvgText>
         </Svg>
@@ -2375,7 +2375,7 @@ export default function SpotlightCard({ title = 'Spotlight', items, brandLabel =
             </View>
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={styles.price}>{Number(it.price).toLocaleString('en-US', { maximumFractionDigits: 2 })}</Text>
-              <Text style={[styles.pct, { color: it.changePct >= 0 ? vantage.up : vantage.down }]}>
+              <Text style={[styles.pct, { color: it.changePct >= 0 ? vx.up : vx.down }]}>
                 {`${it.changePct >= 0 ? '+' : ''}${it.changePct.toFixed(2)}%`}
               </Text>
             </View>
@@ -2388,26 +2388,26 @@ export default function SpotlightCard({ title = 'Spotlight', items, brandLabel =
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: space.lg, paddingBottom: 0 },
-  title: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
+  title: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
   glow: {},
   body: { margin: space.md, padding: space.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.sm },
-  rowBorder: { borderBottomColor: vantage.border, borderBottomWidth: StyleSheet.hairlineWidth },
-  sym: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
-  sub: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
-  price: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
+  rowBorder: { borderBottomColor: vx.border, borderBottomWidth: StyleSheet.hairlineWidth },
+  sym: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
+  sub: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  price: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
   pct: { fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, marginTop: 2 },
 });
 ```
 
 - [ ] **Step 4: Write DiscreteSlider**
 
-Create `src/components/vantage/DiscreteSlider.js`:
+Create `src/components/vx/DiscreteSlider.js`:
 
 ```js
 import React from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
-import { vantage, space } from '../../theme/vantageTheme';
+import { vx, space } from '../../theme/vxTheme';
 
 export default function DiscreteSlider({ value, onChange, stops }) {
   // stops: number[] e.g. [0.1, 0.5, 1, 5, 20]
@@ -2436,21 +2436,21 @@ export default function DiscreteSlider({ value, onChange, stops }) {
 
 const styles = StyleSheet.create({
   wrap: { height: 32, justifyContent: 'center' },
-  track: { position: 'absolute', left: 0, right: 0, height: 2, backgroundColor: vantage.borderStrong, borderRadius: 1 },
+  track: { position: 'absolute', left: 0, right: 0, height: 2, backgroundColor: vx.borderStrong, borderRadius: 1 },
   dotsRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  dot: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: vantage.borderStrong, backgroundColor: vantage.bg },
-  dotActive: { backgroundColor: vantage.accent, borderColor: vantage.accent, width: 16, height: 16, borderRadius: 8 },
+  dot: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: vx.borderStrong, backgroundColor: vx.bg },
+  dotActive: { backgroundColor: vx.accent, borderColor: vx.accent, width: 16, height: 16, borderRadius: 8 },
 });
 ```
 
 - [ ] **Step 5: Write EmptyState**
 
-Create `src/components/vantage/EmptyState.js`:
+Create `src/components/vx/EmptyState.js`:
 
 ```js
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 export default function EmptyState({ icon, title, subtitle, action }) {
   return (
@@ -2466,8 +2466,8 @@ export default function EmptyState({ icon, title, subtitle, action }) {
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: space.huge, paddingHorizontal: space.xl, gap: space.sm },
   icon: { marginBottom: space.sm },
-  title: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold, textAlign: 'center' },
-  subtitle: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, textAlign: 'center' },
+  title: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold, textAlign: 'center' },
+  subtitle: { color: vx.textMuted, fontFamily, fontSize: sizes.body, textAlign: 'center' },
   action: { marginTop: space.md, alignSelf: 'stretch' },
 });
 ```
@@ -2537,7 +2537,7 @@ function SliderDemo() {
 <Section title="EmptyState">
   <Card padding={0}>
     <EmptyState
-      icon={<Ionicons name="cube-outline" size={48} color={vantage.textMuted} />}
+      icon={<Ionicons name="cube-outline" size={48} color={vx.textMuted} />}
       title="No positions yet"
       subtitle="Place your first trade to see it here."
       action={<PillButton label="Trade now" variant="primary" onPress={() => {}} />}
@@ -2558,7 +2558,7 @@ Reload. Each new component renders correctly:
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/components/vantage/CalendarStrip.js src/components/vantage/MoversBars.js src/components/vantage/SpotlightCard.js src/components/vantage/DiscreteSlider.js src/components/vantage/EmptyState.js src/components/vantage/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vantage): add CalendarStrip, MoversBars, SpotlightCard, DiscreteSlider, EmptyState"
+git add src/components/vx/CalendarStrip.js src/components/vx/MoversBars.js src/components/vx/SpotlightCard.js src/components/vx/DiscreteSlider.js src/components/vx/EmptyState.js src/components/vx/index.js src/screens/_dev/ComponentGalleryScreen.js && git commit -m "feat(vx): add CalendarStrip, MoversBars, SpotlightCard, DiscreteSlider, EmptyState"
 ```
 
 ---
@@ -2580,8 +2580,8 @@ Create `src/screens/HomeScreen.js`:
 ```js
 import React from 'react';
 import { ScrollView, View, Text, StyleSheet } from 'react-native';
-import { Screen } from '../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../theme/vantageTheme';
+import { Screen } from '../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../theme/vxTheme';
 
 export default function HomeScreen() {
   return (
@@ -2596,8 +2596,8 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   body: { padding: space.lg, paddingBottom: 120 },
-  h1: { color: vantage.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
-  sub: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, marginTop: space.sm },
+  h1: { color: vx.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
+  sub: { color: vx.textMuted, fontFamily, fontSize: sizes.body, marginTop: space.sm },
 });
 ```
 
@@ -2608,8 +2608,8 @@ Create `src/screens/MarketsScreen.js` — identical structure to HomeScreen but 
 ```js
 import React from 'react';
 import { ScrollView, Text, StyleSheet } from 'react-native';
-import { Screen } from '../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../theme/vantageTheme';
+import { Screen } from '../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../theme/vxTheme';
 
 export default function MarketsScreen() {
   return (
@@ -2624,8 +2624,8 @@ export default function MarketsScreen() {
 
 const styles = StyleSheet.create({
   body: { padding: space.lg, paddingBottom: 120 },
-  h1: { color: vantage.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
-  sub: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, marginTop: space.sm },
+  h1: { color: vx.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
+  sub: { color: vx.textMuted, fontFamily, fontSize: sizes.body, marginTop: space.sm },
 });
 ```
 
@@ -2636,8 +2636,8 @@ Create `src/screens/TradeScreen.js` analogously — title "Trade", subtitle "Pha
 ```js
 import React from 'react';
 import { ScrollView, Text, StyleSheet } from 'react-native';
-import { Screen } from '../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../theme/vantageTheme';
+import { Screen } from '../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../theme/vxTheme';
 
 export default function TradeScreen() {
   return (
@@ -2652,8 +2652,8 @@ export default function TradeScreen() {
 
 const styles = StyleSheet.create({
   body: { padding: space.lg, paddingBottom: 120 },
-  h1: { color: vantage.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
-  sub: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, marginTop: space.sm },
+  h1: { color: vx.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
+  sub: { color: vx.textMuted, fontFamily, fontSize: sizes.body, marginTop: space.sm },
 });
 ```
 
@@ -2664,8 +2664,8 @@ Create `src/screens/funds/FundsScreen.js`:
 ```js
 import React from 'react';
 import { ScrollView, Text, StyleSheet } from 'react-native';
-import { Screen } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { Screen } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 export default function FundsScreen() {
   return (
@@ -2680,15 +2680,15 @@ export default function FundsScreen() {
 
 const styles = StyleSheet.create({
   body: { padding: space.lg, paddingBottom: 120 },
-  h1: { color: vantage.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
-  sub: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, marginTop: space.sm },
+  h1: { color: vx.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
+  sub: { color: vx.textMuted, fontFamily, fontSize: sizes.body, marginTop: space.sm },
 });
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/screens/HomeScreen.js src/screens/MarketsScreen.js src/screens/TradeScreen.js src/screens/funds/FundsScreen.js && git commit -m "feat(screens): add Vantage placeholder tab screens"
+git add src/screens/HomeScreen.js src/screens/MarketsScreen.js src/screens/TradeScreen.js src/screens/funds/FundsScreen.js && git commit -m "feat(screens): add Vxness placeholder tab screens"
 ```
 
 ---
@@ -2815,8 +2815,8 @@ import HomeStack from './HomeStack';
 import MarketsStack from './MarketsStack';
 import TradeStack from './TradeStack';
 import FundsStack from './FundsStack';
-import { BottomNavPill } from '../components/vantage';
-import { vantage } from '../theme/vantageTheme';
+import { BottomNavPill } from '../components/vx';
+import { vx } from '../theme/vxTheme';
 
 const Tab = createBottomTabNavigator();
 
@@ -2834,8 +2834,8 @@ function VantageTabBar({ state, navigation }) {
     return {
       key: r.name,
       label: m.label,
-      icon:         <Ionicons name={m.iconActive}   size={18} color={vantage.textPrimary} />,
-      iconInactive: <Ionicons name={m.iconInactive} size={18} color={vantage.textMuted} />,
+      icon:         <Ionicons name={m.iconActive}   size={18} color={vx.textPrimary} />,
+      iconInactive: <Ionicons name={m.iconInactive} size={18} color={vx.textMuted} />,
     };
   });
 
@@ -2866,7 +2866,7 @@ export default function MainTabs() {
 - [ ] **Step 2: Commit**
 
 ```bash
-git add src/navigation/MainTabs.js && git commit -m "feat(nav): add MainTabs with floating Vantage pill nav"
+git add src/navigation/MainTabs.js && git commit -m "feat(nav): add MainTabs with floating Vxness pill nav"
 ```
 
 ---
@@ -2930,7 +2930,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthContext';
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
-import { vantage } from '../theme/vantageTheme';
+import { vx } from '../theme/vxTheme';
 
 export default function RootNavigator() {
   const auth = useContext(AuthContext);
@@ -2941,12 +2941,12 @@ export default function RootNavigator() {
       theme={{
         dark: true,
         colors: {
-          primary: vantage.accent,
-          background: vantage.bg,
-          card: vantage.bg,
-          text: vantage.textPrimary,
-          border: vantage.border,
-          notification: vantage.accent,
+          primary: vx.accent,
+          background: vx.bg,
+          card: vx.bg,
+          text: vx.textPrimary,
+          border: vx.border,
+          notification: vx.accent,
         },
         fonts: {
           regular: { fontFamily: 'System', fontWeight: '400' },
@@ -2957,8 +2957,8 @@ export default function RootNavigator() {
       }}
     >
       {!ready ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: vantage.bg }}>
-          <ActivityIndicator color={vantage.accent} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: vx.bg }}>
+          <ActivityIndicator color={vx.accent} />
         </View>
       ) : auth.user ? (
         <MainTabs />
@@ -2991,7 +2991,7 @@ import { SettingsProvider } from './src/context/SettingsContext';
 import { I18nProvider } from './src/i18n';
 import { AuthProvider } from './src/context/AuthContext';
 import RootNavigator from './src/navigation/RootNavigator';
-import { ToastHost } from './src/components/vantage';
+import { ToastHost } from './src/components/vx';
 
 export default function App() {
   useEffect(() => {
@@ -3033,7 +3033,7 @@ Reload Expo. With no token in SecureStore, you should see the legacy LoginScreen
 - [ ] **Step 4: Smoke check (logged in)**
 
 Log in with a valid Vxness backend account. Expected:
-- The app shows the new HomeScreen placeholder ("Home — Phase 2 will replace this...") with the **floating Vantage pill** at the bottom.
+- The app shows the new HomeScreen placeholder ("Home — Phase 2 will replace this...") with the **floating Vxness pill** at the bottom.
 - Tapping Markets / Trade / Funds switches to the matching placeholder screen, each preserving its own back-stack state.
 - The active tab is the one with a dark capsule background; inactive tabs are grey.
 - Status bar text is light, background is pure black.
@@ -3086,8 +3086,8 @@ Modify `src/screens/HomeScreen.js`. Replace the body with:
 import React from 'react';
 import { ScrollView, Text, StyleSheet, Pressable } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Screen } from '../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../theme/vantageTheme';
+import { Screen } from '../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../theme/vxTheme';
 
 export default function HomeScreen() {
   const nav = useNavigation();
@@ -3105,8 +3105,8 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   body: { padding: space.lg, paddingBottom: 120 },
-  h1: { color: vantage.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
-  sub: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, marginTop: space.sm },
+  h1: { color: vx.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
+  sub: { color: vx.textMuted, fontFamily, fontSize: sizes.body, marginTop: space.sm },
 });
 ```
 
@@ -3134,10 +3134,10 @@ git add src/navigation/HomeStack.js src/screens/HomeScreen.js && git commit -m "
 
 After Task 28:
 
-- `src/theme/vantageTheme.js` is the single source of truth for Vantage design tokens.
-- `src/components/vantage/` contains 25 reusable presentational components, each smoke-tested in the gallery.
-- `App.js` renders a new `RootNavigator` that switches between `AuthStack` (legacy login retained until Plan F) and `MainTabs` (4-tab floating Vantage pill).
-- Each tab has its own stack with a Vantage-styled placeholder screen confirming the routing works.
+- `src/theme/vxTheme.js` is the single source of truth for Vxness design tokens.
+- `src/components/vx/` contains 25 reusable presentational components, each smoke-tested in the gallery.
+- `App.js` renders a new `RootNavigator` that switches between `AuthStack` (legacy login retained until Plan F) and `MainTabs` (4-tab floating Vxness pill).
+- Each tab has its own stack with a Vxness-styled placeholder screen confirming the routing works.
 - ComponentGallery is reachable via long-press on "Home" title in DEV builds, deleted from PRODUCTION roots.
 
-Plan B will replace the HomeScreen placeholder with the real Vantage Home (BalanceBlock, QuickActions, PromoBanner, StrategyCarousel, Watchlist) using the components built here. Plan C → Markets. Plan D → Trade. Plan E → Funds + payment gateways. Plan F → Auth + Profile. Plan G → secondary screen restyling + deletions.
+Plan B will replace the HomeScreen placeholder with the real Vxness Home (BalanceBlock, QuickActions, PromoBanner, StrategyCarousel, Watchlist) using the components built here. Plan C → Markets. Plan D → Trade. Plan E → Funds + payment gateways. Plan F → Auth + Profile. Plan G → secondary screen restyling + deletions.

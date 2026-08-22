@@ -5,8 +5,8 @@ import { useNavigation } from '@react-navigation/native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
-import { SegmentedTabs, Card, Sheet, PillButton, PriceTicker, showToast, showAppAlert, DateRangeSheet, formatRangeLabel } from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
+import { SegmentedTabs, Card, Sheet, PillButton, PriceTicker, showToast, showAppAlert, DateRangeSheet, formatRangeLabel } from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 import ApiService from '../../../services/api/ApiService';
 import { isSoftTradeError, handleTradeError } from '../../../utils/tradeErrors';
 import { TRADE_WEB_URL } from '../../../constants';
@@ -249,7 +249,7 @@ export default function PositionsList({ positions = [], orders = [], history = [
           <>
             <View style={styles.closeAllRow}>
               <Pressable onPress={() => setCloseAllType('all')} style={styles.closeAllBtn} accessibilityRole="button" accessibilityLabel="Close all positions">
-                <Ionicons name="close-circle-outline" size={16} color={vantage.down} />
+                <Ionicons name="close-circle-outline" size={16} color={vx.down} />
                 <Text style={styles.closeAllTxt}>Close all ({positions.length})</Text>
               </Pressable>
             </View>
@@ -285,7 +285,7 @@ export default function PositionsList({ positions = [], orders = [], history = [
                 accessibilityRole="button"
                 accessibilityLabel="Custom date range"
               >
-                <Ionicons name="calendar-outline" size={18} color={historyRange === 'custom' ? vantage.accent : vantage.textSecondary} />
+                <Ionicons name="calendar-outline" size={18} color={historyRange === 'custom' ? vx.accent : vx.textSecondary} />
               </Pressable>
               <Pressable
                 onPress={exporting ? undefined : exportHistoryPdf}
@@ -293,12 +293,12 @@ export default function PositionsList({ positions = [], orders = [], history = [
                 accessibilityRole="button"
                 accessibilityLabel="Download trade history PDF"
               >
-                <Ionicons name={exporting ? 'hourglass-outline' : 'download-outline'} size={18} color={vantage.accent} />
+                <Ionicons name={exporting ? 'hourglass-outline' : 'download-outline'} size={18} color={vx.accent} />
               </Pressable>
             </View>
             {historyRange === 'custom' && historyCustom ? (
               <View style={styles.customRangeRow}>
-                <Ionicons name="calendar" size={13} color={vantage.accent} />
+                <Ionicons name="calendar" size={13} color={vx.accent} />
                 <Text style={styles.customRangeTxt}>{formatRangeLabel(historyCustom.from, historyCustom.to)}</Text>
                 <Pressable
                   onPress={() => { setHistoryRange('all'); setHistoryCustom(null); }}
@@ -306,7 +306,7 @@ export default function PositionsList({ positions = [], orders = [], history = [
                   accessibilityRole="button"
                   accessibilityLabel="Clear custom range"
                 >
-                  <Ionicons name="close-circle" size={16} color={vantage.textMuted} />
+                  <Ionicons name="close-circle" size={16} color={vx.textMuted} />
                 </Pressable>
               </View>
             ) : null}
@@ -334,7 +334,7 @@ export default function PositionsList({ positions = [], orders = [], history = [
                     <Text style={styles.showMoreTxt}>
                       Show more ({filteredHistory.length - historyShown} remaining)
                     </Text>
-                    <Ionicons name="chevron-down" size={16} color={vantage.textSecondary} />
+                    <Ionicons name="chevron-down" size={16} color={vx.textSecondary} />
                   </Pressable>
                 ) : serverHasMore ? (
                   /* Everything fetched so far is on screen but the server has
@@ -348,7 +348,7 @@ export default function PositionsList({ positions = [], orders = [], history = [
                     <Text style={styles.showMoreTxt}>
                       Load older trades ({historyTotal - history.length} more)
                     </Text>
-                    <Ionicons name="cloud-download-outline" size={16} color={vantage.textSecondary} />
+                    <Ionicons name="cloud-download-outline" size={16} color={vx.textSecondary} />
                   </Pressable>
                 ) : null}
               </>
@@ -476,13 +476,13 @@ function CloseConfirmSheet({ position, positions = [], onCancel, onConfirm, onBu
           {/* Summary card — Symbol / Side / Open lots / live P&L. */}
           <View style={closeStyles.sumBox}>
             <SumRow label="Symbol" value={position.symbol} bold />
-            <SumRow label="Side" value={side.toUpperCase()} color={side === 'buy' ? vantage.up : vantage.down} />
+            <SumRow label="Side" value={side.toUpperCase()} color={side === 'buy' ? vx.up : vx.down} />
             <SumRow label="Open lots" value={openLots ? openLots.toFixed(2) : '—'} />
             <SumRow label="Open price" value={open ? open.toFixed(5) : '—'} />
             <SumRow
               label="P&L"
               value={pl != null ? `${plPositive ? '+' : '−'}$${Math.abs(pl).toFixed(2)}` : '—'}
-              color={plPositive ? vantage.up : vantage.down}
+              color={plPositive ? vx.up : vx.down}
               last
             />
           </View>
@@ -523,7 +523,7 @@ function CloseConfirmSheet({ position, positions = [], onCancel, onConfirm, onBu
             onChangeText={(t) => { setLotsText(t.replace(/[^0-9.]/g, '')); setPct(null); }}
             keyboardType="decimal-pad"
             placeholder="0.01"
-            placeholderTextColor={vantage.textMuted}
+            placeholderTextColor={vx.textMuted}
             style={[sheetStyles.input, !lotsValid && lotsText !== '' && closeStyles.inputBad]}
             accessibilityLabel="Lots to close"
           />
@@ -540,7 +540,7 @@ function CloseConfirmSheet({ position, positions = [], onCancel, onConfirm, onBu
                 ? `EST. P&L · ${effPct}% (${lotsNum.toFixed(2)} lots)`
                 : 'EST. P&L'}
             </Text>
-            <Text style={[closeStyles.estVal, { color: estPositive ? vantage.up : vantage.down }]}>
+            <Text style={[closeStyles.estVal, { color: estPositive ? vx.up : vx.down }]}>
               {estPl != null ? `${estPositive ? '+' : '−'}$${Math.abs(estPl).toFixed(2)}` : '—'}
             </Text>
           </View>
@@ -563,11 +563,11 @@ function CloseConfirmSheet({ position, positions = [], onCancel, onConfirm, onBu
           {/* Bulk close — same buckets as the web dialog. */}
           <Text style={closeStyles.bulkLab}>BULK CLOSE</Text>
           <View style={closeStyles.bulkRow}>
-            <BulkChip icon="layers-outline" label="All" count={positions.length} color={vantage.textPrimary}
+            <BulkChip icon="layers-outline" label="All" count={positions.length} color={vx.textPrimary}
               disabled={closing || positions.length === 0} onPress={() => onBulk?.('all')} />
-            <BulkChip icon="trending-up-outline" label="Profit" count={profitCount} color={vantage.up}
+            <BulkChip icon="trending-up-outline" label="Profit" count={profitCount} color={vx.up}
               disabled={closing || profitCount === 0} onPress={() => onBulk?.('profit')} />
-            <BulkChip icon="trending-down-outline" label="Loss" count={lossCount} color={vantage.down}
+            <BulkChip icon="trending-down-outline" label="Loss" count={lossCount} color={vx.down}
               disabled={closing || lossCount === 0} onPress={() => onBulk?.('loss')} />
           </View>
         </View>
@@ -622,7 +622,7 @@ function CloseAllSheet({ type, positions, onCancel, onConfirm }) {
       <View style={sheetStyles.wrap}>
         <View style={closeStyles.plBox}>
           <Text style={closeStyles.plLab}>Combined live P&L</Text>
-          <Text style={[closeStyles.plBig, { color: positive ? vantage.up : vantage.down }]}>
+          <Text style={[closeStyles.plBig, { color: positive ? vx.up : vx.down }]}>
             {`${positive ? '+' : ''}${total.toFixed(2)} USD`}
           </Text>
         </View>
@@ -651,70 +651,70 @@ function CloseAllSheet({ type, positions, onCancel, onConfirm }) {
 const closeStyles = StyleSheet.create({
   // Summary card (Symbol / Side / Open lots / P&L)
   sumBox: {
-    backgroundColor: vantage.bgRaised, borderRadius: radius.md,
-    borderWidth: 1, borderColor: vantage.border,
+    backgroundColor: vx.bgRaised, borderRadius: radius.md,
+    borderWidth: 1, borderColor: vx.border,
     paddingHorizontal: space.md, marginBottom: space.md,
   },
   sumRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: space.sm },
-  sumRowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: vantage.border },
-  sumRowLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
-  sumRowVal: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
+  sumRowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: vx.border },
+  sumRowLab: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
+  sumRowVal: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
   // Lots-to-close section
-  secLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro, fontWeight: weights.bold, letterSpacing: 0.6, marginBottom: space.sm },
+  secLab: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, fontWeight: weights.bold, letterSpacing: 0.6, marginBottom: space.sm },
   pctRow: { flexDirection: 'row', gap: space.sm, marginBottom: space.sm },
   pctChip: {
     paddingHorizontal: space.md, paddingVertical: 6,
-    borderRadius: radius.sm || 6, borderWidth: 1, borderColor: vantage.border,
-    backgroundColor: vantage.bgRaised,
+    borderRadius: radius.sm || 6, borderWidth: 1, borderColor: vx.border,
+    backgroundColor: vx.bgRaised,
   },
-  pctChipActive: { borderColor: vantage.accent, backgroundColor: vantage.accentMuted || 'rgba(242,106,31,0.15)' },
-  pctTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
-  pctTxtActive: { color: vantage.accent },
-  inputBad: { borderColor: vantage.down },
-  badHint: { color: vantage.down, fontFamily, fontSize: sizes.micro, marginTop: space.xs },
+  pctChipActive: { borderColor: vx.accent, backgroundColor: vx.accentMuted || 'rgba(242,106,31,0.15)' },
+  pctTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
+  pctTxtActive: { color: vx.accent },
+  inputBad: { borderColor: vx.down },
+  badHint: { color: vx.down, fontFamily, fontSize: sizes.micro, marginTop: space.xs },
   estRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: vantage.bgRaised, borderRadius: radius.md, borderWidth: 1, borderColor: vantage.border,
+    backgroundColor: vx.bgRaised, borderRadius: radius.md, borderWidth: 1, borderColor: vx.border,
     paddingHorizontal: space.md, paddingVertical: space.md, marginTop: space.md,
   },
-  estLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro, fontWeight: weights.bold, letterSpacing: 0.6 },
+  estLab: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, fontWeight: weights.bold, letterSpacing: 0.6 },
   estVal: { fontFamily, fontSize: sizes.body, fontWeight: weights.heavy },
   btnRow: { flexDirection: 'row', gap: space.sm, marginTop: space.lg, alignItems: 'stretch' },
   cancelBtn: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
-    borderRadius: radius.pill, borderWidth: 1, borderColor: vantage.border,
-    backgroundColor: vantage.bgRaised,
+    borderRadius: radius.pill, borderWidth: 1, borderColor: vx.border,
+    backgroundColor: vx.bgRaised,
   },
-  cancelBtnTxt: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
+  cancelBtnTxt: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
   // Bulk close
   bulkLab: {
-    color: vantage.textMuted, fontFamily, fontSize: sizes.micro, fontWeight: weights.bold,
+    color: vx.textMuted, fontFamily, fontSize: sizes.micro, fontWeight: weights.bold,
     letterSpacing: 0.6, textAlign: 'center',
     marginTop: space.lg, paddingTop: space.md,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: vantage.border,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: vx.border,
   },
   bulkRow: { flexDirection: 'row', gap: space.sm, marginTop: space.sm },
   bulkChip: {
     flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2,
-    borderRadius: radius.md, borderWidth: 1, borderColor: vantage.border,
-    backgroundColor: vantage.bgRaised, paddingVertical: space.md,
+    borderRadius: radius.md, borderWidth: 1, borderColor: vx.border,
+    backgroundColor: vx.bgRaised, paddingVertical: space.md,
   },
   bulkChipTxt: { fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
-  bulkChipCount: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro },
+  bulkChipCount: { color: vx.textMuted, fontFamily, fontSize: sizes.micro },
   plBox: {
     alignItems: 'center',
-    backgroundColor: vantage.bgRaised,
+    backgroundColor: vx.bgRaised,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: vantage.border,
+    borderColor: vx.border,
     paddingVertical: space.lg,
     marginBottom: space.md,
   },
-  plLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  plLab: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
   plBig: { fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy, marginTop: 4 },
-  plSub: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 4 },
+  plSub: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 4 },
   cancel: { alignItems: 'center', paddingVertical: space.md, marginTop: space.xs },
-  cancelTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
+  cancelTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
 });
 
 function SlTpSheet({ position, onClose, onSaved }) {
@@ -757,7 +757,7 @@ function SlTpSheet({ position, onClose, onSaved }) {
         <View style={sheetStyles.wrap}>
           <View style={sheetStyles.head}>
             <Text style={styles.sym}>{position.symbol}</Text>
-            <Text style={[styles.side, { color: side === 'buy' ? vantage.up : vantage.down }]}>
+            <Text style={[styles.side, { color: side === 'buy' ? vx.up : vx.down }]}>
               {side.toUpperCase()} {position.volume ?? position.lots ?? '—'}
               {current != null ? `  ·  ${Number(current).toFixed(5)}` : ''}
             </Text>
@@ -769,7 +769,7 @@ function SlTpSheet({ position, onClose, onSaved }) {
             onChangeText={(t) => setSl(t.replace(/[^0-9.]/g, ''))}
             keyboardType="decimal-pad"
             placeholder="0.00000"
-            placeholderTextColor={vantage.textMuted}
+            placeholderTextColor={vx.textMuted}
             style={sheetStyles.input}
           />
 
@@ -779,7 +779,7 @@ function SlTpSheet({ position, onClose, onSaved }) {
             onChangeText={(t) => setTp(t.replace(/[^0-9.]/g, ''))}
             keyboardType="decimal-pad"
             placeholder="0.00000"
-            placeholderTextColor={vantage.textMuted}
+            placeholderTextColor={vx.textMuted}
             style={sheetStyles.input}
           />
 
@@ -832,7 +832,7 @@ function PositionRow({ position, onClose, onSetSlTp }) {
       <View style={styles.cardRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.sym}>{position.symbol}</Text>
-          <Text style={[styles.side, { color: side === 'buy' ? vantage.up : vantage.down, fontWeight: weights.bold }]}>
+          <Text style={[styles.side, { color: side === 'buy' ? vx.up : vx.down, fontWeight: weights.bold }]}>
             {side.toUpperCase()} {lots} @ {open ? open.toFixed(5) : '—'}
           </Text>
         </View>
@@ -846,22 +846,22 @@ function PositionRow({ position, onClose, onSetSlTp }) {
                 fontSize={sizes.h3}
                 fontWeight={weights.heavy}
                 fontFamily={fontFamily}
-                upColor={vantage.up}
-                downColor={vantage.down}
-                neutralColor={plPositive ? vantage.up : vantage.down}
+                upColor={vx.up}
+                downColor={vx.down}
+                neutralColor={plPositive ? vx.up : vx.down}
               />
-              <Text style={[styles.pl, { color: plPositive ? vantage.up : vantage.down }]}> USD</Text>
+              <Text style={[styles.pl, { color: plPositive ? vx.up : vx.down }]}> USD</Text>
             </View>
           ) : (
-            <Text style={[styles.pl, { color: vantage.textMuted }]}>— USD</Text>
+            <Text style={[styles.pl, { color: vx.textMuted }]}>— USD</Text>
           )}
         </View>
       </View>
 
       <View style={styles.metaGrid}>
         {current != null ? <Meta label="Current" value={Number(current).toFixed(5)} /> : null}
-        <Meta label="SL" value={hasSl ? slVal.toFixed(5) : '—'} valueColor={hasSl ? vantage.down : vantage.textMuted} />
-        <Meta label="TP" value={hasTp ? tpVal.toFixed(5) : '—'} valueColor={hasTp ? vantage.up : vantage.textMuted} />
+        <Meta label="SL" value={hasSl ? slVal.toFixed(5) : '—'} valueColor={hasSl ? vx.down : vx.textMuted} />
+        <Meta label="TP" value={hasTp ? tpVal.toFixed(5) : '—'} valueColor={hasTp ? vx.up : vx.textMuted} />
         <Meta label="Commission" value={`${Number(commission).toFixed(2)} USD`} />
         <Meta label="Swap" value={`${Number(swap).toFixed(2)} USD`} />
       </View>
@@ -869,11 +869,11 @@ function PositionRow({ position, onClose, onSetSlTp }) {
 
       <View style={styles.btnRow}>
         <Pressable onPress={onSetSlTp} style={[styles.actionPill, styles.slTpBtn]} accessibilityRole="button" accessibilityLabel="Set stop loss / take profit">
-          <Ionicons name="options-outline" size={16} color={vantage.accent} />
+          <Ionicons name="options-outline" size={16} color={vx.accent} />
           <Text style={styles.slTpTxt}>SL/TP</Text>
         </Pressable>
         <Pressable onPress={onClose} style={[styles.actionPill, styles.closeBtn]} accessibilityRole="button">
-          <Ionicons name="close-circle-outline" size={16} color={vantage.down} />
+          <Ionicons name="close-circle-outline" size={16} color={vx.down} />
           <Text style={styles.closeTxt}>Close position</Text>
         </Pressable>
       </View>
@@ -904,13 +904,13 @@ function HistoryRow({ trade }) {
       <View style={styles.cardRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.sym}>{trade.symbol}</Text>
-          <Text style={[styles.side, { color: side === 'buy' ? vantage.up : vantage.down }]}>
+          <Text style={[styles.side, { color: side === 'buy' ? vx.up : vx.down }]}>
             {side.toUpperCase()} {lots} @ {open ? open.toFixed(5) : '—'}
           </Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <Text style={styles.plLabel}>P&L</Text>
-          <Text style={[styles.pl, { color: pnlPositive ? vantage.up : vantage.down }]}>
+          <Text style={[styles.pl, { color: pnlPositive ? vx.up : vx.down }]}>
             {pnl != null ? `${pnlPositive ? '+' : ''}${Number(pnl).toFixed(2)}` : '—'} USD
           </Text>
         </View>
@@ -941,13 +941,13 @@ function OrderRow({ order, onCancel }) {
       <View style={styles.cardRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.sym}>{order.symbol}</Text>
-          <Text style={[styles.side, { color: side === 'buy' ? vantage.up : vantage.down }]}>
+          <Text style={[styles.side, { color: side === 'buy' ? vx.up : vx.down }]}>
             {(order.order_type || 'limit').toUpperCase()} {side.toUpperCase()} {order.volume ?? order.lots ?? '—'} @ {Number(order.price ?? 0).toFixed(5)}
           </Text>
         </View>
         <Pressable onPress={onCancel} hitSlop={8} style={styles.actionBtn}>
-          <Ionicons name="trash-outline" size={20} color={vantage.down} />
-          <Text style={[styles.actionTxt, { color: vantage.down }]}>Cancel</Text>
+          <Ionicons name="trash-outline" size={20} color={vx.down} />
+          <Text style={[styles.actionTxt, { color: vx.down }]}>Cancel</Text>
         </Pressable>
       </View>
     </Card>
@@ -997,51 +997,51 @@ const styles = StyleSheet.create({
   wrap: { paddingHorizontal: space.lg, paddingTop: space.md, gap: space.sm },
   summary: { marginBottom: space.sm },
   sumTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space.sm, gap: space.sm },
-  sumAcct: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.heavy, flexShrink: 1 },
-  sumCounts: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  sumAcct: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.heavy, flexShrink: 1 },
+  sumCounts: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
   sumGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: space.sm },
   sumCell: { width: '33%' },
-  sumLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro },
-  sumVal: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold, marginTop: 2 },
+  sumLab: { color: vx.textMuted, fontFamily, fontSize: sizes.micro },
+  sumVal: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold, marginTop: 2 },
   headerRow: { paddingBottom: space.sm },
   closeAllRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: space.sm },
   closeAllBtn: {
     flexDirection: 'row', alignItems: 'center', gap: space.xs,
     paddingVertical: space.xs, paddingHorizontal: space.md,
-    borderRadius: radius.pill, borderWidth: 1, borderColor: vantage.down,
+    borderRadius: radius.pill, borderWidth: 1, borderColor: vx.down,
   },
-  closeAllTxt: { color: vantage.down, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
-  empty: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, textAlign: 'center', padding: space.lg },
+  closeAllTxt: { color: vx.down, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
+  empty: { color: vx.textMuted, fontFamily, fontSize: sizes.body, textAlign: 'center', padding: space.lg },
   showMoreBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     paddingVertical: space.md, marginTop: space.xs,
-    borderWidth: 1, borderColor: vantage.border, borderRadius: radius.md, backgroundColor: vantage.bgRaised,
+    borderWidth: 1, borderColor: vx.border, borderRadius: radius.md, backgroundColor: vx.bgRaised,
   },
-  showMoreTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  showMoreTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
   histControls: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginBottom: space.sm },
   customRangeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: space.sm, paddingHorizontal: 2 },
-  customRangeTxt: { color: vantage.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  customRangeTxt: { color: vx.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
   pdfBtn: {
     width: 38, height: 38, alignItems: 'center', justifyContent: 'center',
-    borderRadius: radius.md, borderWidth: 1, borderColor: vantage.border, backgroundColor: vantage.bgRaised,
+    borderRadius: radius.md, borderWidth: 1, borderColor: vx.border, backgroundColor: vx.bgRaised,
   },
   card: { marginBottom: space.sm },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  sym: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
+  sym: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
   side: { fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, marginTop: 2 },
-  plLabel: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro },
+  plLabel: { color: vx.textMuted, fontFamily, fontSize: sizes.micro },
   pl: { fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy, marginTop: 1 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: space.xs, marginTop: space.sm },
-  actionTxt: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  actionTxt: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
 
   metaGrid: {
     flexDirection: 'row', flexWrap: 'wrap', gap: space.lg,
     marginTop: space.md, paddingTop: space.md,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: vantage.border,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: vx.border,
   },
   meta: { minWidth: 80 },
-  metaLabel: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro },
-  metaValue: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, marginTop: 2 },
+  metaLabel: { color: vx.textMuted, fontFamily, fontSize: sizes.micro },
+  metaValue: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, marginTop: 2 },
   btnRow: { flexDirection: 'row', gap: space.sm, marginTop: space.md },
   actionPill: {
     flex: 1,
@@ -1049,19 +1049,19 @@ const styles = StyleSheet.create({
     paddingVertical: space.sm, borderRadius: 10, borderWidth: 1,
   },
   slTpBtn: { borderColor: '#FBA945' },
-  slTpTxt: { color: vantage.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
+  slTpTxt: { color: vx.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
   closeBtn: { borderColor: '#FBA945' },
-  closeTxt: { color: vantage.down, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
+  closeTxt: { color: vx.down, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
 });
 
 const sheetStyles = StyleSheet.create({
   wrap: { paddingBottom: space.md },
   head: { marginBottom: space.lg },
-  label: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
+  label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
   input: {
-    backgroundColor: vantage.bgRaised, borderRadius: radius.md, borderWidth: 1, borderColor: vantage.border,
+    backgroundColor: vx.bgRaised, borderRadius: radius.md, borderWidth: 1, borderColor: vx.border,
     paddingHorizontal: space.md, paddingVertical: space.md,
-    color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold,
+    color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold,
   },
-  hint: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro, marginTop: space.sm },
+  hint: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, marginTop: space.sm },
 });

@@ -3,9 +3,9 @@ import { View, Text, TextInput, FlatList, StyleSheet, Pressable } from 'react-na
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import { Screen, IconButton, SymbolIcon, CategoryTabs } from '../../../components/vantage';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vantage/BottomNavPill';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
+import { Screen, IconButton, SymbolIcon, CategoryTabs } from '../../../components/vx';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 import { getInstruments } from '../../../utils/instrumentsCache';
 import { getWatchlist, setWatchlist } from './watchlistStorage';
 import { bySegment } from '../../../utils/marketMovers';
@@ -77,30 +77,30 @@ export default function WatchlistEditScreen() {
     <Screen edges={['top']}>
       <View style={styles.headerRow}>
         <IconButton
-          icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />}
+          icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />}
           accessibilityLabel="Back"
           onPress={() => nav.goBack()}
         />
         <Text style={styles.title}>Edit Watchlist</Text>
         <Pressable onPress={save} hitSlop={8} accessibilityRole="button" accessibilityLabel="Done">
-          <Text style={[styles.doneTxt, !dirty && { color: vantage.textMuted }]}>Done</Text>
+          <Text style={[styles.doneTxt, !dirty && { color: vx.textMuted }]}>Done</Text>
         </Pressable>
       </View>
 
       <View style={styles.searchWrap}>
-        <Ionicons name="search" size={18} color={vantage.textMuted} style={{ marginRight: space.sm }} />
+        <Ionicons name="search" size={18} color={vx.textMuted} style={{ marginRight: space.sm }} />
         <TextInput
           value={query}
           onChangeText={setQuery}
           placeholder="Search symbol or name"
-          placeholderTextColor={vantage.textMuted}
+          placeholderTextColor={vx.textMuted}
           style={styles.searchInput}
           autoCapitalize="characters"
           autoCorrect={false}
         />
         {query ? (
           <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityLabel="Clear">
-            <Ionicons name="close-circle" size={18} color={vantage.textMuted} />
+            <Ionicons name="close-circle" size={18} color={vx.textMuted} />
           </Pressable>
         ) : null}
       </View>
@@ -126,7 +126,7 @@ export default function WatchlistEditScreen() {
               style={styles.row}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: isPinned }}
-              android_ripple={{ color: vantage.bgPressed }}
+              android_ripple={{ color: vx.bgPressed }}
             >
               <SymbolIcon symbol={sym} size={36} />
               <View style={styles.rowText}>
@@ -136,7 +136,7 @@ export default function WatchlistEditScreen() {
               <Ionicons
                 name={isPinned ? 'checkmark-circle' : 'add-circle-outline'}
                 size={26}
-                color={isPinned ? vantage.accent : vantage.textMuted}
+                color={isPinned ? vx.accent : vx.textMuted}
               />
             </Pressable>
           );
@@ -150,27 +150,27 @@ export default function WatchlistEditScreen() {
 }
 
 const styles = StyleSheet.create({
-  pagingFooter: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, textAlign: 'center', paddingVertical: space.md },
+  pagingFooter: { color: vx.textMuted, fontFamily, fontSize: sizes.label, textAlign: 'center', paddingVertical: space.md },
   headerRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.sm,
     gap: space.sm,
   },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
-  doneTxt: { color: vantage.accent, fontFamily, fontSize: sizes.body, fontWeight: weights.bold, paddingHorizontal: space.md },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  doneTxt: { color: vx.accent, fontFamily, fontSize: sizes.body, fontWeight: weights.bold, paddingHorizontal: space.md },
   searchWrap: {
     flexDirection: 'row', alignItems: 'center',
     marginHorizontal: space.lg, marginVertical: space.sm,
-    backgroundColor: vantage.bgElevated,
+    backgroundColor: vx.bgElevated,
     borderRadius: radius.md, paddingHorizontal: space.md, height: 44,
   },
-  searchInput: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.body, padding: 0 },
+  searchInput: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.body, padding: 0 },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: space.md,
     paddingHorizontal: space.lg, paddingVertical: space.md,
   },
   rowText: { flex: 1 },
-  rowSym: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
-  rowName: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
-  empty: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, padding: space.huge, textAlign: 'center' },
+  rowSym: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
+  rowName: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  empty: { color: vx.textMuted, fontFamily, fontSize: sizes.body, padding: space.huge, textAlign: 'center' },
 });

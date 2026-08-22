@@ -1,19 +1,19 @@
 import * as SecureStore from 'expo-secure-store';
 import { DevSettings } from 'react-native';
-import { applyVantageTheme, THEME_PREF_KEY } from '../../theme/vantageTheme';
+import { applyVxTheme, THEME_PREF_KEY } from '../../theme/vxTheme';
 
 /**
  * Read the saved theme preference and apply it to the live token object.
  * MUST run before the app's screen modules are imported so their
  * module-level StyleSheet.create() captures the right colors.
  */
-export async function applyVantageThemeFromStorage() {
+export async function applyVxThemeFromStorage() {
   let name = 'dark';
   try {
     const saved = await SecureStore.getItemAsync(THEME_PREF_KEY);
     if (saved === 'light' || saved === 'dark') name = saved;
   } catch (_) {}
-  applyVantageTheme(name);
+  applyVxTheme(name);
   return name;
 }
 

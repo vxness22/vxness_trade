@@ -2,8 +2,8 @@ import React from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
-import { StrategyCard } from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../../../theme/vantageTheme';
+import { StrategyCard } from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../../../theme/vxTheme';
 
 // Each master card is one full screen-width (minus side padding) and the list
 // snaps one card at a time.
@@ -137,8 +137,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg,
     paddingBottom: space.sm,
   },
-  heading: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
-  viewAll: { color: vantage.accent, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
-  empty: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, paddingHorizontal: space.lg, paddingBottom: space.md },
+  heading: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
+  viewAll: { color: vx.accent, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
+  empty: { color: vx.textMuted, fontFamily, fontSize: sizes.label, paddingHorizontal: space.lg, paddingBottom: space.md },
   row: { gap: space.md, paddingHorizontal: space.lg, paddingBottom: space.sm },
 });

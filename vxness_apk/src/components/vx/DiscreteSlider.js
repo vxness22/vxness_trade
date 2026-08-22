@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
-import { vantage, space } from '../../theme/vantageTheme';
+import { vx, space } from '../../theme/vxTheme';
 
 export default function DiscreteSlider({ value, onChange, stops }) {
   return (
@@ -28,8 +28,8 @@ export default function DiscreteSlider({ value, onChange, stops }) {
 
 const styles = StyleSheet.create({
   wrap: { height: 32, justifyContent: 'center' },
-  track: { position: 'absolute', left: 0, right: 0, height: 2, backgroundColor: vantage.borderStrong, borderRadius: 1 },
+  track: { position: 'absolute', left: 0, right: 0, height: 2, backgroundColor: vx.borderStrong, borderRadius: 1 },
   dotsRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  dot: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: vantage.borderStrong, backgroundColor: vantage.bg },
-  dotActive: { backgroundColor: vantage.accent, borderColor: vantage.accent, width: 16, height: 16, borderRadius: 8 },
+  dot: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: vx.borderStrong, backgroundColor: vx.bg },
+  dotActive: { backgroundColor: vx.accent, borderColor: vx.accent, width: 16, height: 16, borderRadius: 8 },
 });

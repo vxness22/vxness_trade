@@ -2,14 +2,14 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollView, RefreshControl, StyleSheet } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
-import { Screen } from '../../../components/vantage';
-import { vantage, space } from '../../../theme/vantageTheme';
+import { Screen } from '../../../components/vx';
+import { vx, space } from '../../../theme/vxTheme';
 import ApiService from '../../../services/api/ApiService';
 import webSocketService from '../../../services/websocket/WebSocketService';
 import { getInstruments } from '../../../utils/instrumentsCache';
 import { getWatchlist } from '../watchlist/watchlistStorage';
 import { getSparkData } from '../../../utils/sparklineCache';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vantage/BottomNavPill';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 
 import MarketsHeader from '../components/MarketsHeader';
 import MarketsExplore from '../components/MarketsExplore';
@@ -142,7 +142,7 @@ export default function MarketsScreen() {
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: BOTTOM_NAV_PILL_HEIGHT + space.huge }]}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vantage.accent} colors={[vantage.accent]} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vx.accent} colors={[vx.accent]} />
         }
       >
         {view === 'explore' ? (

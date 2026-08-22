@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, View, Text, StyleSheet } from 'react-native';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 export default function QuickActionTile({
   icon,
@@ -44,23 +44,23 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   iconAccent: {
-    backgroundColor: vantage.accentMuted,
+    backgroundColor: vx.accentMuted,
     borderWidth: 1,
     borderColor: 'rgba(242,106,31,0.22)',
   },
   iconFlat: {
-    backgroundColor: vantage.bgRaised,
+    backgroundColor: vx.bgRaised,
   },
   badge: {
     position: 'absolute',
     top: -6,
     left: -10,
-    backgroundColor: vantage.accent,
+    backgroundColor: vx.accent,
     paddingHorizontal: space.xs + 2,
     paddingVertical: 1,
     borderRadius: radius.sm,
   },
-  badgeTxt: { color: vantage.textInverse, fontFamily, fontSize: sizes.micro, fontWeight: weights.heavy },
-  label: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, textAlign: 'center' },
-  labelFlat: { color: vantage.textSecondary },
+  badgeTxt: { color: vx.textInverse, fontFamily, fontSize: sizes.micro, fontWeight: weights.heavy },
+  label: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, textAlign: 'center' },
+  labelFlat: { color: vx.textSecondary },
 });

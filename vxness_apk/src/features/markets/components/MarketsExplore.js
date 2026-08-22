@@ -10,8 +10,8 @@ import {
   SpotlightCard,
   MoversBars,
   InstrumentRow,
-} from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
+} from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 import { topRisers, topFallers, bySegment, MARQUEE_SPOTLIGHT } from '../../../utils/marketMovers';
 
 // Stable fallback so memoized rows don't see a fresh [] identity every render.
@@ -104,7 +104,7 @@ export default function MarketsExplore({
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Essentials</Text>
           <Pressable onPress={() => onChangeSegment('overview')} hitSlop={8} accessibilityRole="button">
-            <Ionicons name="chevron-forward" size={20} color={vantage.textMuted} />
+            <Ionicons name="chevron-forward" size={20} color={vx.textMuted} />
           </Pressable>
         </View>
         {essentials.length === 0 ? (
@@ -134,7 +134,7 @@ export default function MarketsExplore({
             accessibilityLabel={`Show ${Math.min(ESSENTIALS_PAGE, essentialsRemaining)} more instruments`}
           >
             <Text style={styles.showMoreTxt}>Show more ({essentialsRemaining} remaining)</Text>
-            <Ionicons name="chevron-down" size={16} color={vantage.textSecondary} />
+            <Ionicons name="chevron-down" size={16} color={vx.textSecondary} />
           </Pressable>
         ) : null}
       </View>
@@ -146,13 +146,13 @@ const styles = StyleSheet.create({
   quickRow: { flexDirection: 'row', paddingHorizontal: space.lg, paddingVertical: space.md, gap: space.md },
   section: { paddingHorizontal: space.lg, paddingVertical: space.sm },
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: space.sm },
-  sectionTitle: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
-  sectionAction: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
-  empty: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, padding: space.md, textAlign: 'center' },
+  sectionTitle: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
+  sectionAction: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  empty: { color: vx.textMuted, fontFamily, fontSize: sizes.label, padding: space.md, textAlign: 'center' },
   showMoreBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     paddingVertical: space.md, marginTop: space.xs,
-    borderWidth: 1, borderColor: vantage.border, borderRadius: radius.md, backgroundColor: vantage.bgRaised,
+    borderWidth: 1, borderColor: vx.border, borderRadius: radius.md, backgroundColor: vx.bgRaised,
   },
-  showMoreTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  showMoreTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
 });

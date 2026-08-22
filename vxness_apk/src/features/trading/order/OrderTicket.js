@@ -8,8 +8,8 @@ import {
   CheckboxRow,
   PillButton,
   showToast,
-} from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
+} from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 import { handleTradeError } from '../../../utils/tradeErrors';
 import ApiService from '../../../services/api/ApiService';
 
@@ -118,7 +118,7 @@ export default function OrderTicket({ accountId, account, accountSummary, symbol
       <View>
         <Pressable style={styles.dropdown} onPress={() => setTypeOpen((o) => !o)} accessibilityRole="button">
           <Text style={styles.dropdownTxt}>{ORDER_LABEL[orderType]}</Text>
-          <Ionicons name={typeOpen ? 'chevron-up' : 'chevron-down'} size={16} color={vantage.textMuted} />
+          <Ionicons name={typeOpen ? 'chevron-up' : 'chevron-down'} size={16} color={vx.textMuted} />
         </Pressable>
         {typeOpen ? (
           <View style={styles.dropdownMenu}>
@@ -127,10 +127,10 @@ export default function OrderTicket({ accountId, account, accountSummary, symbol
                 key={t}
                 onPress={() => { setOrderType(t); setTypeOpen(false); }}
                 style={styles.dropdownItem}
-                android_ripple={{ color: vantage.bgPressed }}
+                android_ripple={{ color: vx.bgPressed }}
               >
-                <Text style={[styles.dropdownItemTxt, orderType === t && { color: vantage.accent, fontWeight: weights.bold }]}>{ORDER_LABEL[t]}</Text>
-                {orderType === t ? <Ionicons name="checkmark" size={16} color={vantage.accent} /> : null}
+                <Text style={[styles.dropdownItemTxt, orderType === t && { color: vx.accent, fontWeight: weights.bold }]}>{ORDER_LABEL[t]}</Text>
+                {orderType === t ? <Ionicons name="checkmark" size={16} color={vx.accent} /> : null}
               </Pressable>
             ))}
           </View>
@@ -147,7 +147,7 @@ export default function OrderTicket({ accountId, account, accountSummary, symbol
             onChangeText={setLimitPrice}
             keyboardType="decimal-pad"
             placeholder={orderType === 'limit' ? 'Limit price' : 'Stop price'}
-            placeholderTextColor={vantage.textMuted}
+            placeholderTextColor={vx.textMuted}
             style={styles.priceInput}
           />
         )}
@@ -156,7 +156,7 @@ export default function OrderTicket({ accountId, account, accountSummary, symbol
       {/* Volume + unit */}
       <View style={styles.volRow}>
         <Pressable onPress={() => stepVolume(-1)} hitSlop={8} style={styles.volBtn} accessibilityLabel="Decrease volume">
-          <Ionicons name="remove" size={20} color={vantage.textSecondary} />
+          <Ionicons name="remove" size={20} color={vx.textSecondary} />
         </Pressable>
         <View style={styles.volCenter}>
           <Text style={styles.volLabel}>Volume</Text>
@@ -177,7 +177,7 @@ export default function OrderTicket({ accountId, account, accountSummary, symbol
           )}
         </View>
         <Pressable onPress={() => stepVolume(1)} hitSlop={8} style={styles.volBtn} accessibilityLabel="Increase volume">
-          <Ionicons name="add" size={20} color={vantage.textSecondary} />
+          <Ionicons name="add" size={20} color={vx.textSecondary} />
         </Pressable>
         <View style={styles.volDivider} />
         <Text style={styles.lotsTxt}>Lots</Text>
@@ -190,11 +190,11 @@ export default function OrderTicket({ accountId, account, accountSummary, symbol
         <View style={styles.tpSlRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.fieldLabel}>Stop Loss</Text>
-            <TextInput value={stopLoss} onChangeText={setStopLoss} keyboardType="decimal-pad" placeholder="0.00000" placeholderTextColor={vantage.textMuted} style={styles.priceInput} />
+            <TextInput value={stopLoss} onChangeText={setStopLoss} keyboardType="decimal-pad" placeholder="0.00000" placeholderTextColor={vx.textMuted} style={styles.priceInput} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.fieldLabel}>Take Profit</Text>
-            <TextInput value={takeProfit} onChangeText={setTakeProfit} keyboardType="decimal-pad" placeholder="0.00000" placeholderTextColor={vantage.textMuted} style={styles.priceInput} />
+            <TextInput value={takeProfit} onChangeText={setTakeProfit} keyboardType="decimal-pad" placeholder="0.00000" placeholderTextColor={vx.textMuted} style={styles.priceInput} />
           </View>
         </View>
       ) : null}
@@ -233,42 +233,42 @@ const styles = StyleSheet.create({
   wrap: { paddingHorizontal: space.lg, paddingTop: space.md, gap: space.md },
   dropdown: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: vantage.bgElevated, borderRadius: radius.md,
+    backgroundColor: vx.bgElevated, borderRadius: radius.md,
     paddingVertical: space.md, paddingHorizontal: space.md, gap: space.sm,
   },
-  dropdownTxt: { flex: 1, textAlign: 'center', color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
-  dropdownMenu: { backgroundColor: vantage.bgRaised, borderRadius: radius.md, marginTop: space.xs, overflow: 'hidden', borderWidth: 1, borderColor: vantage.border },
+  dropdownTxt: { flex: 1, textAlign: 'center', color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
+  dropdownMenu: { backgroundColor: vx.bgRaised, borderRadius: radius.md, marginTop: space.xs, overflow: 'hidden', borderWidth: 1, borderColor: vx.border },
   dropdownItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.lg, paddingVertical: space.md },
-  dropdownItemTxt: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
-  volInput: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold, minWidth: 64, textAlign: 'center', padding: 0, marginTop: 1 },
+  dropdownItemTxt: { color: vx.textPrimary, fontFamily, fontSize: sizes.body },
+  volInput: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold, minWidth: 64, textAlign: 'center', padding: 0, marginTop: 1 },
   priceBox: {
-    backgroundColor: vantage.bgElevated, borderRadius: radius.md,
+    backgroundColor: vx.bgElevated, borderRadius: radius.md,
     paddingVertical: space.md, paddingHorizontal: space.md, alignItems: 'center',
     minHeight: 48, justifyContent: 'center',
   },
-  pricePlaceholder: { color: vantage.textMuted, fontFamily, fontSize: sizes.body },
-  priceInput: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold, textAlign: 'center', padding: 0 },
+  pricePlaceholder: { color: vx.textMuted, fontFamily, fontSize: sizes.body },
+  priceInput: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold, textAlign: 'center', padding: 0 },
   volRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: vantage.bgElevated, borderRadius: radius.md,
+    backgroundColor: vx.bgElevated, borderRadius: radius.md,
     paddingHorizontal: space.md, paddingVertical: space.sm, gap: space.sm,
   },
   volBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   volCenter: { flex: 1, alignItems: 'center' },
-  volLabel: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro },
-  volValue: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold, marginTop: 1 },
-  volDivider: { width: StyleSheet.hairlineWidth, height: 28, backgroundColor: vantage.borderStrong, marginHorizontal: space.xs },
+  volLabel: { color: vx.textMuted, fontFamily, fontSize: sizes.micro },
+  volValue: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold, marginTop: 1 },
+  volDivider: { width: StyleSheet.hairlineWidth, height: 28, backgroundColor: vx.borderStrong, marginHorizontal: space.xs },
   lotsUnit: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: space.sm },
-  lotsTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
-  maxOpen: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, textAlign: 'right' },
-  fieldLabel: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.xs },
+  lotsTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
+  maxOpen: { color: vx.textMuted, fontFamily, fontSize: sizes.label, textAlign: 'right' },
+  fieldLabel: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.xs },
   tpSlRow: { flexDirection: 'row', gap: space.md },
   info: { gap: space.sm, marginTop: space.xs },
 });
 
 const infoStyles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  label: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  label: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
   dashed: { textDecorationLine: 'underline', textDecorationStyle: 'dotted' },
-  value: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  value: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
 });

@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import AppLoader from '../../components/vantage/AppLoader';
-import { showToast } from '../../components/vantage';
-import { vantage } from '../../theme/vantageTheme';
+import AppLoader from '../../components/vx/AppLoader';
+import { showToast } from '../../components/vx';
+import { vx } from '../../theme/vxTheme';
 import { setThemeAndReload } from '../bootstrap/themeRuntime';
 
 /** Dark — BG #121212, Card #1E1E1E, Green #2FBF71 */
@@ -94,13 +94,13 @@ const ThemeContext = createContext({
 
 export const ThemeProvider = ({ children }) => {
   // The active theme is decided at startup (index.js) and baked into the
-  // `vantage` tokens before any screen loads. Mirror it here so legacy screens
+  // `vx` tokens before any screen loads. Mirror it here so legacy screens
   // that read `colors` from this context match the rest of the app.
-  const [isDark] = useState(vantage.isDark !== false);
+  const [isDark] = useState(vx.isDark !== false);
   const [loading] = useState(false);
 
   // Switching theme repaints the whole app, so persist the choice and reload
-  // the JS bundle — this keeps the static `vantage` tokens and these `colors`
+  // the JS bundle — this keeps the static `vx` tokens and these `colors`
   // perfectly in sync.
   const setTheme = useCallback(async (name) => {
     const reloaded = await setThemeAndReload(name);

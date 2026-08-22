@@ -4,8 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 import { AuthContext } from '../../../app/providers/AuthContext';
-import { Card, CategoryTabs, SymbolIcon } from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
+import { Card, CategoryTabs, SymbolIcon } from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 import ApiService from '../../../services/api/ApiService';
 
 function copyKey(x) {
@@ -79,11 +79,11 @@ export default function TradeCopy() {
     <View>
       <Card style={styles.becomeCard} onPress={() => nav.navigate('BecomeMaster')}>
         <View style={styles.becomeRow}>
-          <View style={[styles.iconCircle, { backgroundColor: vantage.accentMuted }]}>
-            <Ionicons name="ribbon-outline" size={22} color={vantage.accent} />
+          <View style={[styles.iconCircle, { backgroundColor: vx.accentMuted }]}>
+            <Ionicons name="ribbon-outline" size={22} color={vx.accent} />
           </View>
           <Text style={styles.becomeTxt}>Become a Master</Text>
-          <Ionicons name="chevron-forward" size={18} color={vantage.textMuted} />
+          <Ionicons name="chevron-forward" size={18} color={vx.textMuted} />
         </View>
       </Card>
 
@@ -110,7 +110,7 @@ export default function TradeCopy() {
           <Pressable
             key={p.id || p.provider_id || p.name}
             onPress={() => nav.navigate('StrategyDetail', { providerId: p.id || p.provider_id })}
-            android_ripple={{ color: vantage.bgPressed }}
+            android_ripple={{ color: vx.bgPressed }}
             style={styles.row}
           >
             <StrategyMiniRow item={p} following={isFollowing(p)} />
@@ -124,7 +124,7 @@ export default function TradeCopy() {
 function FollowingBadge() {
   return (
     <View style={badgeStyles.following}>
-      <Ionicons name="checkmark-circle" size={12} color={vantage.up} />
+      <Ionicons name="checkmark-circle" size={12} color={vx.up} />
       <Text style={badgeStyles.followingTxt}>Following</Text>
     </View>
   );
@@ -154,7 +154,7 @@ function BigStrategyRow({ item, following }) {
       <View style={bigStyles.statsRow}>
         <View style={{ flex: 1 }}>
           <Text style={bigStyles.lab}>30D Return</Text>
-          <Text style={[bigStyles.val, { color: positive ? vantage.up : vantage.down }]}>
+          <Text style={[bigStyles.val, { color: positive ? vx.up : vx.down }]}>
             {`${positive ? '+' : ''}${ret.toFixed(2)}%`}
           </Text>
         </View>
@@ -189,7 +189,7 @@ function StrategyMiniRow({ item, following }) {
       </View>
       <View style={{ alignItems: 'flex-end' }}>
         {aum != null ? <Text style={miniStyles.aum}>{Number(aum).toLocaleString('en-US', { maximumFractionDigits: 0 })} USD</Text> : null}
-        <Text style={[miniStyles.ret, { color: positive ? vantage.up : vantage.down }]}>
+        <Text style={[miniStyles.ret, { color: positive ? vx.up : vx.down }]}>
           {`${positive ? '+' : ''}${ret.toFixed(2)}%`}
         </Text>
       </View>
@@ -237,7 +237,7 @@ function DeckCard({ item, following, self, onOpen }) {
       <View style={deckStyles.statsRow}>
         <View style={{ flex: 1 }}>
           <Text style={deckStyles.lab}>30D Return</Text>
-          <Text style={[deckStyles.val, { color: positive ? vantage.up : vantage.down }]}>
+          <Text style={[deckStyles.val, { color: positive ? vx.up : vx.down }]}>
             {`${positive ? '+' : ''}${ret.toFixed(2)}%`}
           </Text>
         </View>
@@ -330,41 +330,41 @@ const styles = StyleSheet.create({
   becomeCard: { margin: space.lg },
   becomeRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   iconCircle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  becomeTxt: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
+  becomeTxt: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
   section: { paddingHorizontal: space.lg, paddingVertical: space.md, gap: space.sm },
-  sectionTitle: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, marginBottom: space.sm },
-  empty: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, padding: space.lg, textAlign: 'center' },
+  sectionTitle: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, marginBottom: space.sm },
+  empty: { color: vx.textMuted, fontFamily, fontSize: sizes.body, padding: space.lg, textAlign: 'center' },
   row: { paddingVertical: space.sm },
 });
 
 const badgeStyles = StyleSheet.create({
   following: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: vantage.upMuted,
+    backgroundColor: vx.upMuted,
     paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: radius.pill,
   },
-  followingTxt: { color: vantage.up, fontFamily, fontSize: sizes.micro, fontWeight: weights.bold },
+  followingTxt: { color: vx.up, fontFamily, fontSize: sizes.micro, fontWeight: weights.bold },
 });
 
 const bigStyles = StyleSheet.create({
   wrap: { padding: space.sm, gap: space.md },
   head: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  name: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, flexShrink: 1 },
-  badge: { alignSelf: 'flex-start', backgroundColor: vantage.bgPressed, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: radius.sm, marginTop: 2 },
-  badgeTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.micro, fontWeight: weights.medium },
-  full: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, backgroundColor: vantage.bgPressed, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: radius.sm },
+  name: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, flexShrink: 1 },
+  badge: { alignSelf: 'flex-start', backgroundColor: vx.bgPressed, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: radius.sm, marginTop: 2 },
+  badgeTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.micro, fontWeight: weights.medium },
+  full: { color: vx.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, backgroundColor: vx.bgPressed, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: radius.sm },
   statsRow: { flexDirection: 'row' },
-  lab: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  lab: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
   val: { fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy, marginTop: 2 },
-  aum: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, marginTop: 2 },
+  aum: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, marginTop: 2 },
 });
 
 const miniStyles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.sm },
-  name: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
-  sub: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
-  aum: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
+  name: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
+  sub: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  aum: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
   ret: { fontFamily, fontSize: sizes.label, fontWeight: weights.bold, marginTop: 2 },
 });
 
@@ -372,24 +372,24 @@ const deckStyles = StyleSheet.create({
   stack: { height: 158, marginTop: 4 },
   layer: { position: 'absolute', left: 0, right: 0, top: 16 },
   card: {
-    backgroundColor: vantage.bgElevated,
+    backgroundColor: vx.bgElevated,
     borderRadius: radius.lg,
     padding: space.lg,
     borderWidth: 1,
-    borderColor: vantage.border,
+    borderColor: vx.border,
     gap: space.lg,
   },
   head: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  name: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, flexShrink: 1 },
-  badge: { alignSelf: 'flex-start', backgroundColor: vantage.bgPressed, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: radius.sm, marginTop: 3 },
-  badgeTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.micro, fontWeight: weights.medium },
-  copyBtn: { backgroundColor: vantage.textPrimary, paddingHorizontal: space.lg, paddingVertical: space.sm, borderRadius: radius.pill },
-  copyTxt: { color: vantage.textInverse, fontFamily, fontSize: sizes.label, fontWeight: weights.heavy },
-  youBadge: { backgroundColor: vantage.accentMuted, borderWidth: 1, borderColor: vantage.accent, paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.pill },
-  youTxt: { color: vantage.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.heavy },
+  name: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, flexShrink: 1 },
+  badge: { alignSelf: 'flex-start', backgroundColor: vx.bgPressed, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: radius.sm, marginTop: 3 },
+  badgeTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.micro, fontWeight: weights.medium },
+  copyBtn: { backgroundColor: vx.textPrimary, paddingHorizontal: space.lg, paddingVertical: space.sm, borderRadius: radius.pill },
+  copyTxt: { color: vx.textInverse, fontFamily, fontSize: sizes.label, fontWeight: weights.heavy },
+  youBadge: { backgroundColor: vx.accentMuted, borderWidth: 1, borderColor: vx.accent, paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.pill },
+  youTxt: { color: vx.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.heavy },
   statsRow: { flexDirection: 'row' },
-  lab: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  lab: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
   val: { fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy, marginTop: 2 },
-  aum: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy, marginTop: 2 },
-  counter: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro, textAlign: 'center', marginTop: space.sm },
+  aum: { color: vx.textPrimary, fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy, marginTop: 2 },
+  counter: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, textAlign: 'center', marginTop: space.sm },
 });

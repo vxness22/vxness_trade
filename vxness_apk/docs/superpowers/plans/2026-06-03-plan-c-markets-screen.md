@@ -1,8 +1,8 @@
-# Plan C — Vantage Redesign: Markets Screen (Phase 3)
+# Plan C — Vxness Redesign: Markets Screen (Phase 3)
 
 > Subagent-driven execution. Steps use `- [ ]`.
 
-**Goal:** Replace the Markets placeholder with the real Vantage-style screen — Watchlist | Explore toggle, category filter, Spotlight, Market Movers, Essentials list — wired to live Vxness data, plus InstrumentDetail and WatchlistEdit screens.
+**Goal:** Replace the Markets placeholder with the real Vxness-style screen — Watchlist | Explore toggle, category filter, Spotlight, Market Movers, Essentials list — wired to live Vxness data, plus InstrumentDetail and WatchlistEdit screens.
 
 **Architecture:** `MarketsScreen` is the orchestrator with a `SegmentedTabs` toggle between two sub-views: `MarketsExplore` (Spotlight + Movers + Essentials, filtered by segment) and `MarketsWatchlist` (pinned symbols + filter chips + Edit/Add). Both sub-views reuse `<InstrumentRow>` and the `pricesBySymbol` + `sparkData` pattern from Plan B. Two pushed screens: `InstrumentDetailScreen` (symbol info + Trade CTA) and `WatchlistEditScreen` (multi-select instrument list).
 
@@ -127,8 +127,8 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { SegmentedTabs, IconButton } from '../../components/vantage';
-import { vantage, space } from '../../theme/vantageTheme';
+import { SegmentedTabs, IconButton } from '../../components/vx';
+import { vx, space } from '../../theme/vxTheme';
 
 export default function MarketsHeader({ view, onChangeView, onSearch }) {
   return (
@@ -144,7 +144,7 @@ export default function MarketsHeader({ view, onChangeView, onSearch }) {
         />
       </View>
       <IconButton
-        icon={<Ionicons name="search" size={20} color={vantage.textPrimary} />}
+        icon={<Ionicons name="search" size={20} color={vx.textPrimary} />}
         accessibilityLabel="Search"
         onPress={onSearch}
       />
@@ -183,8 +183,8 @@ import {
   SpotlightCard,
   MoversBars,
   InstrumentRow,
-} from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+} from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 import { topRisers, topFallers, bySegment, MARQUEE_SPOTLIGHT } from '../../utils/marketMovers';
 import { getSparkData } from '../../utils/sparklineCache';
 
@@ -238,12 +238,12 @@ export default function MarketsExplore({
     <View>
       <View style={styles.quickRow}>
         <QuickActionTile
-          icon={<Ionicons name="calendar-outline" size={24} color={vantage.textPrimary} />}
+          icon={<Ionicons name="calendar-outline" size={24} color={vx.textPrimary} />}
           label="Calendar"
           onPress={() => nav.navigate('EconomicCalendar')}
         />
         <QuickActionTile
-          icon={<Ionicons name="calculator-outline" size={24} color={vantage.textPrimary} />}
+          icon={<Ionicons name="calculator-outline" size={24} color={vx.textPrimary} />}
           label="Risk Calc"
           onPress={() => nav.navigate('RiskCalculator')}
         />
@@ -279,7 +279,7 @@ export default function MarketsExplore({
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Essentials</Text>
           <Pressable onPress={() => onChangeSegment('overview')} hitSlop={8} accessibilityRole="button">
-            <Ionicons name="chevron-forward" size={20} color={vantage.textMuted} />
+            <Ionicons name="chevron-forward" size={20} color={vx.textMuted} />
           </Pressable>
         </View>
         {essentials.length === 0 ? (
@@ -309,9 +309,9 @@ const styles = StyleSheet.create({
   quickRow: { flexDirection: 'row', paddingHorizontal: space.lg, paddingVertical: space.md, gap: space.md },
   section: { paddingHorizontal: space.lg, paddingVertical: space.sm },
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: space.sm },
-  sectionTitle: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
-  sectionAction: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
-  empty: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, padding: space.md, textAlign: 'center' },
+  sectionTitle: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
+  sectionAction: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  empty: { color: vx.textMuted, fontFamily, fontSize: sizes.label, padding: space.md, textAlign: 'center' },
 });
 ```
 
@@ -328,8 +328,8 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import { InstrumentRow, CategoryTabs } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { InstrumentRow, CategoryTabs } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 import { bySegment } from '../../utils/marketMovers';
 
 const FILTER_OPTIONS = [
@@ -366,13 +366,13 @@ export default function MarketsWatchlist({
           <CategoryTabs value={filter} onChange={setFilter} options={FILTER_OPTIONS} />
         </View>
         <Pressable onPress={onEdit || (() => {})} hitSlop={8} accessibilityRole="button" accessibilityLabel="Edit watchlist filters">
-          <Ionicons name="options-outline" size={22} color={vantage.textMuted} />
+          <Ionicons name="options-outline" size={22} color={vx.textMuted} />
         </Pressable>
       </View>
 
       {pinnedSymbols.length === 0 ? (
         <View style={styles.emptyWrap}>
-          <Ionicons name="bookmark-outline" size={48} color={vantage.textMuted} />
+          <Ionicons name="bookmark-outline" size={48} color={vx.textMuted} />
           <Text style={styles.emptyTitle}>No pinned instruments</Text>
           <Text style={styles.emptySub}>Tap + Add to pin symbols here.</Text>
         </View>
@@ -400,11 +400,11 @@ export default function MarketsWatchlist({
 
       <View style={styles.actionsRow}>
         <Pressable onPress={onEdit || (() => nav.navigate('WatchlistEdit'))} style={styles.actionBtn} accessibilityRole="button" accessibilityLabel="Edit watchlist">
-          <Ionicons name="create-outline" size={18} color={vantage.textPrimary} />
+          <Ionicons name="create-outline" size={18} color={vx.textPrimary} />
           <Text style={styles.actionTxt}>Edit</Text>
         </Pressable>
         <Pressable onPress={onAdd || (() => nav.navigate('WatchlistEdit'))} style={styles.actionBtn} accessibilityRole="button" accessibilityLabel="Add to watchlist">
-          <Ionicons name="add" size={20} color={vantage.textPrimary} />
+          <Ionicons name="add" size={20} color={vx.textPrimary} />
           <Text style={styles.actionTxt}>Add</Text>
         </Pressable>
       </View>
@@ -415,12 +415,12 @@ export default function MarketsWatchlist({
 const styles = StyleSheet.create({
   filterRow: { flexDirection: 'row', alignItems: 'center', paddingRight: space.lg, gap: space.sm },
   emptyWrap: { alignItems: 'center', paddingVertical: space.huge, paddingHorizontal: space.xl, gap: space.sm },
-  emptyTitle: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
-  emptySub: { color: vantage.textMuted, fontFamily, fontSize: sizes.body },
-  emptyInline: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, padding: space.lg, textAlign: 'center' },
+  emptyTitle: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
+  emptySub: { color: vx.textMuted, fontFamily, fontSize: sizes.body },
+  emptyInline: { color: vx.textMuted, fontFamily, fontSize: sizes.body, padding: space.lg, textAlign: 'center' },
   actionsRow: { flexDirection: 'row', justifyContent: 'center', gap: space.xxl, paddingVertical: space.lg },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: space.xs, paddingHorizontal: space.lg, paddingVertical: space.sm },
-  actionTxt: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
+  actionTxt: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
 });
 ```
 
@@ -438,14 +438,14 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollView, RefreshControl, StyleSheet } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
-import { Screen } from '../components/vantage';
-import { vantage, space } from '../theme/vantageTheme';
+import { Screen } from '../components/vx';
+import { vx, space } from '../theme/vxTheme';
 import ApiService from '../services/ApiService';
 import webSocketService from '../services/WebSocketService';
 import { getInstruments } from '../utils/instrumentsCache';
 import { getWatchlist } from '../utils/watchlistStorage';
 import { getSparkData } from '../utils/sparklineCache';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../components/vantage/BottomNavPill';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../components/vx/BottomNavPill';
 
 import MarketsHeader from './markets/MarketsHeader';
 import MarketsExplore from './markets/MarketsExplore';
@@ -553,7 +553,7 @@ export default function MarketsScreen() {
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: BOTTOM_NAV_PILL_HEIGHT + space.huge }]}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vantage.accent} colors={[vantage.accent]} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vx.accent} colors={[vx.accent]} />
         }
       >
         {view === 'explore' ? (
@@ -595,7 +595,7 @@ const styles = StyleSheet.create({
 **Files:**
 - Create: `src/screens/markets/InstrumentDetailScreen.js`
 
-Minimal Vantage-styled detail page: header + symbol + bid/ask/spread/change + Trade CTA + "Add to Watchlist" toggle. No chart in this phase — chart belongs to Plan D (Trade).
+Minimal Vxness-styled detail page: header + symbol + bid/ask/spread/change + Trade CTA + "Add to Watchlist" toggle. No chart in this phase — chart belongs to Plan D (Trade).
 
 ```js
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
@@ -603,8 +603,8 @@ import { ScrollView, View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
-import { Screen, Card, PillButton, SymbolIcon, Sparkline, IconButton, showToast } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { Screen, Card, PillButton, SymbolIcon, Sparkline, IconButton, showToast } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 import ApiService from '../../services/ApiService';
 import { getInstruments } from '../../utils/instrumentsCache';
 import { getSparkData } from '../../utils/sparklineCache';
@@ -667,13 +667,13 @@ export default function InstrumentDetailScreen() {
     <Screen edges={['top']}>
       <View style={styles.headerRow}>
         <IconButton
-          icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />}
+          icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />}
           accessibilityLabel="Back"
           onPress={() => nav.goBack()}
         />
         <View style={{ flex: 1 }} />
         <Pressable onPress={togglePin} hitSlop={8} accessibilityRole="button" accessibilityLabel={pinned ? 'Unpin' : 'Pin to watchlist'}>
-          <Ionicons name={pinned ? 'bookmark' : 'bookmark-outline'} size={22} color={pinned ? vantage.accent : vantage.textPrimary} />
+          <Ionicons name={pinned ? 'bookmark' : 'bookmark-outline'} size={22} color={pinned ? vx.accent : vx.textPrimary} />
         </Pressable>
       </View>
 
@@ -689,14 +689,14 @@ export default function InstrumentDetailScreen() {
         <View style={styles.priceRow}>
           <Text style={styles.price}>{bid != null ? bid.toLocaleString('en-US', { maximumFractionDigits: 5 }) : '—'}</Text>
           {changePct != null ? (
-            <Text style={[styles.pct, { color: positive ? vantage.up : vantage.down }]}>
+            <Text style={[styles.pct, { color: positive ? vx.up : vx.down }]}>
               {`${positive ? '+' : ''}${changePct.toFixed(2)}%`}
             </Text>
           ) : null}
         </View>
 
         <View style={styles.sparkWrap}>
-          <Sparkline data={sparkData} width={320} height={80} strokeWidth={2} color={positive ? vantage.up : vantage.down} />
+          <Sparkline data={sparkData} width={320} height={80} strokeWidth={2} color={positive ? vx.up : vx.down} />
         </View>
 
         <Card style={{ marginTop: space.lg }}>
@@ -730,19 +730,19 @@ function Stat({ label, value, last = false }) {
 const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs, gap: space.xs },
   symbolRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  symbol: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy },
-  subname: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, marginTop: 2 },
+  symbol: { color: vx.textPrimary, fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy },
+  subname: { color: vx.textMuted, fontFamily, fontSize: sizes.body, marginTop: 2 },
   priceRow: { marginTop: space.lg, gap: 4 },
-  price: { color: vantage.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
+  price: { color: vx.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
   pct: { fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
   sparkWrap: { alignItems: 'center', marginTop: space.md },
 });
 
 const statStyles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: space.sm },
-  border: { borderBottomColor: vantage.border, borderBottomWidth: StyleSheet.hairlineWidth },
-  label: { color: vantage.textMuted, fontFamily, fontSize: sizes.body },
-  value: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
+  border: { borderBottomColor: vx.border, borderBottomWidth: StyleSheet.hairlineWidth },
+  label: { color: vx.textMuted, fontFamily, fontSize: sizes.body },
+  value: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
 });
 ```
 
@@ -761,8 +761,8 @@ import { View, Text, TextInput, FlatList, StyleSheet, Pressable } from 'react-na
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import { Screen, IconButton, SymbolIcon, CategoryTabs } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { Screen, IconButton, SymbolIcon, CategoryTabs } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 import { getInstruments } from '../../utils/instrumentsCache';
 import { getWatchlist, setWatchlist } from '../../utils/watchlistStorage';
 import { bySegment } from '../../utils/marketMovers';
@@ -827,30 +827,30 @@ export default function WatchlistEditScreen() {
     <Screen edges={['top']}>
       <View style={styles.headerRow}>
         <IconButton
-          icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />}
+          icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />}
           accessibilityLabel="Back"
           onPress={() => nav.goBack()}
         />
         <Text style={styles.title}>Edit Watchlist</Text>
         <Pressable onPress={save} hitSlop={8} accessibilityRole="button" accessibilityLabel="Done">
-          <Text style={[styles.doneTxt, !dirty && { color: vantage.textMuted }]}>Done</Text>
+          <Text style={[styles.doneTxt, !dirty && { color: vx.textMuted }]}>Done</Text>
         </Pressable>
       </View>
 
       <View style={styles.searchWrap}>
-        <Ionicons name="search" size={18} color={vantage.textMuted} style={{ marginRight: space.sm }} />
+        <Ionicons name="search" size={18} color={vx.textMuted} style={{ marginRight: space.sm }} />
         <TextInput
           value={query}
           onChangeText={setQuery}
           placeholder="Search symbol or name"
-          placeholderTextColor={vantage.textMuted}
+          placeholderTextColor={vx.textMuted}
           style={styles.searchInput}
           autoCapitalize="characters"
           autoCorrect={false}
         />
         {query ? (
           <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityLabel="Clear">
-            <Ionicons name="close-circle" size={18} color={vantage.textMuted} />
+            <Ionicons name="close-circle" size={18} color={vx.textMuted} />
           </Pressable>
         ) : null}
       </View>
@@ -869,7 +869,7 @@ export default function WatchlistEditScreen() {
               style={styles.row}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: isPinned }}
-              android_ripple={{ color: vantage.bgPressed }}
+              android_ripple={{ color: vx.bgPressed }}
             >
               <SymbolIcon symbol={sym} size={36} />
               <View style={styles.rowText}>
@@ -879,7 +879,7 @@ export default function WatchlistEditScreen() {
               <Ionicons
                 name={isPinned ? 'checkmark-circle' : 'add-circle-outline'}
                 size={26}
-                color={isPinned ? vantage.accent : vantage.textMuted}
+                color={isPinned ? vx.accent : vx.textMuted}
               />
             </Pressable>
           );
@@ -898,23 +898,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.sm,
     gap: space.sm,
   },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
-  doneTxt: { color: vantage.accent, fontFamily, fontSize: sizes.body, fontWeight: weights.bold, paddingHorizontal: space.md },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  doneTxt: { color: vx.accent, fontFamily, fontSize: sizes.body, fontWeight: weights.bold, paddingHorizontal: space.md },
   searchWrap: {
     flexDirection: 'row', alignItems: 'center',
     marginHorizontal: space.lg, marginVertical: space.sm,
-    backgroundColor: vantage.bgElevated,
+    backgroundColor: vx.bgElevated,
     borderRadius: radius.md, paddingHorizontal: space.md, height: 44,
   },
-  searchInput: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.body, padding: 0 },
+  searchInput: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.body, padding: 0 },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: space.md,
     paddingHorizontal: space.lg, paddingVertical: space.md,
   },
   rowText: { flex: 1 },
-  rowSym: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
-  rowName: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
-  empty: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, padding: space.huge, textAlign: 'center' },
+  rowSym: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
+  rowName: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  empty: { color: vx.textMuted, fontFamily, fontSize: sizes.body, padding: space.huge, textAlign: 'center' },
 });
 ```
 

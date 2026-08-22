@@ -3,8 +3,8 @@ import { ScrollView, View, Text, TextInput, StyleSheet, Pressable, KeyboardAvoid
 import { Ionicons } from '@expo/vector-icons';
 
 import { AuthContext } from '../../../app/providers/AuthContext';
-import { Screen, PillButton, IconButton, showToast } from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
+import { Screen, PillButton, IconButton, showToast } from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 
 export default function RegisterOtp({ navigation, route }) {
   const { registerVerify, registerResend } = useContext(AuthContext);
@@ -32,7 +32,7 @@ export default function RegisterOtp({ navigation, route }) {
   return (
     <Screen edges={['top', 'bottom']}>
       <View style={styles.headerRow}>
-        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={() => navigation.goBack()} />
+        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={() => navigation.goBack()} />
         <Text style={styles.title}>Verify Email</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -40,7 +40,7 @@ export default function RegisterOtp({ navigation, route }) {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <View style={styles.iconWrap}>
-            <Ionicons name="mail-unread-outline" size={56} color={vantage.accent} />
+            <Ionicons name="mail-unread-outline" size={56} color={vx.accent} />
           </View>
           <Text style={styles.help}>
             We sent a verification code to{'\n'}
@@ -50,7 +50,7 @@ export default function RegisterOtp({ navigation, route }) {
             value={code}
             onChangeText={(t) => setCode(t.replace(/\D/g, '').slice(0, 6))}
             placeholder="123456"
-            placeholderTextColor={vantage.textMuted}
+            placeholderTextColor={vx.textMuted}
             keyboardType="number-pad"
             maxLength={6}
             autoFocus
@@ -77,13 +77,13 @@ export default function RegisterOtp({ navigation, route }) {
 
 const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
   body: { padding: space.xl, flexGrow: 1, alignItems: 'center' },
   iconWrap: { marginTop: space.xl, marginBottom: space.lg },
-  help: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, marginBottom: space.xl, textAlign: 'center', lineHeight: 22 },
-  email: { color: vantage.textPrimary, fontWeight: weights.bold },
-  input: { width: '100%', backgroundColor: vantage.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
+  help: { color: vx.textMuted, fontFamily, fontSize: sizes.body, marginBottom: space.xl, textAlign: 'center', lineHeight: 22 },
+  email: { color: vx.textPrimary, fontWeight: weights.bold },
+  input: { width: '100%', backgroundColor: vx.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vx.textPrimary, fontFamily, fontSize: sizes.body },
   codeInput: { textAlign: 'center', letterSpacing: 8, fontSize: sizes.hero, fontWeight: weights.heavy },
   resendWrap: { marginTop: space.xl, alignSelf: 'center' },
-  resend: { color: vantage.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
+  resend: { color: vx.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
 });

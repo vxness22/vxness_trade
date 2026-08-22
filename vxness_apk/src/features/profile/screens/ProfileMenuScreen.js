@@ -15,10 +15,10 @@ const AVATAR_KEY = 'profileAvatar';
 
 import { AuthContext } from '../../../app/providers/AuthContext';
 import { useTheme } from '../../../app/providers/ThemeContext';
-import { Screen, Card, MenuRow, PillButton, showToast } from '../../../components/vantage';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vantage/BottomNavPill';
+import { Screen, Card, MenuRow, PillButton, showToast } from '../../../components/vx';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 import { fetchKycStatus, isKycApproved, kycStatusLabel } from '../../../utils/kycGate';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 import {
   getBiometricSupport,
   isBiometricEnabled,
@@ -210,7 +210,7 @@ export default function ProfileMenuScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: BOTTOM_NAV_PILL_HEIGHT + space.huge }}>
         <View style={styles.backRow}>
           <Pressable onPress={() => nav.goBack()} hitSlop={8} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Back">
-            <Ionicons name="chevron-back" size={24} color={vantage.textPrimary} />
+            <Ionicons name="chevron-back" size={24} color={vx.textPrimary} />
           </Pressable>
         </View>
         {/* Profile header */}
@@ -228,45 +228,45 @@ export default function ProfileMenuScreen() {
             <Text style={styles.email}>{user?.email || ''}</Text>
             {kycApproved ? (
               <View style={[styles.badge, { backgroundColor: 'rgba(34,197,94,0.15)' }]}>
-                <Ionicons name="shield-checkmark" size={12} color={vantage.up} />
-                <Text style={[styles.badgeTxt, { color: vantage.up }]}>KYC Verified</Text>
+                <Ionicons name="shield-checkmark" size={12} color={vx.up} />
+                <Text style={[styles.badgeTxt, { color: vx.up }]}>KYC Verified</Text>
               </View>
             ) : (
-              <View style={[styles.badge, { backgroundColor: vantage.accentMuted }]}>
-                <Ionicons name="alert-circle-outline" size={12} color={vantage.accent} />
-                <Text style={[styles.badgeTxt, { color: vantage.accent }]}>{kycStatusLabel(kycStatus)}</Text>
+              <View style={[styles.badge, { backgroundColor: vx.accentMuted }]}>
+                <Ionicons name="alert-circle-outline" size={12} color={vx.accent} />
+                <Text style={[styles.badgeTxt, { color: vx.accent }]}>{kycStatusLabel(kycStatus)}</Text>
               </View>
             )}
           </View>
         </View>
 
         <Section title="ACCOUNTS">
-          <MenuRow icon={<Ionicons name="card-outline" size={18} color={vantage.textPrimary} />} label="My Accounts" onPress={() => nav.navigate('Accounts')} />
-          <MenuRow icon={<Ionicons name="trending-up-outline" size={18} color={vantage.textPrimary} />} label="Portfolio" onPress={() => nav.navigate('Portfolio')} />
+          <MenuRow icon={<Ionicons name="card-outline" size={18} color={vx.textPrimary} />} label="My Accounts" onPress={() => nav.navigate('Accounts')} />
+          <MenuRow icon={<Ionicons name="trending-up-outline" size={18} color={vx.textPrimary} />} label="Portfolio" onPress={() => nav.navigate('Portfolio')} />
         </Section>
 
         <Section title="VERIFICATION">
-          <MenuRow icon={<Ionicons name="shield-checkmark-outline" size={18} color={vantage.up} />} label="KYC" value={kycStatusLabel(kycStatus)} onPress={() => nav.navigate('Kyc')} />
+          <MenuRow icon={<Ionicons name="shield-checkmark-outline" size={18} color={vx.up} />} label="KYC" value={kycStatusLabel(kycStatus)} onPress={() => nav.navigate('Kyc')} />
         </Section>
 
         <Section title="PROGRAMS">
-          <MenuRow icon={<Ionicons name="briefcase-outline" size={18} color={vantage.textPrimary} />} label="Business / Sub-Broker" onPress={() => nav.navigate('Business')} />
-          <MenuRow icon={<Ionicons name="bar-chart-outline" size={18} color={vantage.textPrimary} />} label="PAMM Investments" onPress={() => nav.navigate('Pamm')} />
+          <MenuRow icon={<Ionicons name="briefcase-outline" size={18} color={vx.textPrimary} />} label="Business / Sub-Broker" onPress={() => nav.navigate('Business')} />
+          <MenuRow icon={<Ionicons name="bar-chart-outline" size={18} color={vx.textPrimary} />} label="PAMM Investments" onPress={() => nav.navigate('Pamm')} />
         </Section>
 
         <Section title="TOOLS">
-          <MenuRow icon={<Ionicons name="school-outline" size={18} color={vantage.textPrimary} />} label="Academy" onPress={() => nav.navigate('Academy')} />
-          <MenuRow icon={<Ionicons name="calculator-outline" size={18} color={vantage.textPrimary} />} label="Risk Calculator" onPress={() => nav.navigate('RiskCalculator')} />
-          <MenuRow icon={<Ionicons name="calendar-outline" size={18} color={vantage.textPrimary} />} label="Economic Calendar" onPress={() => nav.navigate('EconomicCalendar')} />
+          <MenuRow icon={<Ionicons name="school-outline" size={18} color={vx.textPrimary} />} label="Academy" onPress={() => nav.navigate('Academy')} />
+          <MenuRow icon={<Ionicons name="calculator-outline" size={18} color={vx.textPrimary} />} label="Risk Calculator" onPress={() => nav.navigate('RiskCalculator')} />
+          <MenuRow icon={<Ionicons name="calendar-outline" size={18} color={vx.textPrimary} />} label="Economic Calendar" onPress={() => nav.navigate('EconomicCalendar')} />
           {/* One source of truth for orders/history: the Trade tab (live,
               paginated, on-brand). The old Order Book screen duplicated it. */}
-          <MenuRow icon={<Ionicons name="book-outline" size={18} color={vantage.textPrimary} />} label="Order History" onPress={() => nav.navigate('TradeTab')} />
+          <MenuRow icon={<Ionicons name="book-outline" size={18} color={vx.textPrimary} />} label="Order History" onPress={() => nav.navigate('TradeTab')} />
         </Section>
 
         <Section title="APPEARANCE">
           <View style={styles.appearanceRow}>
             <View style={styles.appearanceLabel}>
-              <Ionicons name={isDark ? 'moon' : 'sunny'} size={18} color={vantage.accent} />
+              <Ionicons name={isDark ? 'moon' : 'sunny'} size={18} color={vx.accent} />
               <Text style={styles.appearanceTxt}>Theme</Text>
             </View>
             <View style={styles.segment}>
@@ -276,7 +276,7 @@ export default function ProfileMenuScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Light theme"
               >
-                <Ionicons name="sunny-outline" size={14} color={!isDark ? vantage.textInverse : vantage.textSecondary} />
+                <Ionicons name="sunny-outline" size={14} color={!isDark ? vx.textInverse : vx.textSecondary} />
                 <Text style={[styles.segmentTxt, !isDark && styles.segmentTxtActive]}>Light</Text>
               </Pressable>
               <Pressable
@@ -285,7 +285,7 @@ export default function ProfileMenuScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Dark theme"
               >
-                <Ionicons name="moon-outline" size={14} color={isDark ? vantage.textInverse : vantage.textSecondary} />
+                <Ionicons name="moon-outline" size={14} color={isDark ? vx.textInverse : vx.textSecondary} />
                 <Text style={[styles.segmentTxt, isDark && styles.segmentTxtActive]}>Dark</Text>
               </Pressable>
             </View>
@@ -295,7 +295,7 @@ export default function ProfileMenuScreen() {
         <Section title="SECURITY">
           <View style={styles.appearanceRow}>
             <View style={styles.appearanceLabel}>
-              <Ionicons name={bioSupport.label === 'Face ID' ? 'scan-outline' : 'finger-print'} size={18} color={vantage.accent} />
+              <Ionicons name={bioSupport.label === 'Face ID' ? 'scan-outline' : 'finger-print'} size={18} color={vx.accent} />
               <View>
                 <Text style={styles.appearanceTxt}>App Lock</Text>
                 <Text style={styles.securitySub}>
@@ -306,18 +306,18 @@ export default function ProfileMenuScreen() {
             <Switch
               value={bioEnabled}
               onValueChange={toggleBiometric}
-              trackColor={{ false: vantage.bgRaised, true: vantage.accent }}
+              trackColor={{ false: vx.bgRaised, true: vx.accent }}
               thumbColor="#fff"
             />
           </View>
         </Section>
 
         <Section title="HELP">
-          <MenuRow icon={<Ionicons name="chatbubble-outline" size={18} color={vantage.textPrimary} />} label="Support" onPress={() => nav.navigate('Support')} />
-          <MenuRow icon={<Ionicons name="notifications-outline" size={18} color={vantage.textPrimary} />} label="Notifications" onPress={() => nav.navigate('Notifications')} />
-          <MenuRow icon={<Ionicons name="book-outline" size={18} color={vantage.textPrimary} />} label="How to use" onPress={() => nav.navigate('Instructions')} />
+          <MenuRow icon={<Ionicons name="chatbubble-outline" size={18} color={vx.textPrimary} />} label="Support" onPress={() => nav.navigate('Support')} />
+          <MenuRow icon={<Ionicons name="notifications-outline" size={18} color={vx.textPrimary} />} label="Notifications" onPress={() => nav.navigate('Notifications')} />
+          <MenuRow icon={<Ionicons name="book-outline" size={18} color={vx.textPrimary} />} label="How to use" onPress={() => nav.navigate('Instructions')} />
           <MenuRow
-            icon={<Ionicons name="map-outline" size={18} color={vantage.textPrimary} />}
+            icon={<Ionicons name="map-outline" size={18} color={vx.textPrimary} />}
             label="App Tour"
             onPress={() => {
               // Pop back to the dashboard so the tour plays over the shell,
@@ -330,7 +330,7 @@ export default function ProfileMenuScreen() {
 
         <Section title="ABOUT">
           <MenuRow
-            icon={<Ionicons name={checking ? 'sync' : 'cloud-download-outline'} size={18} color={vantage.accent} />}
+            icon={<Ionicons name={checking ? 'sync' : 'cloud-download-outline'} size={18} color={vx.accent} />}
             label={checking ? 'Checking for update…' : 'Check for update'}
             value={`v${APP_VERSION}`}
             onPress={checkForUpdate}
@@ -376,7 +376,7 @@ export default function ProfileMenuScreen() {
             </View>
 
             <Pressable onPress={() => saveAvatar({ type: 'default' })} style={styles.resetBtn}>
-              <Ionicons name="refresh-outline" size={15} color={vantage.textMuted} />
+              <Ionicons name="refresh-outline" size={15} color={vx.textMuted} />
               <Text style={styles.resetTxt}>Reset to default</Text>
             </Pressable>
           </Pressable>
@@ -407,27 +407,27 @@ const styles = StyleSheet.create({
   },
   avatar: {
     width: 56, height: 56, borderRadius: 28, overflow: 'hidden',
-    backgroundColor: vantage.bgRaised,
+    backgroundColor: vx.bgRaised,
     alignItems: 'center', justifyContent: 'center',
   },
   avatarAnim: { width: 48, height: 48 },
   avatarEditBadge: {
     position: 'absolute', right: -2, bottom: -2, width: 20, height: 20, borderRadius: 10,
-    backgroundColor: vantage.accent, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: vantage.bg,
+    backgroundColor: vx.accent, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: vx.bg,
   },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: space.lg },
-  modalCard: { width: '100%', maxWidth: 360, backgroundColor: vantage.bgRaised, borderRadius: radius.lg, borderWidth: 1, borderColor: vantage.border, padding: space.lg },
-  modalTitle: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy, marginBottom: space.md },
-  photoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, backgroundColor: vantage.accent, borderRadius: radius.md, paddingVertical: 13 },
+  modalCard: { width: '100%', maxWidth: 360, backgroundColor: vx.bgRaised, borderRadius: radius.lg, borderWidth: 1, borderColor: vx.border, padding: space.lg },
+  modalTitle: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy, marginBottom: space.md },
+  photoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, backgroundColor: vx.accent, borderRadius: radius.md, paddingVertical: 13 },
   photoBtnTxt: { color: '#fff', fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
-  modalSub: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, marginTop: space.lg, marginBottom: space.sm },
+  modalSub: { color: vx.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, marginTop: space.lg, marginBottom: space.sm },
   avatarGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  gridItem: { width: 56, height: 56, borderRadius: 28, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: vantage.bgRaisedHover || vantage.bgRaised, borderWidth: 1, borderColor: vantage.border },
+  gridItem: { width: 56, height: 56, borderRadius: 28, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: vx.bgRaisedHover || vx.bgRaised, borderWidth: 1, borderColor: vx.border },
   resetBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: space.lg, paddingVertical: 10 },
-  resetTxt: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
-  name: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
-  email: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  resetTxt: { color: vx.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  name: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
+  email: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
   badge: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: 6, marginTop: space.sm },
   badgeTxt: { fontFamily, fontSize: sizes.micro, fontWeight: weights.heavy },
   appearanceRow: {
@@ -435,22 +435,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg, paddingVertical: space.md,
   },
   appearanceLabel: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  appearanceTxt: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
-  securitySub: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro, marginTop: 1 },
+  appearanceTxt: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
+  securitySub: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, marginTop: 1 },
   segment: {
-    flexDirection: 'row', backgroundColor: vantage.bgRaised,
+    flexDirection: 'row', backgroundColor: vx.bgRaised,
     borderRadius: radius.pill, padding: 3, gap: 2,
   },
   segmentBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: space.md, paddingVertical: 6, borderRadius: radius.pill,
   },
-  segmentBtnActive: { backgroundColor: vantage.accent },
-  segmentTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
-  segmentTxtActive: { color: vantage.textInverse },
+  segmentBtnActive: { backgroundColor: vx.accent },
+  segmentTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  segmentTxtActive: { color: vx.textInverse },
   section: { paddingHorizontal: space.lg, marginTop: space.lg },
   sectionTitle: {
-    color: vantage.textSecondary, fontFamily, fontSize: sizes.label,
+    color: vx.textSecondary, fontFamily, fontSize: sizes.label,
     fontWeight: weights.semibold, textTransform: 'uppercase', letterSpacing: 1,
     marginBottom: space.sm,
   },

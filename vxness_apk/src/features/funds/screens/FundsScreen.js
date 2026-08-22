@@ -4,11 +4,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 import { useAccount } from '../../../app/providers/AccountContext';
-import { Screen, BalanceBlock, QuickActionTile } from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../../../theme/vantageTheme';
+import { Screen, BalanceBlock, QuickActionTile } from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../../../theme/vxTheme';
 import ApiService from '../../../services/api/ApiService';
 import { useHiddenBalance } from '../../../utils/hiddenBalance';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vantage/BottomNavPill';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 
 // "Recent Transactions" shows at most this many rows from the last 2 days;
 // everything else lives in the full History screen.
@@ -111,7 +111,7 @@ export default function FundsScreen() {
 
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: BOTTOM_NAV_PILL_HEIGHT + space.huge }]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vantage.accent} colors={[vantage.accent]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vx.accent} colors={[vx.accent]} />}
       >
         <View style={styles.recentSection}>
           <View style={styles.sectionHeaderRow}>
@@ -134,7 +134,7 @@ function TxRow({ tx }) {
   const isDeposit = t.includes('deposit');
   const isWithdraw = t.includes('withdraw');
   const sign = isDeposit ? '+' : (isWithdraw ? '−' : '');
-  const color = isDeposit ? vantage.up : (isWithdraw ? vantage.down : vantage.textPrimary);
+  const color = isDeposit ? vx.up : (isWithdraw ? vx.down : vx.textPrimary);
   const amount = Math.abs(Number(tx.amount ?? 0));
   const method = tx.payment_method || tx.method || tx.gateway || tx.type || 'Transaction';
   const status = String(tx.status || '').toLowerCase();
@@ -152,7 +152,7 @@ function TxRow({ tx }) {
       </View>
       <View style={{ alignItems: 'flex-end' }}>
         <Text style={[txStyles.amount, { color }]}>{sign}${amount.toFixed(2)}</Text>
-        <Text style={[txStyles.status, status === 'completed' ? { color: '#2FBF71' } : status === 'failed' ? { color: vantage.down } : null]}>
+        <Text style={[txStyles.status, status === 'completed' ? { color: '#2FBF71' } : status === 'failed' ? { color: vx.down } : null]}>
           {status || 'pending'}
         </Text>
       </View>
@@ -161,9 +161,9 @@ function TxRow({ tx }) {
 }
 
 const styles = StyleSheet.create({
-  fixedHeader: { backgroundColor: vantage.bg },
+  fixedHeader: { backgroundColor: vx.bg },
   headerWrap: { paddingHorizontal: space.lg, paddingTop: space.sm },
-  title: { color: vantage.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
+  title: { color: vx.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
   scroll: {},
   // Empty banner placeholder. width = 92% of screen, height auto via aspectRatio.
   // Recommended image: 1560 × 600 px (ratio 2.6) — or any image at the same ratio.
@@ -173,28 +173,28 @@ const styles = StyleSheet.create({
     aspectRatio: 2.6,
     marginTop: space.md,
     borderRadius: 20,
-    backgroundColor: vantage.bgElevated,
+    backgroundColor: vx.bgElevated,
     borderWidth: 1,
-    borderColor: vantage.border,
+    borderColor: vx.border,
     overflow: 'hidden',
   },
   bannerImage: { width: '100%', height: '100%' },
   balanceWrap: { paddingHorizontal: space.lg, paddingTop: space.md },
-  splitRow: { flexDirection: 'row', gap: space.lg, marginTop: space.md, padding: space.md, backgroundColor: vantage.bgElevated, borderRadius: 12 },
-  splitLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
-  splitVal: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold, marginTop: 2 },
+  splitRow: { flexDirection: 'row', gap: space.lg, marginTop: space.md, padding: space.md, backgroundColor: vx.bgElevated, borderRadius: 12 },
+  splitLab: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
+  splitVal: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold, marginTop: 2 },
   tilesRow: { flexDirection: 'row', paddingHorizontal: space.lg, paddingVertical: space.lg, gap: space.md },
   recentSection: { paddingHorizontal: space.lg, paddingTop: space.md },
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  viewAll: { color: vantage.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
-  sectionTitle: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, marginBottom: space.sm },
-  empty: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, padding: space.lg, textAlign: 'center' },
+  viewAll: { color: vx.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  sectionTitle: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, marginBottom: space.sm },
+  empty: { color: vx.textMuted, fontFamily, fontSize: sizes.body, padding: space.lg, textAlign: 'center' },
 });
 
 const txStyles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: space.md, borderBottomColor: vantage.border, borderBottomWidth: StyleSheet.hairlineWidth },
-  method: { color: vantage.textPrimary, fontFamily, fontSize: 16, fontWeight: weights.semibold },
-  date: { color: vantage.textMuted, fontFamily, fontSize: 13, marginTop: 2 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: space.md, borderBottomColor: vx.border, borderBottomWidth: StyleSheet.hairlineWidth },
+  method: { color: vx.textPrimary, fontFamily, fontSize: 16, fontWeight: weights.semibold },
+  date: { color: vx.textMuted, fontFamily, fontSize: 13, marginTop: 2 },
   amount: { fontFamily, fontSize: 16, fontWeight: weights.heavy },
-  status: { color: vantage.textMuted, fontFamily, fontSize: 13, marginTop: 2, textTransform: 'capitalize' },
+  status: { color: vx.textMuted, fontFamily, fontSize: 13, marginTop: 2, textTransform: 'capitalize' },
 });

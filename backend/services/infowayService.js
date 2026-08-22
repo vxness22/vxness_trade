@@ -3,6 +3,7 @@ import dotenv from 'dotenv'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { isForexWeekend } from '../utils/marketHours.js'
 import {
   SESSION_START_HOUR_NY,
   barStartSeconds,
@@ -652,8 +653,22 @@ class InfowayService {
       if (this.shutdown) return
       const now = Date.now()
 
+      // Silence is NOT staleness when the market is shut.
+      //
+      // The forex socket carries FX, metals, indices and commodities, and all of
+      // them stop on Saturday and Sunday. The watchdog could not tell "the feed
+      // is broken" from "the week has ended", so every weekend it killed a
+      // perfectly healthy socket every 60 seconds - roughly 2,900 pointless
+      // reconnects between Friday's close and Monday's open, each one a fresh
+      // handshake against the provider, and a log so full of the same warning
+      // that a real outage would be invisible in it.
+      //
+      // Crypto is deliberately still watched: it trades through the weekend, so
+      // silence there IS a fault.
+      const fxClosed = isForexWeekend()
+
       if (this.forexWs?.readyState === WebSocket.OPEN) {
-        if (this.forexLastMessageAt && (now - this.forexLastMessageAt) > STALE_MS) {
+        if (!fxClosed && this.forexLastMessageAt && (now - this.forexLastMessageAt) > STALE_MS) {
           const ageSec = Math.round((now - this.forexLastMessageAt) / 1000)
           console.warn(`[Infoway] Forex WS stale (${ageSec}s no data), terminating to force reconnect`)
           try { this.forexWs.terminate() } catch (e) {}

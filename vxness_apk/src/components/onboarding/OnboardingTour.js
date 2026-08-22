@@ -21,7 +21,7 @@ import {
   Modal, View, Text, Pressable, StyleSheet, Animated, Easing, useWindowDimensions,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 const DIM = 'rgba(0,0,0,0.80)';
 const SPOT_PAD = 6;      // breathing room around the highlighted element
@@ -195,7 +195,7 @@ export default function OnboardingTour({ visible, steps = [], onDone }) {
             <View style={styles.titleRow}>
               {step.icon ? (
                 <View style={styles.iconBadge}>
-                  <Ionicons name={step.icon} size={18} color={vantage.accent} />
+                  <Ionicons name={step.icon} size={18} color={vx.accent} />
                 </View>
               ) : null}
               <Text style={styles.title}>{step.title}</Text>
@@ -216,7 +216,7 @@ export default function OnboardingTour({ visible, steps = [], onDone }) {
                 )}
                 {index > 0 && (
                   <Pressable onPress={back} style={styles.backBtn} hitSlop={4} accessibilityRole="button" accessibilityLabel="Previous tip">
-                    <Ionicons name="chevron-back" size={16} color={vantage.textSecondary} />
+                    <Ionicons name="chevron-back" size={16} color={vx.textSecondary} />
                     <Text style={styles.backTxt}>Back</Text>
                   </Pressable>
                 )}
@@ -244,8 +244,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderRadius: radius.lg,
     borderWidth: 2,
-    borderColor: vantage.accent,
-    shadowColor: vantage.accent,
+    borderColor: vx.accent,
+    shadowColor: vx.accent,
     shadowOpacity: 0.6,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 0 },
@@ -255,31 +255,31 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 440,
-    backgroundColor: vantage.bgElevated,
+    backgroundColor: vx.bgElevated,
     borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: vantage.border,
+    borderColor: vx.border,
     padding: space.lg,
   },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   iconBadge: {
     width: 32, height: 32, borderRadius: 16,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: vantage.accentMuted || 'rgba(242,106,31,0.14)',
+    backgroundColor: vx.accentMuted || 'rgba(242,106,31,0.14)',
   },
-  title: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, flexShrink: 1 },
-  text: { color: vantage.textSecondary, fontFamily, fontSize: sizes.body, marginTop: space.sm, lineHeight: 20 },
+  title: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, flexShrink: 1 },
+  text: { color: vx.textSecondary, fontFamily, fontSize: sizes.body, marginTop: space.sm, lineHeight: 20 },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: space.lg, gap: space.md },
   dots: { flexDirection: 'row', gap: 4, flexShrink: 1, flexWrap: 'wrap', maxWidth: 120 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: vantage.border },
-  dotActive: { backgroundColor: vantage.accent, width: 16 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: vx.border },
+  dotActive: { backgroundColor: vx.accent, width: 16 },
   btnRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  skip: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  skip: { color: vx.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingVertical: space.xs },
-  backTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  backTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
   nextBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 2,
-    backgroundColor: vantage.accent,
+    backgroundColor: vx.accent,
     borderRadius: radius.pill,
     paddingHorizontal: space.lg,
     paddingVertical: space.sm,

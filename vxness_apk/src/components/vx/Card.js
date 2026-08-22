@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
-import { vantage, space, radius } from '../../theme/vantageTheme';
+import { vx, space, radius } from '../../theme/vxTheme';
 
 export default function Card({
   children,
@@ -11,10 +11,10 @@ export default function Card({
   style,
 }) {
   const bg =
-    variant === 'raised' ? vantage.bgRaised :
+    variant === 'raised' ? vx.bgRaised :
     variant === 'outline' ? 'transparent' :
-    vantage.bgElevated;
-  const border = variant === 'outline' ? vantage.borderStrong : 'transparent';
+    vx.bgElevated;
+  const border = variant === 'outline' ? vx.borderStrong : 'transparent';
 
   const inner = (
     <View
@@ -32,7 +32,7 @@ export default function Card({
     return (
       <Pressable
         onPress={onPress}
-        android_ripple={{ color: vantage.bgPressed, borderless: false }}
+        android_ripple={{ color: vx.bgPressed, borderless: false }}
         accessibilityRole="button"
       >
         {({ pressed }) => (

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Pressable, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 // Approximate fully-rendered height of the attached nav bar (used by screens for
 // bottom padding so content isn't hidden behind the nav). Keep in sync with the
@@ -12,12 +12,12 @@ export const BOTTOM_NAV_PILL_HEIGHT = 84;
 
 // Dark, faded gradient for the bar — lighter at the top edge, fading to near the
 // screen background at the bottom so the bar reads as "attached" and glossy.
-const BAR_GRADIENT = vantage.isDark
+const BAR_GRADIENT = vx.isDark
   ? ['#34353B', '#1B1C20', '#0B0B0D']
   : ['#FFFFFF', '#F2F5FA', '#E7ECF3'];
 
 // Subtle highlight hairline along the very top edge (the "faded" sheen).
-const TOP_SHEEN = vantage.isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.9)';
+const TOP_SHEEN = vx.isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.9)';
 
 export default function BottomNavPill({ tabs, activeKey, onChange }) {
   const insets = useSafeAreaInsets();
@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radius.xl,
     paddingHorizontal: space.sm,
     borderTopWidth: 1,
-    borderColor: vantage.border,
+    borderColor: vx.border,
     overflow: 'hidden',
     // Lift the attached bar off the content with a soft upward shadow.
     shadowColor: '#000',
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   indicatorActive: {
-    backgroundColor: vantage.accent,
+    backgroundColor: vx.accent,
   },
   icon: {
     width: 28,
@@ -121,13 +121,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   label: {
-    color: vantage.textMuted,
+    color: vx.textMuted,
     fontFamily,
     fontSize: sizes.micro,
     fontWeight: weights.medium,
   },
   labelActive: {
-    color: vantage.accent,
+    color: vx.accent,
     fontWeight: weights.bold,
   },
 });

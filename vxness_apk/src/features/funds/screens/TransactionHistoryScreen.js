@@ -5,9 +5,9 @@ import { useNavigation } from '@react-navigation/native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
-import { Screen, IconButton, CategoryTabs, Sheet, showToast, DateRangeSheet, formatRangeLabel } from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vantage/BottomNavPill';
+import { Screen, IconButton, CategoryTabs, Sheet, showToast, DateRangeSheet, formatRangeLabel } from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 import ApiService from '../../../services/api/ApiService';
 import { useAccount } from '../../../app/providers/AccountContext';
 import { TRADE_WEB_URL } from '../../../constants';
@@ -139,10 +139,10 @@ export default function TransactionHistoryScreen() {
   return (
     <Screen edges={['top']}>
       <View style={styles.header}>
-        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
+        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
         <Text style={styles.title}>Transactions</Text>
         <IconButton
-          icon={<Ionicons name={exporting ? 'hourglass-outline' : 'download-outline'} size={20} color={vantage.accent} />}
+          icon={<Ionicons name={exporting ? 'hourglass-outline' : 'download-outline'} size={20} color={vx.accent} />}
           accessibilityLabel="Download PDF"
           onPress={exporting ? undefined : exportPdf}
         />
@@ -156,12 +156,12 @@ export default function TransactionHistoryScreen() {
           accessibilityRole="button"
           accessibilityLabel="Filter by account"
         >
-          <Ionicons name="wallet-outline" size={15} color={vantage.textSecondary} />
+          <Ionicons name="wallet-outline" size={15} color={vx.textSecondary} />
           <Text style={styles.acctBarLab}>Account</Text>
           <Text style={styles.acctBarVal} numberOfLines={1}>
             {acctId ? acctMap[acctId] : 'All accounts'}
           </Text>
-          <Ionicons name="chevron-down" size={15} color={vantage.textMuted} />
+          <Ionicons name="chevron-down" size={15} color={vx.textMuted} />
         </Pressable>
       ) : null}
       <Sheet visible={acctSheetOpen} onClose={() => setAcctSheetOpen(false)} title="Select account">
@@ -179,11 +179,11 @@ export default function TransactionHistoryScreen() {
                 <Ionicons
                   name={id == null ? 'albums-outline' : 'wallet-outline'}
                   size={18}
-                  color={active ? vantage.accent : vantage.textSecondary}
+                  color={active ? vx.accent : vx.textSecondary}
                 />
-                <Text style={[styles.acctOptionTxt, active && { color: vantage.accent }]}>{label}</Text>
+                <Text style={[styles.acctOptionTxt, active && { color: vx.accent }]}>{label}</Text>
                 <View style={{ flex: 1 }} />
-                {active ? <Ionicons name="checkmark-circle" size={18} color={vantage.accent} /> : null}
+                {active ? <Ionicons name="checkmark-circle" size={18} color={vx.accent} /> : null}
               </Pressable>
             );
           })}
@@ -214,7 +214,7 @@ export default function TransactionHistoryScreen() {
           accessibilityState={{ selected: range === 'custom' }}
           accessibilityLabel="Custom date range"
         >
-          <Ionicons name="calendar-outline" size={13} color={range === 'custom' ? vantage.accent : vantage.textSecondary} />
+          <Ionicons name="calendar-outline" size={13} color={range === 'custom' ? vx.accent : vx.textSecondary} />
           <Text style={[styles.rangeTxt, range === 'custom' && styles.rangeTxtActive]}>
             {range === 'custom' && customRange ? formatRangeLabel(customRange.from, customRange.to) : 'Custom'}
           </Text>
@@ -245,12 +245,12 @@ export default function TransactionHistoryScreen() {
             <Text style={styles.showMoreTxt}>
               Show more ({items.length - shown} remaining)
             </Text>
-            <Ionicons name="chevron-down" size={16} color={vantage.textSecondary} />
+            <Ionicons name="chevron-down" size={16} color={vx.textSecondary} />
           </Pressable>
         ) : items.length > TX_PAGE ? (
           <Text style={styles.pagingFooter}>All {items.length} transactions shown</Text>
         ) : null}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vantage.accent} colors={[vantage.accent]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vx.accent} colors={[vx.accent]} />}
       />
     </Screen>
   );
@@ -299,7 +299,7 @@ function Row({ tx, acctLabel }) {
   // Trade-close ledger rows: sign/colour by result, trade details underneath.
   const isProfit = t === 'profit';
   const isLoss = t === 'loss';
-  const color = (isDeposit || isProfit) ? vantage.up : ((isWithdraw || isLoss) ? vantage.down : vantage.textPrimary);
+  const color = (isDeposit || isProfit) ? vx.up : ((isWithdraw || isLoss) ? vx.down : vx.textPrimary);
   const sign = (isDeposit || isProfit) ? '+' : ((isWithdraw || isLoss) ? '−' : '');
   const amount = Math.abs(Number(tx.amount ?? 0));
   const method = tx.payment_method || tx.method || tx.gateway || tx.type || 'Transaction';
@@ -326,54 +326,54 @@ function Row({ tx, acctLabel }) {
       </View>
       <View style={{ alignItems: 'flex-end' }}>
         <Text style={[rowStyles.amount, { color }]}>{sign}${amount.toFixed(2)}</Text>
-        <Text style={[rowStyles.status, status === 'completed' && { color: vantage.up }, status === 'failed' && { color: vantage.down }]}>{status || 'pending'}</Text>
+        <Text style={[rowStyles.status, status === 'completed' && { color: vx.up }, status === 'failed' && { color: vx.down }]}>{status || 'pending'}</Text>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  pagingFooter: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, textAlign: 'center', paddingVertical: space.md },
+  pagingFooter: { color: vx.textMuted, fontFamily, fontSize: sizes.label, textAlign: 'center', paddingVertical: space.md },
   showMoreBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     marginHorizontal: space.lg, marginTop: space.sm, paddingVertical: space.md,
-    borderWidth: 1, borderColor: vantage.border, borderRadius: radius.md, backgroundColor: vantage.bgRaised,
+    borderWidth: 1, borderColor: vx.border, borderRadius: radius.md, backgroundColor: vx.bgRaised,
   },
-  showMoreTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  showMoreTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs },
   rangeRow: { flexDirection: 'row', gap: space.xs, paddingHorizontal: space.lg, paddingTop: space.xs, paddingBottom: space.sm },
   acctBar: {
     flexDirection: 'row', alignItems: 'center', gap: space.xs,
     marginHorizontal: space.lg, marginBottom: space.sm,
     paddingHorizontal: space.md, paddingVertical: 10,
-    borderWidth: 1, borderColor: vantage.border, borderRadius: radius.md, backgroundColor: vantage.bgRaised,
+    borderWidth: 1, borderColor: vx.border, borderRadius: radius.md, backgroundColor: vx.bgRaised,
   },
-  acctBarLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, textTransform: 'uppercase', letterSpacing: 0.5 },
-  acctBarVal: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold, textAlign: 'right' },
+  acctBarLab: { color: vx.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  acctBarVal: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold, textAlign: 'right' },
   acctSheetWrap: { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.xs },
   acctOption: {
     flexDirection: 'row', alignItems: 'center', gap: space.md,
     paddingHorizontal: space.md, paddingVertical: space.md,
-    borderWidth: 1, borderColor: vantage.border, borderRadius: radius.md, backgroundColor: vantage.bgRaised,
+    borderWidth: 1, borderColor: vx.border, borderRadius: radius.md, backgroundColor: vx.bgRaised,
   },
-  acctOptionActive: { borderColor: vantage.accent },
-  acctOptionTxt: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
+  acctOptionActive: { borderColor: vx.accent },
+  acctOptionTxt: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
   rangeChip: {
     paddingHorizontal: space.md, paddingVertical: 6, borderRadius: 999,
-    borderWidth: 1, borderColor: vantage.border, backgroundColor: vantage.bgRaised,
+    borderWidth: 1, borderColor: vx.border, backgroundColor: vx.bgRaised,
   },
-  rangeChipActive: { borderColor: vantage.accent, backgroundColor: vantage.accentSoft || vantage.bgRaised },
+  rangeChipActive: { borderColor: vx.accent, backgroundColor: vx.accentSoft || vx.bgRaised },
   customChip: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  rangeTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
-  rangeTxtActive: { color: vantage.accent },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
-  empty: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, padding: space.huge, textAlign: 'center' },
+  rangeTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  rangeTxtActive: { color: vx.accent },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  empty: { color: vx.textMuted, fontFamily, fontSize: sizes.body, padding: space.huge, textAlign: 'center' },
 });
 
 const rowStyles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.lg, paddingVertical: space.md, borderBottomColor: vantage.border, borderBottomWidth: StyleSheet.hairlineWidth },
-  method: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
-  date: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.lg, paddingVertical: space.md, borderBottomColor: vx.border, borderBottomWidth: StyleSheet.hairlineWidth },
+  method: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
+  date: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
   amount: { fontFamily, fontSize: sizes.body, fontWeight: weights.heavy },
-  status: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2, textTransform: 'capitalize' },
+  status: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2, textTransform: 'capitalize' },
 });

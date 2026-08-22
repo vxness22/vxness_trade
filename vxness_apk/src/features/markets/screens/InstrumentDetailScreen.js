@@ -10,12 +10,12 @@ import {
   IconButton,
   Sheet,
   showToast,
-} from '../../../components/vantage';
+} from '../../../components/vx';
 import OrderTicket from '../../trading/order/OrderTicket';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vantage/BottomNavPill';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 import AccountSwitcher from '../../trading/components/AccountSwitcher';
 import { useAccount } from '../../../app/providers/AccountContext';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 import * as SecureStore from 'expo-secure-store';
 import ApiService from '../../../services/api/ApiService';
 import webSocketService from '../../../services/websocket/WebSocketService';
@@ -377,13 +377,13 @@ export default function InstrumentDetailScreen() {
                   stuck-spinner regression. Loads per open (a bit slower) but
                   works — fast-load to be revisited carefully. */}
               {/* No key={symbol} → the chart does NOT remount on a symbol change;
-                  it switches LIVE via window.SC.setSymbol() (no 26 MB reload =
+                  it switches LIVE via window.VX.setSymbol() (no 26 MB reload =
                   FundedZone-fast). The boot symbol is correct via the URL param,
                   so the earlier 'frozen on first symbol' bug can't recur. Stays
                   mounted across tabs; unmounts only while fullscreen is open so
                   we never run two heavy WebViews at once. */}
               {!chartFull ? (
-                <NativeChart symbol={symbol} interval={interval} theme={vantage.isDark ? 'dark' : 'light'} accountId={activeAccount?.id || activeAccount?._id} onDrag={setChartDragging} refreshTick={posRefresh} onClosePosition={(id) => setClosePrompt(id)} />
+                <NativeChart symbol={symbol} interval={interval} theme={vx.isDark ? 'dark' : 'light'} accountId={activeAccount?.id || activeAccount?._id} onDrag={setChartDragging} refreshTick={posRefresh} onClosePosition={(id) => setClosePrompt(id)} />
               ) : null}
             </View>
 
@@ -397,7 +397,7 @@ export default function InstrumentDetailScreen() {
                 {/* Safe-area padding so the chart's top toolbar isn't hidden
                     behind the device status bar / notch. */}
                 <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom }}>
-                  <NativeChart symbol={symbol} interval={interval} theme={vantage.isDark ? 'dark' : 'light'} accountId={activeAccount?.id || activeAccount?._id} onDrag={setChartDragging} refreshTick={posRefresh} onClosePosition={(id) => setClosePrompt(id)} />
+                  <NativeChart symbol={symbol} interval={interval} theme={vx.isDark ? 'dark' : 'light'} accountId={activeAccount?.id || activeAccount?._id} onDrag={setChartDragging} refreshTick={posRefresh} onClosePosition={(id) => setClosePrompt(id)} />
                   {/* Trade bar in fullscreen too: Lots + advanced (limit/stop)
                       opener + the same one-tap Sell/Buy split. Lift it above
                       the keyboard when typing Lots (edge-to-edge breaks the
@@ -410,7 +410,7 @@ export default function InstrumentDetailScreen() {
                       <LotsField value={lots} onChange={setLots} />
                       <View style={{ flex: 1 }} />
                       <Pressable onPress={() => setAdvOpen(true)} style={styles.advBtn} accessibilityRole="button" accessibilityLabel="Advanced order — limit, stop, TP/SL">
-                        <Ionicons name="options-outline" size={14} color={vantage.textSecondary} />
+                        <Ionicons name="options-outline" size={14} color={vx.textSecondary} />
                         <Text style={styles.advBtnTxt}>Limit / Stop</Text>
                       </Pressable>
                     </View>
@@ -471,11 +471,11 @@ export default function InstrumentDetailScreen() {
         onLayout={(e) => setFooterH(e.nativeEvent.layout.height)}
       >
         <Pressable onPress={() => setAcctSheet(true)} style={styles.acctRow} accessibilityRole="button" accessibilityLabel="Switch account">
-          <Ionicons name="wallet-outline" size={14} color={vantage.textSecondary} />
+          <Ionicons name="wallet-outline" size={14} color={vx.textSecondary} />
           <Text style={styles.acctTxt} numberOfLines={1}>
             {activeAccount ? `${activeAccount.is_demo ? 'Demo' : 'Live'} ${activeAccount.account_number || activeAccount.id || ''}` : 'Select account'}
           </Text>
-          <Ionicons name="chevron-down" size={14} color={vantage.textMuted} />
+          <Ionicons name="chevron-down" size={14} color={vx.textMuted} />
         </Pressable>
         <View style={styles.lotsBar}>
           <Text style={styles.lotsLabel}>Lots</Text>
@@ -497,7 +497,7 @@ export default function InstrumentDetailScreen() {
             turns red when it exceeds free margin. */}
         <View style={styles.freeMarginRow}>
           <Text style={styles.freeMarginLab}>Margin required:</Text>
-          <Text style={[styles.freeMarginVal, marginTight && { color: vantage.down }]}>
+          <Text style={[styles.freeMarginVal, marginTight && { color: vx.down }]}>
             {marginReq != null
               ? `≈ ${marginReq.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${activeAccount?.currency || 'USD'}`
               : '—'}
@@ -510,7 +510,7 @@ export default function InstrumentDetailScreen() {
           </Text>
           <View style={{ flex: 1 }} />
           <Pressable onPress={() => setAdvOpen(true)} style={styles.advBtn} accessibilityRole="button" accessibilityLabel="Advanced order — limit, stop, TP/SL">
-            <Ionicons name="options-outline" size={14} color={vantage.textSecondary} />
+            <Ionicons name="options-outline" size={14} color={vx.textSecondary} />
             <Text style={styles.advBtnTxt}>Limit / Stop</Text>
           </Pressable>
         </View>
@@ -563,7 +563,7 @@ function AccountPrompt({ mode, onCancel, onConfirm }) {
       <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
       <View style={promptStyles.card}>
         <View style={promptStyles.iconWrap}>
-          <Ionicons name={isOpen ? 'add-circle-outline' : 'wallet-outline'} size={40} color={vantage.accent} />
+          <Ionicons name={isOpen ? 'add-circle-outline' : 'wallet-outline'} size={40} color={vx.accent} />
         </View>
         <Text style={promptStyles.title}>{isOpen ? 'Open your account' : 'Choose your account'}</Text>
         <Text style={promptStyles.sub}>
@@ -590,12 +590,12 @@ function ClosePositionPrompt({ visible, busy, onCancel, onConfirm }) {
     <View style={promptStyles.overlay}>
       <Pressable style={StyleSheet.absoluteFill} onPress={busy ? undefined : onCancel} />
       <View style={promptStyles.card}>
-        <View style={[promptStyles.iconWrap, { backgroundColor: vantage.down + '1F', borderColor: vantage.down + '55' }]}>
-          <Ionicons name="close-circle-outline" size={40} color={vantage.down} />
+        <View style={[promptStyles.iconWrap, { backgroundColor: vx.down + '1F', borderColor: vx.down + '55' }]}>
+          <Ionicons name="close-circle-outline" size={40} color={vx.down} />
         </View>
         <Text style={promptStyles.title}>Close position?</Text>
         <Text style={promptStyles.sub}>This will close the trade at the current market price.</Text>
-        <Pressable style={[promptStyles.primaryBtn, { backgroundColor: vantage.down }, busy && { opacity: 0.6 }]} onPress={onConfirm} disabled={busy}>
+        <Pressable style={[promptStyles.primaryBtn, { backgroundColor: vx.down }, busy && { opacity: 0.6 }]} onPress={onConfirm} disabled={busy}>
           <Text style={[promptStyles.primaryTxt, { color: '#fff' }]}>{busy ? 'Closing…' : 'Close position'}</Text>
         </Pressable>
         <Pressable style={promptStyles.cancelBtn} onPress={onCancel} hitSlop={8} disabled={busy}>
@@ -611,7 +611,7 @@ function ClosePositionPrompt({ visible, busy, onCancel, onConfirm }) {
 function MessagePopup({ data, onClose }) {
   if (!data) return null;
   const ok = data.kind === 'success';
-  const color = ok ? (vantage.up || '#22c55e') : vantage.accent;
+  const color = ok ? (vx.up || '#22c55e') : vx.accent;
   return (
     <View style={promptStyles.overlay}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
@@ -637,22 +637,22 @@ const promptStyles = StyleSheet.create({
   },
   card: {
     width: '100%', maxWidth: 360, borderRadius: 20,
-    backgroundColor: vantage.bgRaised, borderWidth: StyleSheet.hairlineWidth, borderColor: vantage.border,
+    backgroundColor: vx.bgRaised, borderWidth: StyleSheet.hairlineWidth, borderColor: vx.border,
     padding: 22, alignItems: 'center',
   },
   iconWrap: {
     width: 68, height: 68, borderRadius: 34, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: vantage.accent + '1F', borderWidth: 1, borderColor: vantage.accent + '55', marginBottom: 14,
+    backgroundColor: vx.accent + '1F', borderWidth: 1, borderColor: vx.accent + '55', marginBottom: 14,
   },
-  title: { color: vantage.textPrimary, fontFamily, fontSize: 18, fontWeight: '800' },
-  sub: { color: vantage.textMuted, fontFamily, fontSize: 13, textAlign: 'center', marginTop: 6, lineHeight: 18 },
+  title: { color: vx.textPrimary, fontFamily, fontSize: 18, fontWeight: '800' },
+  sub: { color: vx.textMuted, fontFamily, fontSize: 13, textAlign: 'center', marginTop: 6, lineHeight: 18 },
   primaryBtn: {
-    width: '100%', backgroundColor: vantage.accent, borderRadius: 12,
+    width: '100%', backgroundColor: vx.accent, borderRadius: 12,
     paddingVertical: 14, alignItems: 'center', marginTop: 18,
   },
   primaryTxt: { color: '#000', fontFamily, fontSize: 15, fontWeight: '800' },
   cancelBtn: { paddingVertical: 12, marginTop: 4 },
-  cancelTxt: { color: vantage.textMuted, fontFamily, fontSize: 14, fontWeight: '600' },
+  cancelTxt: { color: vx.textMuted, fontFamily, fontSize: 14, fontWeight: '600' },
 });
 
 // Slide-up sheet hosting the full order ticket — market / LIMIT / STOP order
@@ -713,7 +713,7 @@ function LotsField({ value, onChange }) {
       returnKeyType="done"
       selectTextOnFocus
       placeholder="0.00"
-      placeholderTextColor={vantage.textMuted}
+      placeholderTextColor={vx.textMuted}
       accessibilityLabel="Lots volume"
     />
   );
@@ -722,13 +722,13 @@ function LotsField({ value, onChange }) {
 function Header({ pinned, onBack, onPin, onFullscreen }) {
   return (
     <View style={styles.header}>
-      <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={onBack} />
+      <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={onBack} />
       <View style={{ flex: 1 }} />
       <Pressable onPress={onFullscreen} hitSlop={8} accessibilityRole="button" accessibilityLabel="Fullscreen chart" style={styles.hdrIcon}>
-        <Ionicons name="expand-outline" size={21} color={vantage.textPrimary} />
+        <Ionicons name="expand-outline" size={21} color={vx.textPrimary} />
       </Pressable>
       <Pressable onPress={onPin} hitSlop={8} accessibilityRole="button" accessibilityLabel={pinned ? 'Unpin' : 'Pin to watchlist'} style={styles.hdrIcon}>
-        <Ionicons name={pinned ? 'star' : 'star-outline'} size={22} color={pinned ? vantage.accent : vantage.textPrimary} />
+        <Ionicons name={pinned ? 'star' : 'star-outline'} size={22} color={pinned ? vx.accent : vx.textPrimary} />
       </Pressable>
     </View>
   );
@@ -749,7 +749,7 @@ function PeriodCell({ label, pct }) {
   return (
     <View style={styles.periodCell}>
       <Text style={styles.periodLab}>{label}</Text>
-      <Text style={[styles.periodVal, { color: !has ? vantage.textMuted : positive ? vantage.up : vantage.down }]}>
+      <Text style={[styles.periodVal, { color: !has ? vx.textMuted : positive ? vx.up : vx.down }]}>
         {has ? `${positive ? '+' : ''}${pct.toFixed(2)}%` : '—'}
       </Text>
     </View>
@@ -766,7 +766,7 @@ function RangeBar({ range }) {
       </View>
       <View style={styles.rangeTrack}>
         <View style={[styles.rangeMarker, { left: `${range.posPct * 100}%` }]}>
-          <Ionicons name="caret-down" size={12} color={vantage.textPrimary} />
+          <Ionicons name="caret-down" size={12} color={vx.textPrimary} />
         </View>
       </View>
       <View style={styles.rangeRow}>
@@ -802,107 +802,107 @@ const styles = StyleSheet.create({
     gap: space.xs,
   },
   symbolWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  symbolTxt: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
+  symbolTxt: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
   hdrIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
 
-  tabRow: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: vantage.border },
+  tabRow: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: vx.border },
   tabCell: { flex: 1, alignItems: 'center', paddingVertical: space.sm },
-  tabLabel: { color: vantage.textMuted, fontFamily, fontSize: sizes.h3 },
+  tabLabel: { color: vx.textMuted, fontFamily, fontSize: sizes.h3 },
   tabUnderline: { height: 2, width: 36, borderRadius: 1, marginTop: space.xs },
 
   heroRow: { flexDirection: 'row', paddingHorizontal: space.lg, paddingVertical: space.sm, gap: space.md },
-  heroPrice: { color: vantage.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
+  heroPrice: { color: vx.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
   heroChange: { fontFamily, fontSize: sizes.body, fontWeight: weights.bold, marginTop: 2 },
-  heroTime: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  heroTime: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
 
   ohlcGrid: { width: 160, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'flex-start' },
   ohlcCell: { width: '50%', paddingVertical: 2 },
-  ohlcLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro },
-  ohlcVal: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
+  ohlcLab: { color: vx.textMuted, fontFamily, fontSize: sizes.micro },
+  ohlcVal: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
 
   tfRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingBottom: space.sm },
   tfCell: { paddingVertical: space.xs },
-  tfTxt: { color: vantage.textMuted, fontFamily, fontSize: sizes.body },
+  tfTxt: { color: vx.textMuted, fontFamily, fontSize: sizes.body },
   tfMore: { marginLeft: 'auto' },
 
-  chartWrap: { height: 380, marginHorizontal: space.sm, backgroundColor: vantage.bg, borderRadius: radius.md, overflow: 'hidden' },
-  chartLoader: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: vantage.bg },
-  chart: { flex: 1, backgroundColor: vantage.bg },
+  chartWrap: { height: 380, marginHorizontal: space.sm, backgroundColor: vx.bg, borderRadius: radius.md, overflow: 'hidden' },
+  chartLoader: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: vx.bg },
+  chart: { flex: 1, backgroundColor: vx.bg },
   fsBtn: {
     // Bottom-right: clear of TradingView's top-anchored toolbar + indicator
     // dialog close (X) (top-right) and the TradingView logo (bottom-left).
     position: 'absolute', bottom: 10, right: 10,
     width: 34, height: 34, borderRadius: 17,
-    backgroundColor: vantage.bgElevated, borderWidth: 1, borderColor: vantage.border,
+    backgroundColor: vx.bgElevated, borderWidth: 1, borderColor: vx.border,
     alignItems: 'center', justifyContent: 'center',
   },
-  fsContainer: { flex: 1, backgroundColor: vantage.bg },
+  fsContainer: { flex: 1, backgroundColor: vx.bg },
   // Fullscreen-chart bottom trade bar.
-  fsFooter: { paddingHorizontal: space.lg, paddingTop: space.sm, gap: space.sm, backgroundColor: vantage.bg },
+  fsFooter: { paddingHorizontal: space.lg, paddingTop: space.sm, gap: space.sm, backgroundColor: vx.bg },
   fsLotsRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   // "Limit / Stop" advanced-order opener chip.
   advBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    borderWidth: 1, borderColor: vantage.border, borderRadius: radius.pill,
-    paddingHorizontal: space.md, paddingVertical: 5, backgroundColor: vantage.bgRaised,
+    borderWidth: 1, borderColor: vx.border, borderRadius: radius.pill,
+    paddingHorizontal: space.md, paddingVertical: 5, backgroundColor: vx.bgRaised,
   },
-  advBtnTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  advBtnTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
   fsClose: {
     position: 'absolute', right: 14,
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center',
   },
 
-  acctRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs, alignSelf: 'flex-start', backgroundColor: vantage.bgRaised, borderWidth: 1, borderColor: vantage.border, borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: 6, marginBottom: space.xs, maxWidth: '70%' },
-  acctTxt: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, flexShrink: 1 },
+  acctRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs, alignSelf: 'flex-start', backgroundColor: vx.bgRaised, borderWidth: 1, borderColor: vx.border, borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: 6, marginBottom: space.xs, maxWidth: '70%' },
+  acctTxt: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, flexShrink: 1 },
 
-  periodRow: { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: vantage.border, marginTop: space.md },
-  periodCell: { flex: 1, alignItems: 'center', paddingVertical: space.md, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: vantage.border },
-  periodLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  periodRow: { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: vx.border, marginTop: space.md },
+  periodCell: { flex: 1, alignItems: 'center', paddingVertical: space.md, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: vx.border },
+  periodLab: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
   periodVal: { fontFamily, fontSize: sizes.body, fontWeight: weights.bold, marginTop: 2 },
 
-  rangeWrap: { paddingHorizontal: space.lg, paddingVertical: space.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: vantage.border },
+  rangeWrap: { paddingHorizontal: space.lg, paddingVertical: space.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: vx.border },
   rangeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  rangeLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro },
-  rangeVal: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
-  rangeTrack: { height: 4, backgroundColor: vantage.bgRaised, borderRadius: 2, marginVertical: space.sm, position: 'relative' },
+  rangeLab: { color: vx.textMuted, fontFamily, fontSize: sizes.micro },
+  rangeVal: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
+  rangeTrack: { height: 4, backgroundColor: vx.bgRaised, borderRadius: 2, marginVertical: space.sm, position: 'relative' },
   rangeMarker: { position: 'absolute', top: -10, marginLeft: -6, alignItems: 'center' },
 
-  empty: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, textAlign: 'center', padding: space.lg },
-  ordTitle: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: space.sm },
-  ordRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: space.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: vantage.border },
+  empty: { color: vx.textMuted, fontFamily, fontSize: sizes.body, textAlign: 'center', padding: space.lg },
+  ordTitle: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: space.sm },
+  ordRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: space.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: vx.border },
   ordSide: { fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
   ordPl: { fontFamily, fontSize: sizes.body, fontWeight: weights.heavy },
 
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: space.sm },
-  infoBorder: { borderBottomColor: vantage.border, borderBottomWidth: StyleSheet.hairlineWidth },
-  infoLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.body },
-  infoVal: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
+  infoBorder: { borderBottomColor: vx.border, borderBottomWidth: StyleSheet.hairlineWidth },
+  infoLab: { color: vx.textMuted, fontFamily, fontSize: sizes.body },
+  infoVal: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
 
   footer: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
-    backgroundColor: vantage.bg,
+    backgroundColor: vx.bg,
     paddingHorizontal: space.lg, paddingTop: space.xs,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: vantage.border,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: vx.border,
     gap: space.xs,
   },
   lotsBar: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  lotsLabel: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, width: 50 },
+  lotsLabel: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, width: 50 },
   lotsInput: {
     flex: 1,
     height: 42,
-    backgroundColor: vantage.bgRaised,
+    backgroundColor: vx.bgRaised,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: vantage.border,
+    borderColor: vx.border,
     paddingHorizontal: space.md,
-    color: vantage.textPrimary,
+    color: vx.textPrimary,
     fontFamily,
     fontSize: sizes.h3,
     fontWeight: weights.bold,
     textAlign: 'center',
   },
   freeMarginRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
-  freeMarginLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
-  freeMarginVal: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
+  freeMarginLab: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
+  freeMarginVal: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
 });

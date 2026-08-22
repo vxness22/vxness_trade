@@ -2,8 +2,8 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Sheet, MenuRow } from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
+import { Sheet, MenuRow } from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 
 // Identify copy/PAMM/MAM accounts so the user can tell them apart from normal
 // trading accounts. Backend flags them via is_copy_trading; the group name (if
@@ -28,7 +28,7 @@ export default function AccountSwitcher({ visible, onClose, accounts = [], selec
     <Sheet visible={visible} onClose={onClose} title="Select account">
       {onAddAccount ? (
         <MenuRow
-          icon={<Ionicons name="add-circle-outline" size={20} color={vantage.accent} />}
+          icon={<Ionicons name="add-circle-outline" size={20} color={vx.accent} />}
           label="Add account"
           onPress={() => { onClose(); onAddAccount(); }}
         />
@@ -47,10 +47,10 @@ export default function AccountSwitcher({ visible, onClose, accounts = [], selec
             key={id}
             onPress={() => { onSelect(a); onClose(); }}
             style={styles.row}
-            android_ripple={{ color: vantage.bgPressed }}
+            android_ripple={{ color: vx.bgPressed }}
             accessibilityRole="button"
           >
-            <Ionicons name={isSelected ? 'checkmark-circle' : 'card-outline'} size={20} color={isSelected ? vantage.accent : vantage.textPrimary} />
+            <Ionicons name={isSelected ? 'checkmark-circle' : 'card-outline'} size={20} color={isSelected ? vx.accent : vx.textPrimary} />
             <View style={styles.rowText}>
               <View style={styles.labelRow}>
                 <Text style={styles.label} numberOfLines={1}>
@@ -58,7 +58,7 @@ export default function AccountSwitcher({ visible, onClose, accounts = [], selec
                 </Text>
                 {tag ? (
                   <View style={[styles.tag, tag === 'Copy' ? styles.tagCopy : styles.tagManaged]}>
-                    <Text style={[styles.tagTxt, tag === 'Copy' ? { color: vantage.textSecondary } : { color: vantage.accent }]}>{tag}</Text>
+                    <Text style={[styles.tagTxt, tag === 'Copy' ? { color: vx.textSecondary } : { color: vx.accent }]}>{tag}</Text>
                   </View>
                 ) : null}
               </View>
@@ -72,14 +72,14 @@ export default function AccountSwitcher({ visible, onClose, accounts = [], selec
 }
 
 const styles = StyleSheet.create({
-  empty: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, padding: space.lg, textAlign: 'center' },
+  empty: { color: vx.textMuted, fontFamily, fontSize: sizes.body, padding: space.lg, textAlign: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md, paddingHorizontal: space.xs },
   rowText: { flex: 1, minWidth: 0 },
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  label: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold, flexShrink: 1 },
+  label: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold, flexShrink: 1 },
   tag: { paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: radius.sm },
-  tagManaged: { backgroundColor: vantage.accentMuted },
-  tagCopy: { backgroundColor: vantage.bgPressed },
+  tagManaged: { backgroundColor: vx.accentMuted },
+  tagCopy: { backgroundColor: vx.bgPressed },
   tagTxt: { fontFamily, fontSize: sizes.micro, fontWeight: weights.heavy, letterSpacing: 0.5 },
-  balance: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  balance: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
 });

@@ -3,9 +3,9 @@ import { ScrollView, View, Text, TextInput, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
-import { Screen, IconButton } from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vantage/BottomNavPill';
+import { Screen, IconButton } from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 import LocalBankingPanel from '../components/LocalBankingPanel';
 
 // Standalone Local Banking screen — the shared LocalBankingPanel also powers
@@ -18,7 +18,7 @@ export default function DepositLocalBanking() {
   return (
     <Screen edges={['top']}>
       <View style={styles.header}>
-        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
+        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
         <Text style={styles.title}>Local Banking</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -29,7 +29,7 @@ export default function DepositLocalBanking() {
           onChangeText={setAmount}
           keyboardType="decimal-pad"
           placeholder="e.g. 100"
-          placeholderTextColor={vantage.textMuted}
+          placeholderTextColor={vx.textMuted}
           style={styles.input}
         />
         <View style={{ marginTop: space.md }}>
@@ -42,7 +42,7 @@ export default function DepositLocalBanking() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
-  label: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
-  input: { backgroundColor: vantage.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
+  input: { backgroundColor: vx.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vx.textPrimary, fontFamily, fontSize: sizes.body },
 });

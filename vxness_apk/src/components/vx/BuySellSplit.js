@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Pressable, Text, StyleSheet } from 'react-native';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 import PriceTicker from './PriceTicker';
 
 export default function BuySellSplit({
@@ -16,7 +16,7 @@ export default function BuySellSplit({
       <View style={styles.row}>
         <Pressable
           onPress={() => onChange('sell')}
-          style={[styles.half, styles.left, { backgroundColor: side === 'sell' ? vantage.sellBtn : vantage.sellBtnDim }]}
+          style={[styles.half, styles.left, { backgroundColor: side === 'sell' ? vx.sellBtn : vx.sellBtnDim }]}
           accessibilityRole="button"
           accessibilityState={{ selected: side === 'sell' }}
         >
@@ -28,7 +28,7 @@ export default function BuySellSplit({
         </View>
         <Pressable
           onPress={() => onChange('buy')}
-          style={[styles.half, styles.right, { backgroundColor: side === 'buy' ? vantage.buyBtn : vantage.buyBtnDim }]}
+          style={[styles.half, styles.right, { backgroundColor: side === 'buy' ? vx.buyBtn : vx.buyBtnDim }]}
           accessibilityRole="button"
           accessibilityState={{ selected: side === 'buy' }}
         >
@@ -57,15 +57,15 @@ const styles = StyleSheet.create({
     top: '50%',
     transform: [{ translateX: -22 }, { translateY: -12 }],
     width: 44, height: 24,
-    backgroundColor: vantage.spreadChip,
+    backgroundColor: vx.spreadChip,
     borderRadius: 12,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: vantage.borderStrong,
+    borderWidth: 1, borderColor: vx.borderStrong,
     zIndex: 1,
   },
-  chipTxt: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
-  lab: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
-  price: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy, marginTop: 1 },
+  chipTxt: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
+  lab: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  price: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy, marginTop: 1 },
   changeRow: { flexDirection: 'row', alignItems: 'center', marginTop: space.sm, gap: space.sm },
   changeBar: { flex: 1, height: 3, flexDirection: 'row', borderRadius: 2, overflow: 'hidden' },
   changeSeg: { flex: 1, height: 3 },
@@ -73,5 +73,5 @@ const styles = StyleSheet.create({
   segRight: { borderTopRightRadius: 2, borderBottomRightRadius: 2 },
   changeMarker: { alignItems: 'center', minWidth: 20 },
   changeArrow: { fontFamily, fontSize: 9, lineHeight: 11 },
-  changeNum: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro, fontWeight: weights.semibold },
+  changeNum: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, fontWeight: weights.semibold },
 });

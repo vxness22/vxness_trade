@@ -3,12 +3,12 @@ import { ScrollView, RefreshControl, View, StyleSheet, Pressable, Text, Image } 
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 import { AuthContext } from '../../../app/providers/AuthContext';
-import { Screen, BalanceBlock } from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
+import { Screen, BalanceBlock } from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 import ApiService from '../../../services/api/ApiService';
 import webSocketService from '../../../services/websocket/WebSocketService';
 import { useHiddenBalance } from '../../../utils/hiddenBalance';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vantage/BottomNavPill';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 
 import { useAccount } from '../../../app/providers/AccountContext';
 import HomeHeader from '../components/HomeHeader';
@@ -188,7 +188,7 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: BOTTOM_NAV_PILL_HEIGHT + space.huge }]}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vantage.accent} colors={[vantage.accent]} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vx.accent} colors={[vx.accent]} />
         }
       >
         <Pressable onLongPress={() => __DEV__ && nav.navigate('ComponentGallery')}>

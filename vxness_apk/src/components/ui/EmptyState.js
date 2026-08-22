@@ -1,12 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { vantage } from '../../theme/vantageTheme';
+import { vx } from '../../theme/vxTheme';
 
 const colors = {
-  bgSecondary: vantage.bgRaised,
-  textMuted: vantage.textMuted,
-  textSecondary: vantage.textSecondary,
+  bgSecondary: vx.bgRaised,
+  textMuted: vx.textMuted,
+  textSecondary: vx.textSecondary,
 };
 
 export default function EmptyState({ icon = 'file-tray-outline', title, subtitle }) {

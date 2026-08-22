@@ -5,7 +5,7 @@ import HomeScreen from '../../features/home/screens/HomeScreen';
 import ComponentGalleryScreen from '../../features/_dev/ComponentGalleryScreen';
 import ProfileMenuScreen from '../../features/profile/screens/ProfileMenuScreen';
 
-// Legacy screens — reached from Profile menu until they're rewritten in Vantage style.
+// Legacy screens — reached from Profile menu until they're rewritten in Vxness style.
 import KycScreen from '../../features/profile/screens/KycScreen';
 import AccountsScreen from '../../features/profile/screens/AccountsScreen';
 import PortfolioScreen from '../../features/trading/screens/PortfolioScreen';

@@ -2,8 +2,8 @@ import { Platform } from 'react-native';
 
 // ── Theme token sets ────────────────────────────────────────────────────────
 // Two palettes share the same key names so every component can keep reading
-// `vantage.<token>` unchanged. The active set is applied into the live `vantage`
-// object at startup (before screens load) by applyVantageTheme().
+// `vx.<token>` unchanged. The active set is applied into the live `vx`
+// object at startup (before screens load) by applyVxTheme().
 
 const darkTokens = {
   // Surfaces — lifted off pure black so cards stand out against the
@@ -81,22 +81,22 @@ const lightTokens = {
   buyBtnDim:    'rgba(22,163,74,0.18)',
 };
 
-export const VANTAGE_TOKENS = { dark: darkTokens, light: lightTokens };
+export const VX_TOKENS = { dark: darkTokens, light: lightTokens };
 
-// Live token object. Components import this and read `vantage.<token>`. It is
+// Live token object. Components import this and read `vx.<token>`. It is
 // MUTATED in place (never reassigned) so existing destructured imports keep
-// pointing at the up-to-date values. Defaults to dark; applyVantageTheme()
+// pointing at the up-to-date values. Defaults to dark; applyVxTheme()
 // overrides it at startup based on the saved preference.
-export const vantage = { ...darkTokens, scheme: 'dark', isDark: true };
+export const vx = { ...darkTokens, scheme: 'dark', isDark: true };
 
 /** Swap the live tokens to the named theme ('dark' | 'light'). */
-export function applyVantageTheme(name) {
+export function applyVxTheme(name) {
   const isDark = name !== 'light';
-  Object.assign(vantage, isDark ? darkTokens : lightTokens, {
+  Object.assign(vx, isDark ? darkTokens : lightTokens, {
     scheme: isDark ? 'dark' : 'light',
     isDark,
   });
-  return vantage;
+  return vx;
 }
 
 // SecureStore key used across the app for the theme preference.
@@ -142,8 +142,8 @@ export const radius = {
 };
 
 export default {
-  vantage,
-  applyVantageTheme,
+  vx,
+  applyVxTheme,
   fontFamily,
   weights,
   sizes,

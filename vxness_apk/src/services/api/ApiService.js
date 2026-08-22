@@ -666,7 +666,7 @@ class ApiService {
     return this.request(`/accounts/${accountId}/summary`);
   }
 
-  // Social Trading - TrustEdge format
+  // Social Trading - the platform format
   async getMasters() {
     return this.request('/social/masters');
   }

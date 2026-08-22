@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { authenticate, cancelAuthenticate } from '../services/auth/biometricLock';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../theme/vxTheme';
 
 // Android needs the activity to be fully resumed & focused before the native
 // BiometricPrompt can attach; prompting too early on resume silently fails and
@@ -73,14 +73,14 @@ export default function BiometricLockScreen({ onUnlock, onLogout, label = 'Biome
         {/* Dark mode: the square favicon (shows clearly on the dark lock
             screen); light mode: the wide wordmark. */}
         <Image
-          source={vantage.isDark
+          source={vx.isDark
             ? require('../../assets/brand/vxness-favicon.png')
             : require('../../assets/brand/vxness-logo.png')}
-          style={vantage.isDark ? styles.favicon : styles.logo}
+          style={vx.isDark ? styles.favicon : styles.logo}
           resizeMode="contain"
         />
         <View style={styles.iconCircle}>
-          <Ionicons name={isFace ? 'scan-outline' : 'finger-print'} size={44} color={vantage.accent} />
+          <Ionicons name={isFace ? 'scan-outline' : 'finger-print'} size={44} color={vx.accent} />
         </View>
         <Text style={styles.title}>App Locked</Text>
         <Text style={styles.sub}>Unlock with biometrics to continue</Text>
@@ -103,7 +103,7 @@ export default function BiometricLockScreen({ onUnlock, onLogout, label = 'Biome
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: vantage.bg,
+    backgroundColor: vx.bg,
     zIndex: 9999,
     elevation: 9999,
   },
@@ -112,17 +112,17 @@ const styles = StyleSheet.create({
   favicon: { width: 76, height: 76, marginBottom: space.xl, borderRadius: radius.lg },
   iconCircle: {
     width: 88, height: 88, borderRadius: 44,
-    backgroundColor: vantage.accentMuted || 'rgba(242,106,31,0.15)',
+    backgroundColor: vx.accentMuted || 'rgba(242,106,31,0.15)',
     alignItems: 'center', justifyContent: 'center', marginBottom: space.lg,
   },
-  title: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy },
-  sub: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, marginTop: space.sm, textAlign: 'center' },
+  title: { color: vx.textPrimary, fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy },
+  sub: { color: vx.textMuted, fontFamily, fontSize: sizes.body, marginTop: space.sm, textAlign: 'center' },
   unlockBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm,
-    backgroundColor: vantage.accent, borderRadius: radius.pill,
+    backgroundColor: vx.accent, borderRadius: radius.pill,
     paddingVertical: 14, paddingHorizontal: space.xl, marginTop: space.xl, minWidth: 240,
   },
   unlockTxt: { color: '#fff', fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
   logoutBtn: { marginTop: space.lg, paddingVertical: space.sm },
-  logoutTxt: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  logoutTxt: { color: vx.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
 });

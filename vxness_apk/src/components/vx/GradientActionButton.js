@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { space, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { space, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 // Brand gradient: the Vxness green deepening to a lighter tint of the same hue,
 // matching

@@ -4,8 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { WebView } from 'react-native-webview';
 
-import { Screen, Card, PillButton, IconButton, showToast } from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../../../theme/vantageTheme';
+import { Screen, Card, PillButton, IconButton, showToast } from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../../../theme/vxTheme';
 import ApiService from '../../../services/api/ApiService';
 
 export default function DepositRazorpay() {
@@ -81,7 +81,7 @@ export default function DepositRazorpay() {
           javaScriptEnabled
           domStorageEnabled
           startInLoadingState
-          renderLoading={() => <ActivityIndicator color={vantage.accent} style={{ marginTop: 100 }} />}
+          renderLoading={() => <ActivityIndicator color={vx.accent} style={{ marginTop: 100 }} />}
         />
       </Screen>
     );
@@ -92,7 +92,7 @@ export default function DepositRazorpay() {
       <Screen edges={['top']}>
         <Header onBack={() => nav.goBack()} title="Verifying…" />
         <View style={{ alignItems: 'center', padding: space.huge }}>
-          <ActivityIndicator color={vantage.accent} size="large" />
+          <ActivityIndicator color={vx.accent} size="large" />
           <Text style={styles.subText}>Confirming your payment…</Text>
         </View>
       </Screen>
@@ -129,7 +129,7 @@ export default function DepositRazorpay() {
 function Header({ onBack, title }) {
   return (
     <View style={styles.header}>
-      <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={onBack} />
+      <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={onBack} />
       <Text style={styles.title}>{title}</Text>
       <View style={{ width: 40 }} />
     </View>
@@ -173,15 +173,15 @@ setTimeout(function(){ rzp.open(); }, 100);
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
-  subText: { color: vantage.textSecondary, fontFamily, fontSize: sizes.body, marginTop: space.md },
-  error: { color: vantage.down, fontFamily, fontSize: sizes.label, marginTop: space.sm, textAlign: 'center' },
-  helper: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, textAlign: 'center', marginTop: space.sm },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  subText: { color: vx.textSecondary, fontFamily, fontSize: sizes.body, marginTop: space.md },
+  error: { color: vx.down, fontFamily, fontSize: sizes.label, marginTop: space.sm, textAlign: 'center' },
+  helper: { color: vx.textMuted, fontFamily, fontSize: sizes.label, textAlign: 'center', marginTop: space.sm },
 });
 
 const rowStyles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: space.sm },
-  border: { borderBottomColor: vantage.border, borderBottomWidth: StyleSheet.hairlineWidth },
-  label: { color: vantage.textMuted, fontFamily, fontSize: sizes.body },
-  value: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
+  border: { borderBottomColor: vx.border, borderBottomWidth: StyleSheet.hairlineWidth },
+  label: { color: vx.textMuted, fontFamily, fontSize: sizes.body },
+  value: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
 });

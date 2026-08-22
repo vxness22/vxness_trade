@@ -1,7 +1,7 @@
 import React from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Dimensions, Linking } from 'react-native';
 
-import { vantage, space, radius } from '../../../theme/vantageTheme';
+import { vx, space, radius } from '../../../theme/vxTheme';
 import { API_BASE_URL } from '../../../constants/api';
 import ApiService from '../../../services/api/ApiService';
 
@@ -63,6 +63,6 @@ export default function BannerCarousel({ banners = [], onPressFallback }) {
 
 const styles = StyleSheet.create({
   row: { gap: space.md, paddingHorizontal: space.lg, paddingVertical: space.sm },
-  card: { width: CARD_W, height: CARD_H, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: vantage.bgElevated },
+  card: { width: CARD_W, height: CARD_H, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: vx.bgElevated },
   img: { width: CARD_W, height: CARD_H },
 });

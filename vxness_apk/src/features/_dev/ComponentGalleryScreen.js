@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { ScrollView, View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
-import { Card, PillButton, IconButton, CheckboxRow, NumberStepper, SegmentedTabs, CategoryTabs, SymbolIcon, Sparkline, InstrumentRow, StatCard, QuickActionTile, MenuRow, StrategyCard, BuySellSplit, BottomNavPill, BalanceBlock, Sheet, ToastHost, showToast, CalendarStrip, MoversBars, SpotlightCard, DiscreteSlider, EmptyState } from '../../components/vantage';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
+import { Card, PillButton, IconButton, CheckboxRow, NumberStepper, SegmentedTabs, CategoryTabs, SymbolIcon, Sparkline, InstrumentRow, StatCard, QuickActionTile, MenuRow, StrategyCard, BuySellSplit, BottomNavPill, BalanceBlock, Sheet, ToastHost, showToast, CalendarStrip, MoversBars, SpotlightCard, DiscreteSlider, EmptyState } from '../../components/vx';
 
 // Components are imported and rendered here as they're built.
 // Add a new Section() per component task.
@@ -39,31 +39,31 @@ export default function ComponentGalleryScreen() {
         <Text style={styles.subtitle}>Dev-only smoke harness</Text>
 
         <Section title="Theme tokens">
-          <Swatch color={vantage.bg} label="bg" />
-          <Swatch color={vantage.bgElevated} label="bgElevated" />
-          <Swatch color={vantage.accent} label="accent" />
-          <Swatch color={vantage.up} label="up" />
-          <Swatch color={vantage.down} label="down" />
+          <Swatch color={vx.bg} label="bg" />
+          <Swatch color={vx.bgElevated} label="bgElevated" />
+          <Swatch color={vx.accent} label="accent" />
+          <Swatch color={vx.up} label="up" />
+          <Swatch color={vx.down} label="down" />
         </Section>
 
         <Section title="Screen">
-          <Text style={{ color: vantage.textSecondary, fontFamily, fontSize: sizes.body }}>
+          <Text style={{ color: vx.textSecondary, fontFamily, fontSize: sizes.body }}>
             Screen wraps any route with bg + SafeArea + light StatusBar.
           </Text>
         </Section>
 
         <Section title="Card">
           <Card>
-            <Text style={{ color: vantage.textPrimary, fontFamily, fontSize: sizes.body }}>Elevated card (default)</Text>
+            <Text style={{ color: vx.textPrimary, fontFamily, fontSize: sizes.body }}>Elevated card (default)</Text>
           </Card>
           <Card variant="raised">
-            <Text style={{ color: vantage.textPrimary, fontFamily, fontSize: sizes.body }}>Raised card</Text>
+            <Text style={{ color: vx.textPrimary, fontFamily, fontSize: sizes.body }}>Raised card</Text>
           </Card>
           <Card variant="outline">
-            <Text style={{ color: vantage.textPrimary, fontFamily, fontSize: sizes.body }}>Outline card</Text>
+            <Text style={{ color: vx.textPrimary, fontFamily, fontSize: sizes.body }}>Outline card</Text>
           </Card>
           <Card onPress={() => console.log('card pressed')}>
-            <Text style={{ color: vantage.textPrimary, fontFamily, fontSize: sizes.body }}>Pressable card (tap me)</Text>
+            <Text style={{ color: vx.textPrimary, fontFamily, fontSize: sizes.body }}>Pressable card (tap me)</Text>
           </Card>
         </Section>
 
@@ -81,10 +81,10 @@ export default function ComponentGalleryScreen() {
 
         <Section title="IconButton">
           <View style={{ flexDirection: 'row', gap: space.md }}>
-            <IconButton icon={<Ionicons name="search" size={20} color={vantage.textPrimary} />} accessibilityLabel="Search" onPress={() => {}} />
-            <IconButton icon={<Ionicons name="chatbubble-outline" size={20} color={vantage.textPrimary} />} badgeColor={vantage.down} accessibilityLabel="Support (unread)" onPress={() => {}} />
-            <IconButton variant="filled" icon={<Ionicons name="chevron-back" size={20} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={() => {}} />
-            <IconButton size="lg" variant="filled" icon={<Ionicons name="notifications-outline" size={22} color={vantage.textPrimary} />} accessibilityLabel="Notifications" onPress={() => {}} />
+            <IconButton icon={<Ionicons name="search" size={20} color={vx.textPrimary} />} accessibilityLabel="Search" onPress={() => {}} />
+            <IconButton icon={<Ionicons name="chatbubble-outline" size={20} color={vx.textPrimary} />} badgeColor={vx.down} accessibilityLabel="Support (unread)" onPress={() => {}} />
+            <IconButton variant="filled" icon={<Ionicons name="chevron-back" size={20} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={() => {}} />
+            <IconButton size="lg" variant="filled" icon={<Ionicons name="notifications-outline" size={22} color={vx.textPrimary} />} accessibilityLabel="Notifications" onPress={() => {}} />
           </View>
         </Section>
 
@@ -98,7 +98,7 @@ export default function ComponentGalleryScreen() {
             {['XAUUSD','BTCUSD','NAS100','Nikkei225','HK50','EURUSD','UNKNOWN'].map((s) =>
               <View key={s} style={{ alignItems: 'center', gap: 4 }}>
                 <SymbolIcon symbol={s} size={48} />
-                <Text style={{ color: vantage.textMuted, fontFamily, fontSize: sizes.micro }}>{s}</Text>
+                <Text style={{ color: vx.textMuted, fontFamily, fontSize: sizes.micro }}>{s}</Text>
               </View>
             )}
           </View>
@@ -129,19 +129,19 @@ export default function ComponentGalleryScreen() {
 
         <Section title="QuickActionTile">
           <View style={{ flexDirection: 'row', gap: space.md }}>
-            <QuickActionTile icon={<Ionicons name="gift-outline" size={24} color={vantage.textPrimary} />} label="Promotion" badge="New" onPress={() => {}} />
-            <QuickActionTile icon={<Ionicons name="calendar-outline" size={24} color={vantage.textPrimary} />} label="Calendar" onPress={() => {}} />
-            <QuickActionTile icon={<Ionicons name="school-outline" size={24} color={vantage.textPrimary} />} label="Academy" onPress={() => {}} />
-            <QuickActionTile icon={<Ionicons name="people-outline" size={24} color={vantage.textPrimary} />} label="IB" onPress={() => {}} />
+            <QuickActionTile icon={<Ionicons name="gift-outline" size={24} color={vx.textPrimary} />} label="Promotion" badge="New" onPress={() => {}} />
+            <QuickActionTile icon={<Ionicons name="calendar-outline" size={24} color={vx.textPrimary} />} label="Calendar" onPress={() => {}} />
+            <QuickActionTile icon={<Ionicons name="school-outline" size={24} color={vx.textPrimary} />} label="Academy" onPress={() => {}} />
+            <QuickActionTile icon={<Ionicons name="people-outline" size={24} color={vx.textPrimary} />} label="IB" onPress={() => {}} />
           </View>
         </Section>
 
         <Section title="MenuRow">
           <Card padding={0}>
-            <MenuRow icon={<Ionicons name="card-outline" size={20} color={vantage.textPrimary} />} label="My Accounts" onPress={() => {}} />
-            <MenuRow icon={<Ionicons name="shield-checkmark-outline" size={20} color={vantage.up} />} label="KYC" value="Verified" onPress={() => {}} />
-            <MenuRow icon={<Ionicons name="globe-outline" size={20} color={vantage.textPrimary} />} label="Language" value="English" onPress={() => {}} />
-            <MenuRow icon={<Ionicons name="log-out-outline" size={20} color={vantage.down} />} label="Log Out" danger onPress={() => {}} />
+            <MenuRow icon={<Ionicons name="card-outline" size={20} color={vx.textPrimary} />} label="My Accounts" onPress={() => {}} />
+            <MenuRow icon={<Ionicons name="shield-checkmark-outline" size={20} color={vx.up} />} label="KYC" value="Verified" onPress={() => {}} />
+            <MenuRow icon={<Ionicons name="globe-outline" size={20} color={vx.textPrimary} />} label="Language" value="English" onPress={() => {}} />
+            <MenuRow icon={<Ionicons name="log-out-outline" size={20} color={vx.down} />} label="Log Out" danger onPress={() => {}} />
           </Card>
         </Section>
 
@@ -190,7 +190,7 @@ export default function ComponentGalleryScreen() {
         <Section title="EmptyState">
           <Card padding={0}>
             <EmptyState
-              icon={<Ionicons name="cube-outline" size={48} color={vantage.textMuted} />}
+              icon={<Ionicons name="cube-outline" size={48} color={vx.textMuted} />}
               title="No positions yet"
               subtitle="Place your first trade to see it here."
               action={<PillButton label="Trade now" variant="primary" onPress={() => {}} />}
@@ -207,10 +207,10 @@ export default function ComponentGalleryScreen() {
 function BottomNavDemo() {
   const [k, setK] = useState('home');
   const tabs = [
-    { key: 'home',    label: 'Home',    icon: <Ionicons name="triangle" size={18} color={vantage.textPrimary} />, iconInactive: <Ionicons name="triangle-outline" size={18} color={vantage.textMuted} /> },
-    { key: 'markets', label: 'Markets', icon: <Ionicons name="bar-chart" size={18} color={vantage.textPrimary} />, iconInactive: <Ionicons name="bar-chart-outline" size={18} color={vantage.textMuted} /> },
-    { key: 'trade',   label: 'Trade',   icon: <Ionicons name="swap-horizontal" size={18} color={vantage.textPrimary} />, iconInactive: <Ionicons name="swap-horizontal-outline" size={18} color={vantage.textMuted} /> },
-    { key: 'funds',   label: 'Funds',   icon: <Ionicons name="pie-chart" size={18} color={vantage.textPrimary} />, iconInactive: <Ionicons name="pie-chart-outline" size={18} color={vantage.textMuted} /> },
+    { key: 'home',    label: 'Home',    icon: <Ionicons name="triangle" size={18} color={vx.textPrimary} />, iconInactive: <Ionicons name="triangle-outline" size={18} color={vx.textMuted} /> },
+    { key: 'markets', label: 'Markets', icon: <Ionicons name="bar-chart" size={18} color={vx.textPrimary} />, iconInactive: <Ionicons name="bar-chart-outline" size={18} color={vx.textMuted} /> },
+    { key: 'trade',   label: 'Trade',   icon: <Ionicons name="swap-horizontal" size={18} color={vx.textPrimary} />, iconInactive: <Ionicons name="swap-horizontal-outline" size={18} color={vx.textMuted} /> },
+    { key: 'funds',   label: 'Funds',   icon: <Ionicons name="pie-chart" size={18} color={vx.textPrimary} />, iconInactive: <Ionicons name="pie-chart-outline" size={18} color={vx.textMuted} /> },
   ];
   return (
     <Section title="BottomNavPill">
@@ -327,8 +327,8 @@ function SheetDemo() {
     <Section title="Sheet">
       <PillButton label="Open sheet" variant="secondary" onPress={() => setOpen(true)} />
       <Sheet visible={open} onClose={() => setOpen(false)} title="Pick account">
-        <MenuRow icon={<Ionicons name="card-outline" size={20} color={vantage.textPrimary} />} label="Live #24863411" value="$8,345.67" onPress={() => setOpen(false)} />
-        <MenuRow icon={<Ionicons name="card-outline" size={20} color={vantage.textPrimary} />} label="Demo #12345"   value="$10,000.00" onPress={() => setOpen(false)} />
+        <MenuRow icon={<Ionicons name="card-outline" size={20} color={vx.textPrimary} />} label="Live #24863411" value="$8,345.67" onPress={() => setOpen(false)} />
+        <MenuRow icon={<Ionicons name="card-outline" size={20} color={vx.textPrimary} />} label="Demo #12345"   value="$10,000.00" onPress={() => setOpen(false)} />
       </Sheet>
     </Section>
   );
@@ -348,23 +348,23 @@ function ToastDemo() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: vantage.bg },
+  root: { flex: 1, backgroundColor: vx.bg },
   scroll: { padding: space.lg, paddingBottom: space.huge },
   h1: {
-    color: vantage.textPrimary,
+    color: vx.textPrimary,
     fontFamily,
     fontSize: sizes.hero,
     fontWeight: weights.heavy,
   },
   subtitle: {
-    color: vantage.textMuted,
+    color: vx.textMuted,
     fontFamily,
     fontSize: sizes.label,
     marginBottom: space.xxl,
   },
   section: { marginBottom: space.xxxl },
   sectionTitle: {
-    color: vantage.textSecondary,
+    color: vx.textSecondary,
     fontFamily,
     fontSize: sizes.label,
     fontWeight: weights.semibold,
@@ -374,6 +374,6 @@ const styles = StyleSheet.create({
   },
   sectionBody: { gap: space.md },
   swatchRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  swatchBox: { width: 32, height: 32, borderRadius: 8, borderWidth: 1, borderColor: vantage.border },
-  swatchLabel: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
+  swatchBox: { width: 32, height: 32, borderRadius: 8, borderWidth: 1, borderColor: vx.border },
+  swatchLabel: { color: vx.textPrimary, fontFamily, fontSize: sizes.body },
 });

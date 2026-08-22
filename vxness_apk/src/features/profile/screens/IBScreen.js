@@ -17,23 +17,23 @@ import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
 import ApiService from '../../../services/api/ApiService';
 import logger from '../../../utils/logger';
-import { vantage } from '../../../theme/vantageTheme';
-import ScreenGlow from '../../../components/vantage/ScreenGlow';
+import { vx } from '../../../theme/vxTheme';
+import ScreenGlow from '../../../components/vx/ScreenGlow';
 
-// Vantage dark/orange palette mapped onto the legacy `colors` keys this screen
+// Vxness dark/orange palette mapped onto the legacy `colors` keys this screen
 // was written against, so the existing JSX renders on-theme without a rewrite.
 const colors = {
-  bgPrimary: vantage.bg,
-  bgSecondary: vantage.bgRaised,
-  bgCard: vantage.bgElevated,
-  bgHover: vantage.bgPressed,
-  border: vantage.border,
-  textPrimary: vantage.textPrimary,
-  textSecondary: vantage.textSecondary,
-  textMuted: vantage.textMuted,
-  primary: vantage.accent,
-  accent: vantage.accent,
-  profitColor: vantage.up,
+  bgPrimary: vx.bg,
+  bgSecondary: vx.bgRaised,
+  bgCard: vx.bgElevated,
+  bgHover: vx.bgPressed,
+  border: vx.border,
+  textPrimary: vx.textPrimary,
+  textSecondary: vx.textSecondary,
+  textMuted: vx.textMuted,
+  primary: vx.accent,
+  accent: vx.accent,
+  profitColor: vx.up,
 };
 
 const IBScreen = ({ navigation, route }) => {
@@ -303,7 +303,7 @@ const IBScreen = ({ navigation, route }) => {
                 'Easy withdrawal to your wallet'
               ].map((benefit, idx) => (
                 <View key={idx} style={styles.benefitRow}>
-                  <Ionicons name="chevron-forward" size={16} color={vantage.accent} />
+                  <Ionicons name="chevron-forward" size={16} color={vx.accent} />
                   <Text style={styles.benefitText}>{benefit}</Text>
                 </View>
               ))}
@@ -512,7 +512,7 @@ const IBScreen = ({ navigation, route }) => {
                     downline.map((node, idx) => (
                       <View key={node._id || idx} style={[styles.downlineItem, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
                         <View style={[styles.downlineAvatar, { backgroundColor: node.isIB ? 'rgba(242,106,31,0.18)' : '#33333320' }]}>
-                          <Text style={[styles.avatarText, { color: node.isIB ? vantage.accent : '#888' }]}>{node.firstName?.charAt(0) || '?'}</Text>
+                          <Text style={[styles.avatarText, { color: node.isIB ? vx.accent : '#888' }]}>{node.firstName?.charAt(0) || '?'}</Text>
                         </View>
                         <View style={styles.downlineInfo}>
                           <Text style={[styles.downlineName, { color: colors.textPrimary }]} numberOfLines={1}>{node.firstName || node.email || 'Unknown'}</Text>
@@ -523,7 +523,7 @@ const IBScreen = ({ navigation, route }) => {
                             ${node.totalEarned.toFixed(2)}
                           </Text>
                           <View style={[styles.downlineBadge, { backgroundColor: node.isIB ? 'rgba(242,106,31,0.12)' : '#33333320' }]}>
-                            <Text style={[styles.downlineBadgeText, { color: node.isIB ? vantage.accent : '#888' }]}>
+                            <Text style={[styles.downlineBadgeText, { color: node.isIB ? vx.accent : '#888' }]}>
                               {node.isIB ? 'IB' : 'User'} • L{node.level}
                             </Text>
                           </View>
@@ -560,7 +560,7 @@ const styles = StyleSheet.create({
   benefitsTitle: { fontSize: 14, fontWeight: '600', marginBottom: 12 },
   benefitRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   benefitText: { color: '#888', fontSize: 13, flex: 1 },
-  applyBtn: { backgroundColor: vantage.accent, paddingHorizontal: 40, paddingVertical: 16, borderRadius: 999, alignSelf: 'stretch', alignItems: 'center' },
+  applyBtn: { backgroundColor: vx.accent, paddingHorizontal: 40, paddingVertical: 16, borderRadius: 999, alignSelf: 'stretch', alignItems: 'center' },
   applyBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   btnDisabled: { opacity: 0.6 },
   
@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
   commissionIcon: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   
   // Referral Link Card
-  referralLinkCard: { marginHorizontal: 16, marginBottom: 12, padding: 16, borderRadius: 14, backgroundColor: vantage.bgElevated, borderWidth: 1, borderColor: vantage.borderStrong },
+  referralLinkCard: { marginHorizontal: 16, marginBottom: 12, padding: 16, borderRadius: 14, backgroundColor: vx.bgElevated, borderWidth: 1, borderColor: vx.borderStrong },
   referralLinkLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginBottom: 4 },
   referralLinkText: { color: '#fff', fontSize: 12, fontFamily: 'monospace', marginBottom: 4 },
   referralCodeText: { color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 12 },
@@ -606,16 +606,16 @@ const styles = StyleSheet.create({
   progressBarContainer: {},
   progressBarLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   progressLabel: { color: '#888', fontSize: 12 },
-  progressPercent: { color: vantage.accent, fontSize: 12, fontWeight: '600' },
+  progressPercent: { color: vx.accent, fontSize: 12, fontWeight: '600' },
   progressBarBg: { height: 6, backgroundColor: '#222', borderRadius: 3, overflow: 'hidden' },
-  progressBarFill: { height: '100%', backgroundColor: vantage.accent, borderRadius: 3 },
+  progressBarFill: { height: '100%', backgroundColor: vx.accent, borderRadius: 3 },
   progressHint: { color: '#666', fontSize: 11, marginTop: 6 },
   
   // Tabs
   tabsScroll: { marginBottom: 12 },
   tabs: { flexDirection: 'row', paddingHorizontal: 16, gap: 8 },
   tab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
-  tabActive: { backgroundColor: vantage.accent },
+  tabActive: { backgroundColor: vx.accent },
   tabText: { color: '#888', fontSize: 12, fontWeight: '500' },
   tabTextActive: { color: '#fff', fontWeight: '700' },
   
@@ -638,7 +638,7 @@ const styles = StyleSheet.create({
   // Referral Item
   referralItem: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1 },
   referralAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(242,106,31,0.18)', justifyContent: 'center', alignItems: 'center' },
-  avatarText: { color: vantage.accent, fontSize: 16, fontWeight: 'bold' },
+  avatarText: { color: vx.accent, fontSize: 16, fontWeight: 'bold' },
   referralInfo: { flex: 1, marginLeft: 12 },
   referralName: { fontSize: 14, fontWeight: '600' },
   referralEmail: { color: '#666', fontSize: 12, marginTop: 2 },
@@ -670,7 +670,7 @@ const styles = StyleSheet.create({
   withdrawBalanceValue: { color: '#22c55e', fontSize: 32, fontWeight: 'bold', marginTop: 8 },
   inputLabel: { color: '#888', fontSize: 12, marginBottom: 8 },
   input: { borderRadius: 12, padding: 16, fontSize: 16, borderWidth: 1, marginBottom: 16 },
-  withdrawBtn: { backgroundColor: vantage.accent, padding: 16, borderRadius: 12, alignItems: 'center' },
+  withdrawBtn: { backgroundColor: vx.accent, padding: 16, borderRadius: 12, alignItems: 'center' },
   withdrawBtnText: { color: '#000', fontSize: 16, fontWeight: 'bold' },
   pendingWithdrawal: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 16 },
   pendingWithdrawalText: { color: '#eab308', fontSize: 13 },

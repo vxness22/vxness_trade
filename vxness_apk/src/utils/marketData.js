@@ -1,5 +1,5 @@
 /**
- * Normalize TrustEdge / gateway responses for instruments and live prices.
+ * Normalize the platform / gateway responses for instruments and live prices.
  */
 
 /** Map backend segment + symbol to Markets tab (UI uses Title Case names). */

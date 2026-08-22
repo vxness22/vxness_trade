@@ -1,14 +1,14 @@
 import React from 'react';
 import { Pressable, Text, ActivityIndicator, View, StyleSheet } from 'react-native';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 const VARIANTS = {
-  primary:   { bg: vantage.accent,   fg: vantage.textInverse, pressed: vantage.accentGlow },
-  secondary: { bg: vantage.bgRaised, fg: vantage.textPrimary, pressed: vantage.bgPressed },
-  sell:      { bg: vantage.sellBg,   fg: vantage.textPrimary, pressed: '#C9341C' },
-  buy:       { bg: vantage.up,       fg: vantage.textPrimary, pressed: '#1FA958' },
-  danger:    { bg: 'transparent',    fg: vantage.down,        pressed: vantage.downMuted, borderColor: vantage.down },
-  ghost:     { bg: 'transparent',    fg: vantage.textPrimary, pressed: vantage.bgPressed },
+  primary:   { bg: vx.accent,   fg: vx.textInverse, pressed: vx.accentGlow },
+  secondary: { bg: vx.bgRaised, fg: vx.textPrimary, pressed: vx.bgPressed },
+  sell:      { bg: vx.sellBg,   fg: vx.textPrimary, pressed: '#C9341C' },
+  buy:       { bg: vx.up,       fg: vx.textPrimary, pressed: '#1FA958' },
+  danger:    { bg: 'transparent',    fg: vx.down,        pressed: vx.downMuted, borderColor: vx.down },
+  ghost:     { bg: 'transparent',    fg: vx.textPrimary, pressed: vx.bgPressed },
 };
 
 const SIZES = {

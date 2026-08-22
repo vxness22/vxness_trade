@@ -2,13 +2,13 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { vantage } from '../../theme/vantageTheme';
+import { vx } from '../../theme/vxTheme';
 
 const colors = {
-  bgPrimary: vantage.bg,
-  border: vantage.border,
-  textPrimary: vantage.textPrimary,
-  textMuted: vantage.textMuted,
+  bgPrimary: vx.bg,
+  border: vx.border,
+  textPrimary: vx.textPrimary,
+  textMuted: vx.textMuted,
 };
 
 export default function ScreenHeader({ title, subtitle, onBack, rightAction }) {

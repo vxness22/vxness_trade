@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 export default function EmptyState({ icon, title, subtitle, action }) {
   return (
@@ -16,7 +16,7 @@ export default function EmptyState({ icon, title, subtitle, action }) {
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: space.huge, paddingHorizontal: space.xl, gap: space.sm },
   icon: { marginBottom: space.sm },
-  title: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold, textAlign: 'center' },
-  subtitle: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, textAlign: 'center' },
+  title: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold, textAlign: 'center' },
+  subtitle: { color: vx.textMuted, fontFamily, fontSize: sizes.body, textAlign: 'center' },
   action: { marginTop: space.md, alignSelf: 'stretch' },
 });

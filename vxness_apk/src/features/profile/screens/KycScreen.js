@@ -17,22 +17,22 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import ApiService from '../../../services/api/ApiService';
 import logger from '../../../utils/logger';
-import { vantage } from '../../../theme/vantageTheme';
-import ScreenGlow from '../../../components/vantage/ScreenGlow';
+import { vx } from '../../../theme/vxTheme';
+import ScreenGlow from '../../../components/vx/ScreenGlow';
 
-// Vantage dark/orange palette mapped onto the legacy `colors` keys.
+// Vxness dark/orange palette mapped onto the legacy `colors` keys.
 const colors = {
-  bgPrimary: vantage.bg,
-  bgCard: vantage.bgElevated,
-  bgSecondary: vantage.bgRaised,
-  border: vantage.border,
-  textPrimary: vantage.textPrimary,
-  textSecondary: vantage.textSecondary,
-  textMuted: vantage.textMuted,
-  primary: vantage.accent,
-  success: vantage.up,
+  bgPrimary: vx.bg,
+  bgCard: vx.bgElevated,
+  bgSecondary: vx.bgRaised,
+  border: vx.border,
+  textPrimary: vx.textPrimary,
+  textSecondary: vx.textSecondary,
+  textMuted: vx.textMuted,
+  primary: vx.accent,
+  success: vx.up,
   warning: '#F59E0B',
-  error: vantage.down,
+  error: vx.down,
 };
 
 const DOC_TYPES = [

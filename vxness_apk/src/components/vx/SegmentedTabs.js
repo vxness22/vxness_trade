@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Pressable, Text, StyleSheet } from 'react-native';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 export default function SegmentedTabs({ value, onChange, options }) {
   return (
@@ -21,8 +21,8 @@ export default function SegmentedTabs({ value, onChange, options }) {
                 // Light theme: force black for the active segment (and a darker
                 // grey for inactive) so the tabs read clearly on a white bg.
                 color: active
-                  ? (vantage.isDark ? vantage.textPrimary : '#000000')
-                  : (vantage.isDark ? vantage.textMuted : '#475569'),
+                  ? (vx.isDark ? vx.textPrimary : '#000000')
+                  : (vx.isDark ? vx.textMuted : '#475569'),
                 fontWeight: active ? weights.heavy : weights.medium,
               },
             ]}>

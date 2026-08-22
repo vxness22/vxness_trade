@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 export default function BalanceBlock({
   label,
@@ -29,7 +29,7 @@ export default function BalanceBlock({
             {label ? <Text style={styles.label}>{label}</Text> : null}
             {onToggleHide ? (
               <Pressable onPress={onToggleHide} hitSlop={10} accessibilityRole="button" accessibilityLabel={hidden ? 'Show balance' : 'Hide balance'}>
-                <Ionicons name={hidden ? 'eye-off-outline' : 'eye-outline'} size={14} color={vantage.textMuted} />
+                <Ionicons name={hidden ? 'eye-off-outline' : 'eye-outline'} size={14} color={vx.textMuted} />
               </Pressable>
             ) : null}
           </View>
@@ -38,12 +38,12 @@ export default function BalanceBlock({
               {onPickAccount ? (
                 <Pressable onPress={onPickAccount} hitSlop={6} style={styles.acctChip} accessibilityRole="button" accessibilityLabel="Switch account">
                   <Text style={styles.acctChipTxt} numberOfLines={1}>{accountLabel || 'All accounts'}</Text>
-                  <Ionicons name="chevron-down" size={14} color={vantage.textSecondary} />
+                  <Ionicons name="chevron-down" size={14} color={vx.textSecondary} />
                 </Pressable>
               ) : null}
               {onAddAccount ? (
                 <Pressable onPress={onAddAccount} hitSlop={6} style={styles.addBtn} accessibilityRole="button" accessibilityLabel="Add account">
-                  <Ionicons name="add" size={18} color={vantage.textPrimary} />
+                  <Ionicons name="add" size={18} color={vx.textPrimary} />
                 </Pressable>
               ) : null}
             </View>
@@ -64,7 +64,7 @@ export default function BalanceBlock({
           {subLabel ? (
             <View style={styles.subRow}>
               <Text style={[styles.subLab, whiteIf]}>{subLabel}</Text>
-              <Text style={[styles.subAmt, { color: subColor || (subPositive ? vantage.up : vantage.down) }]}>
+              <Text style={[styles.subAmt, { color: subColor || (subPositive ? vx.up : vx.down) }]}>
                 {hidden ? '••' : (subAmount != null ? formatSigned(subAmount) : '—')}
               </Text>
               <Text style={[styles.subLab, whiteIf]}>{currency}</Text>
@@ -89,25 +89,25 @@ const styles = StyleSheet.create({
   wrap: { gap: 4, paddingVertical: space.sm },
   labRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
   labLeft: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
-  label: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  label: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
   acctControls: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   acctChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: vantage.bgRaised, borderWidth: 1, borderColor: vantage.border,
+    backgroundColor: vx.bgRaised, borderWidth: 1, borderColor: vx.border,
     borderRadius: 999, paddingHorizontal: space.md, paddingVertical: 6, maxWidth: 180,
   },
-  acctChipTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, flexShrink: 1 },
+  acctChipTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, flexShrink: 1 },
   addBtn: {
     width: 32, height: 32, borderRadius: 16,
-    backgroundColor: vantage.bgRaised, borderWidth: 1, borderColor: vantage.border,
+    backgroundColor: vx.bgRaised, borderWidth: 1, borderColor: vx.border,
     alignItems: 'center', justifyContent: 'center',
   },
   amtRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
-  amount: { color: vantage.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
-  ccyChip: { backgroundColor: vantage.bgRaised, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: 6 },
+  amount: { color: vx.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy },
+  ccyChip: { backgroundColor: vx.bgRaised, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: 6 },
   ccyChipLight: { backgroundColor: 'rgba(0,0,0,0.28)' },
-  ccyTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  ccyTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: 2 },
-  subLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  subLab: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
   subAmt: { fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
 });

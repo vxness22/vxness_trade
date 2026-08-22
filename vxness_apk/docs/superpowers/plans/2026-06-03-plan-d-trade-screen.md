@@ -1,13 +1,13 @@
-# Plan D — Vantage Redesign: Trade Screen (Phase 4)
+# Plan D — Vxness Redesign: Trade Screen (Phase 4)
 
 > Subagent-driven execution. Steps use `- [ ]`.
 
-**Goal:** Replace the Trade placeholder with the Vantage CFDs + Copy split screen, wired to live Vxness backend. Functional order placement, live positions, leaderboards, and a strategy detail page.
+**Goal:** Replace the Trade placeholder with the Vxness CFDs + Copy split screen, wired to live Vxness backend. Functional order placement, live positions, leaderboards, and a strategy detail page.
 
 **Architecture:** `TradeScreen` orchestrator with `SegmentedTabs` toggling between `TradeCFDs` (account header + symbol row + BuySellSplit + OrderTicket + PositionsList) and `TradeCopy` (Become provider card + Discover leaderboards). Chart deferred — kept as an icon that opens a "Coming soon" placeholder. `StrategyDetailScreen` pushed when tapping a strategy.
 
 **Scope notes**
-- Chart panel deferred to a later phase (Vantage screenshot uses TradingView WebView; existing 360KB MainTradingScreen has working integration we'll port later).
+- Chart panel deferred to a later phase (Vxness screenshot uses TradingView WebView; existing 360KB MainTradingScreen has working integration we'll port later).
 - Order placement: market + limit + stop, with optional TP/SL.
 - Positions live-update via existing WS trade stream (already in WebSocketService).
 
@@ -41,8 +41,8 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Sheet, MenuRow } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { Sheet, MenuRow } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 export default function AccountSwitcher({ visible, onClose, accounts = [], selectedId, onSelect }) {
   return (
@@ -57,7 +57,7 @@ export default function AccountSwitcher({ visible, onClose, accounts = [], selec
         return (
           <MenuRow
             key={id}
-            icon={<Ionicons name={isSelected ? 'checkmark-circle' : 'card-outline'} size={20} color={isSelected ? vantage.accent : vantage.textPrimary} />}
+            icon={<Ionicons name={isSelected ? 'checkmark-circle' : 'card-outline'} size={20} color={isSelected ? vx.accent : vx.textPrimary} />}
             label={label}
             value={balance}
             onPress={() => { onSelect(a); onClose(); }}
@@ -69,7 +69,7 @@ export default function AccountSwitcher({ visible, onClose, accounts = [], selec
 }
 
 const styles = StyleSheet.create({
-  empty: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, padding: space.lg, textAlign: 'center' },
+  empty: { color: vx.textMuted, fontFamily, fontSize: sizes.body, padding: space.lg, textAlign: 'center' },
 });
 ```
 
@@ -84,8 +84,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, TextInput, FlatList, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Sheet, SymbolIcon } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { Sheet, SymbolIcon } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 import { getInstruments } from '../../utils/instrumentsCache';
 
 export default function SymbolPicker({ visible, onClose, onSelect }) {
@@ -115,12 +115,12 @@ export default function SymbolPicker({ visible, onClose, onSelect }) {
   return (
     <Sheet visible={visible} onClose={onClose} title="Choose symbol" height="80%">
       <View style={styles.searchWrap}>
-        <Ionicons name="search" size={18} color={vantage.textMuted} style={{ marginRight: space.sm }} />
+        <Ionicons name="search" size={18} color={vx.textMuted} style={{ marginRight: space.sm }} />
         <TextInput
           value={query}
           onChangeText={setQuery}
           placeholder="Search"
-          placeholderTextColor={vantage.textMuted}
+          placeholderTextColor={vx.textMuted}
           style={styles.searchInput}
           autoCapitalize="characters"
           autoCorrect={false}
@@ -128,7 +128,7 @@ export default function SymbolPicker({ visible, onClose, onSelect }) {
         />
         {query ? (
           <Pressable onPress={() => setQuery('')} hitSlop={8}>
-            <Ionicons name="close-circle" size={18} color={vantage.textMuted} />
+            <Ionicons name="close-circle" size={18} color={vx.textMuted} />
           </Pressable>
         ) : null}
       </View>
@@ -141,7 +141,7 @@ export default function SymbolPicker({ visible, onClose, onSelect }) {
             <Pressable
               onPress={() => { onSelect(sym); onClose(); }}
               style={styles.row}
-              android_ripple={{ color: vantage.bgPressed }}
+              android_ripple={{ color: vx.bgPressed }}
             >
               <SymbolIcon symbol={sym} size={32} />
               <View style={styles.rowText}>
@@ -159,15 +159,15 @@ export default function SymbolPicker({ visible, onClose, onSelect }) {
 const styles = StyleSheet.create({
   searchWrap: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: vantage.bgRaised,
+    backgroundColor: vx.bgRaised,
     borderRadius: radius.md, paddingHorizontal: space.md, height: 44,
     marginBottom: space.md,
   },
-  searchInput: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.body, padding: 0 },
+  searchInput: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.body, padding: 0 },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md },
   rowText: { flex: 1 },
-  rowSym: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
-  rowName: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  rowSym: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
+  rowName: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
 });
 ```
 
@@ -192,8 +192,8 @@ import {
   PillButton,
   Card,
   showToast,
-} from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+} from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 import ApiService from '../../services/ApiService';
 
 const ORDER_TYPES = ['market', 'limit', 'stop'];
@@ -269,7 +269,7 @@ export default function OrderTicket({ accountId, symbol, tick, onPlaced }) {
             accessibilityRole="button"
             accessibilityState={{ selected: orderType === t }}
           >
-            <Text style={[styles.typeTxt, orderType === t && { color: vantage.textPrimary, fontWeight: weights.bold }]}>
+            <Text style={[styles.typeTxt, orderType === t && { color: vx.textPrimary, fontWeight: weights.bold }]}>
               {t.toUpperCase()}
             </Text>
           </Pressable>
@@ -284,7 +284,7 @@ export default function OrderTicket({ accountId, symbol, tick, onPlaced }) {
             onChangeText={setLimitPrice}
             keyboardType="decimal-pad"
             placeholder="0.00000"
-            placeholderTextColor={vantage.textMuted}
+            placeholderTextColor={vx.textMuted}
             style={styles.input}
           />
         </View>
@@ -314,7 +314,7 @@ export default function OrderTicket({ accountId, symbol, tick, onPlaced }) {
               onChangeText={setStopLoss}
               keyboardType="decimal-pad"
               placeholder="0.00000"
-              placeholderTextColor={vantage.textMuted}
+              placeholderTextColor={vx.textMuted}
               style={styles.input}
             />
           </View>
@@ -325,7 +325,7 @@ export default function OrderTicket({ accountId, symbol, tick, onPlaced }) {
               onChangeText={setTakeProfit}
               keyboardType="decimal-pad"
               placeholder="0.00000"
-              placeholderTextColor={vantage.textMuted}
+              placeholderTextColor={vx.textMuted}
               style={styles.input}
             />
           </View>
@@ -334,7 +334,7 @@ export default function OrderTicket({ accountId, symbol, tick, onPlaced }) {
 
       <Card style={styles.infoCard}>
         <InfoRow label="Symbol" value={symbol || '—'} />
-        <InfoRow label="Side" value={side.toUpperCase()} valueColor={side === 'buy' ? vantage.up : vantage.down} />
+        <InfoRow label="Side" value={side.toUpperCase()} valueColor={side === 'buy' ? vx.up : vx.down} />
         <InfoRow label="Volume" value={`${volume} lots`} />
         <InfoRow label="Type" value={orderType.toUpperCase()} last />
       </Card>
@@ -366,20 +366,20 @@ const styles = StyleSheet.create({
   typeRow: { flexDirection: 'row', gap: space.sm },
   typeChip: {
     flex: 1, paddingVertical: space.sm, paddingHorizontal: space.md,
-    backgroundColor: vantage.bgElevated,
+    backgroundColor: vx.bgElevated,
     borderRadius: radius.pill,
-    borderWidth: 1, borderColor: vantage.border,
+    borderWidth: 1, borderColor: vx.border,
     alignItems: 'center',
   },
-  typeChipActive: { backgroundColor: vantage.bgRaised, borderColor: vantage.accent },
-  typeTxt: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  typeChipActive: { backgroundColor: vx.bgRaised, borderColor: vx.accent },
+  typeTxt: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
   field: { gap: space.xs },
-  label: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label },
+  label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label },
   input: {
-    backgroundColor: vantage.bgRaised,
+    backgroundColor: vx.bgRaised,
     borderRadius: radius.md,
     paddingHorizontal: space.md, paddingVertical: space.md,
-    color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold,
+    color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold,
   },
   tpSlRow: { flexDirection: 'row', gap: space.md },
   infoCard: { marginTop: space.sm },
@@ -387,9 +387,9 @@ const styles = StyleSheet.create({
 
 const infoStyles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: space.sm },
-  border: { borderBottomColor: vantage.border, borderBottomWidth: StyleSheet.hairlineWidth },
-  label: { color: vantage.textMuted, fontFamily, fontSize: sizes.body },
-  value: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
+  border: { borderBottomColor: vx.border, borderBottomWidth: StyleSheet.hairlineWidth },
+  label: { color: vx.textMuted, fontFamily, fontSize: sizes.body },
+  value: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
 });
 ```
 
@@ -406,8 +406,8 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { SegmentedTabs, Card, showToast } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { SegmentedTabs, Card, showToast } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 import ApiService from '../../services/ApiService';
 
 export default function PositionsList({ positions = [], orders = [], onChange }) {
@@ -477,16 +477,16 @@ function PositionRow({ position, onClose }) {
       <View style={styles.cardRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.sym}>{position.symbol}</Text>
-          <Text style={[styles.side, { color: side === 'buy' ? vantage.up : vantage.down }]}>
+          <Text style={[styles.side, { color: side === 'buy' ? vx.up : vx.down }]}>
             {side.toUpperCase()} {position.volume ?? position.lots ?? '—'} @ {Number(position.open_price ?? position.openPrice ?? 0).toFixed(5)}
           </Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
-          <Text style={[styles.pl, { color: plPositive ? vantage.up : vantage.down }]}>
+          <Text style={[styles.pl, { color: plPositive ? vx.up : vx.down }]}>
             {pl != null ? `${plPositive ? '+' : ''}${Number(pl).toFixed(2)}` : '—'} USD
           </Text>
           <Pressable onPress={onClose} hitSlop={8} style={styles.actionBtn}>
-            <Ionicons name="close-circle-outline" size={20} color={vantage.textMuted} />
+            <Ionicons name="close-circle-outline" size={20} color={vx.textMuted} />
             <Text style={styles.actionTxt}>Close</Text>
           </Pressable>
         </View>
@@ -502,13 +502,13 @@ function OrderRow({ order, onCancel }) {
       <View style={styles.cardRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.sym}>{order.symbol}</Text>
-          <Text style={[styles.side, { color: side === 'buy' ? vantage.up : vantage.down }]}>
+          <Text style={[styles.side, { color: side === 'buy' ? vx.up : vx.down }]}>
             {(order.order_type || 'limit').toUpperCase()} {side.toUpperCase()} {order.volume ?? order.lots ?? '—'} @ {Number(order.price ?? 0).toFixed(5)}
           </Text>
         </View>
         <Pressable onPress={onCancel} hitSlop={8} style={styles.actionBtn}>
-          <Ionicons name="trash-outline" size={20} color={vantage.down} />
-          <Text style={[styles.actionTxt, { color: vantage.down }]}>Cancel</Text>
+          <Ionicons name="trash-outline" size={20} color={vx.down} />
+          <Text style={[styles.actionTxt, { color: vx.down }]}>Cancel</Text>
         </Pressable>
       </View>
     </Card>
@@ -518,14 +518,14 @@ function OrderRow({ order, onCancel }) {
 const styles = StyleSheet.create({
   wrap: { paddingHorizontal: space.lg, paddingTop: space.md, gap: space.sm },
   headerRow: { paddingBottom: space.sm },
-  empty: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, textAlign: 'center', padding: space.lg },
+  empty: { color: vx.textMuted, fontFamily, fontSize: sizes.body, textAlign: 'center', padding: space.lg },
   card: { marginBottom: space.sm },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  sym: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
+  sym: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
   side: { fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, marginTop: 2 },
   pl: { fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: space.xs, marginTop: space.sm },
-  actionTxt: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  actionTxt: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
 });
 ```
 
@@ -540,8 +540,8 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Card, showToast } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { Card, showToast } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 import AccountSwitcher from './AccountSwitcher';
 import SymbolPicker from './SymbolPicker';
@@ -575,15 +575,15 @@ export default function TradeCFDs({
           </Text>
           <Text style={styles.tagSub}>Equity</Text>
         </View>
-        <Ionicons name="chevron-down" size={18} color={vantage.textMuted} />
+        <Ionicons name="chevron-down" size={18} color={vx.textMuted} />
       </Pressable>
 
       <Pressable onPress={() => setSymbolSheet(true)} style={styles.symbolRow} accessibilityRole="button">
         <Text style={styles.symbolName}>{symbol || 'Select symbol'}</Text>
-        <Ionicons name="chevron-down" size={18} color={vantage.textMuted} />
+        <Ionicons name="chevron-down" size={18} color={vx.textMuted} />
         <View style={{ flex: 1 }} />
         <Pressable onPress={() => showToast({ kind: 'info', message: 'Chart coming soon' })} hitSlop={8}>
-          <Ionicons name="stats-chart" size={22} color={vantage.textPrimary} />
+          <Ionicons name="stats-chart" size={22} color={vx.textPrimary} />
         </Pressable>
       </Pressable>
 
@@ -615,18 +615,18 @@ export default function TradeCFDs({
 const styles = StyleSheet.create({
   accountRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: vantage.bgElevated,
+    backgroundColor: vx.bgElevated,
     margin: space.lg, padding: space.lg, borderRadius: 16,
   },
-  tagLine: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
-  equityValue: { color: vantage.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy, marginTop: 2 },
-  tagSub: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  tagLine: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  equityValue: { color: vx.textPrimary, fontFamily, fontSize: sizes.hero, fontWeight: weights.heavy, marginTop: 2 },
+  tagSub: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
   symbolRow: {
     flexDirection: 'row', alignItems: 'center', gap: space.sm,
     paddingHorizontal: space.lg, paddingVertical: space.md,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: vantage.border,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: vx.border,
   },
-  symbolName: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
+  symbolName: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
 });
 ```
 
@@ -642,8 +642,8 @@ import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import { Card, SegmentedTabs, CategoryTabs, SymbolIcon, PillButton } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { Card, SegmentedTabs, CategoryTabs, SymbolIcon, PillButton } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 import ApiService from '../../services/ApiService';
 
 const SORT_OPTIONS = [
@@ -683,11 +683,11 @@ export default function TradeCopy() {
     <View>
       <Card style={styles.becomeCard} onPress={() => nav.navigate('Business')}>
         <View style={styles.becomeRow}>
-          <View style={[styles.iconCircle, { backgroundColor: vantage.accentMuted }]}>
-            <Ionicons name="radio-outline" size={22} color={vantage.accent} />
+          <View style={[styles.iconCircle, { backgroundColor: vx.accentMuted }]}>
+            <Ionicons name="radio-outline" size={22} color={vx.accent} />
           </View>
           <Text style={styles.becomeTxt}>Become a Signal Provider</Text>
-          <Ionicons name="chevron-forward" size={18} color={vantage.textMuted} />
+          <Ionicons name="chevron-forward" size={18} color={vx.textMuted} />
         </View>
       </Card>
 
@@ -724,7 +724,7 @@ export default function TradeCopy() {
               <Pressable
                 key={p.id || p.provider_id || p.name}
                 onPress={() => nav.navigate('StrategyDetail', { providerId: p.id || p.provider_id })}
-                android_ripple={{ color: vantage.bgPressed }}
+                android_ripple={{ color: vx.bgPressed }}
                 style={styles.row}
               >
                 <StrategyMiniRow item={p} />
@@ -760,7 +760,7 @@ function BigStrategyRow({ item }) {
       <View style={bigStyles.statsRow}>
         <View style={{ flex: 1 }}>
           <Text style={bigStyles.lab}>30D Return</Text>
-          <Text style={[bigStyles.val, { color: positive ? vantage.up : vantage.down }]}>
+          <Text style={[bigStyles.val, { color: positive ? vx.up : vx.down }]}>
             {`${positive ? '+' : ''}${ret.toFixed(2)}%`}
           </Text>
         </View>
@@ -790,7 +790,7 @@ function StrategyMiniRow({ item }) {
       </View>
       <View style={{ alignItems: 'flex-end' }}>
         {aum != null ? <Text style={miniStyles.aum}>{Number(aum).toLocaleString('en-US', { maximumFractionDigits: 0 })} USD</Text> : null}
-        <Text style={[miniStyles.ret, { color: positive ? vantage.up : vantage.down }]}>
+        <Text style={[miniStyles.ret, { color: positive ? vx.up : vx.down }]}>
           {`${positive ? '+' : ''}${ret.toFixed(2)}%`}
         </Text>
       </View>
@@ -802,31 +802,31 @@ const styles = StyleSheet.create({
   becomeCard: { margin: space.lg },
   becomeRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   iconCircle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  becomeTxt: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
+  becomeTxt: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
   section: { paddingHorizontal: space.lg, paddingVertical: space.md, gap: space.sm },
-  sectionTitle: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, marginBottom: space.sm },
-  empty: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, padding: space.lg, textAlign: 'center' },
+  sectionTitle: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, marginBottom: space.sm },
+  empty: { color: vx.textMuted, fontFamily, fontSize: sizes.body, padding: space.lg, textAlign: 'center' },
   row: { paddingVertical: space.sm },
 });
 
 const bigStyles = StyleSheet.create({
   wrap: { padding: space.sm, gap: space.md },
   head: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  name: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
-  badge: { alignSelf: 'flex-start', backgroundColor: vantage.bgPressed, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: radius.sm, marginTop: 2 },
-  badgeTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.micro, fontWeight: weights.medium },
-  full: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, backgroundColor: vantage.bgPressed, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: radius.sm },
+  name: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
+  badge: { alignSelf: 'flex-start', backgroundColor: vx.bgPressed, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: radius.sm, marginTop: 2 },
+  badgeTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.micro, fontWeight: weights.medium },
+  full: { color: vx.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, backgroundColor: vx.bgPressed, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: radius.sm },
   statsRow: { flexDirection: 'row' },
-  lab: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  lab: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
   val: { fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy, marginTop: 2 },
-  aum: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, marginTop: 2 },
+  aum: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, marginTop: 2 },
 });
 
 const miniStyles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.sm },
-  name: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
-  sub: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
-  aum: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
+  name: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
+  sub: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  aum: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
   ret: { fontFamily, fontSize: sizes.label, fontWeight: weights.bold, marginTop: 2 },
 });
 ```
@@ -842,11 +842,11 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollView, RefreshControl, StyleSheet } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 
-import { Screen } from '../components/vantage';
-import { vantage, space } from '../theme/vantageTheme';
+import { Screen } from '../components/vx';
+import { vx, space } from '../theme/vxTheme';
 import ApiService from '../services/ApiService';
 import webSocketService from '../services/WebSocketService';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../components/vantage/BottomNavPill';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../components/vx/BottomNavPill';
 
 import MarketsHeader from './markets/MarketsHeader';
 import TradeCFDs from './trade/TradeCFDs';
@@ -951,7 +951,7 @@ export default function TradeScreen() {
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: BOTTOM_NAV_PILL_HEIGHT + space.huge }]}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vantage.accent} colors={[vantage.accent]} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vx.accent} colors={[vx.accent]} />
         }
         keyboardShouldPersistTaps="handled"
       >
@@ -986,7 +986,7 @@ const styles = StyleSheet.create({
 In the orchestrator above, replace the `MarketsHeader` line with:
 
 ```jsx
-import { SegmentedTabs } from '../components/vantage';
+import { SegmentedTabs } from '../components/vx';
 // ...
 <View style={{ paddingHorizontal: space.lg, paddingTop: space.sm }}>
   <SegmentedTabs
@@ -1014,8 +1014,8 @@ import { ScrollView, View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
-import { Screen, Card, PillButton, SymbolIcon, IconButton, StatCard, showToast } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { Screen, Card, PillButton, SymbolIcon, IconButton, StatCard, showToast } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 import ApiService from '../../services/ApiService';
 
 export default function StrategyDetailScreen() {
@@ -1110,7 +1110,7 @@ export default function StrategyDetailScreen() {
 function BackHeader({ onBack }) {
   return (
     <View style={styles.header}>
-      <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={onBack} />
+      <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={onBack} />
     </View>
   );
 }
@@ -1126,19 +1126,19 @@ function Row({ label, value, last }) {
 
 const styles = StyleSheet.create({
   header: { paddingHorizontal: space.sm, paddingTop: space.sm },
-  empty: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, padding: space.huge, textAlign: 'center' },
+  empty: { color: vx.textMuted, fontFamily, fontSize: sizes.body, padding: space.huge, textAlign: 'center' },
   head: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  name: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy },
-  sub: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
-  full: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, backgroundColor: vantage.bgPressed, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: 6 },
+  name: { color: vx.textPrimary, fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy },
+  sub: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  full: { color: vx.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, backgroundColor: vx.bgPressed, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: 6 },
   statsRow: { flexDirection: 'row', gap: space.md, marginTop: space.lg, flexWrap: 'wrap' },
 });
 
 const rowStyles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: space.sm },
-  border: { borderBottomColor: vantage.border, borderBottomWidth: StyleSheet.hairlineWidth },
-  label: { color: vantage.textMuted, fontFamily, fontSize: sizes.body },
-  value: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
+  border: { borderBottomColor: vx.border, borderBottomWidth: StyleSheet.hairlineWidth },
+  label: { color: vx.textMuted, fontFamily, fontSize: sizes.body },
+  value: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
 });
 ```
 

@@ -4,7 +4,7 @@ import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import SymbolIcon from './SymbolIcon';
 import Sparkline from './Sparkline';
 import PriceTicker from './PriceTicker';
-import { vantage, space, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 function InstrumentRow({
   symbol,
@@ -16,7 +16,7 @@ function InstrumentRow({
   onPress,
   rightExtra,
   card = false,
-  upColor = vantage.up,
+  upColor = vx.up,
 }) {
   // The price feed has no change field — derive movement from the sparkline
   // series (first vs last close) when an explicit changePct isn't supplied.
@@ -28,8 +28,8 @@ function InstrumentRow({
   }
   const hasChange = effChange != null && Number.isFinite(effChange);
   const positive = (effChange ?? 0) >= 0;
-  const sparkColor = positive ? upColor : vantage.down;
-  const glowColor = positive ? upColor : vantage.down;
+  const sparkColor = positive ? upColor : vx.down;
+  const glowColor = positive ? upColor : vx.down;
   const gradId = positive ? 'rowGlowUp' : 'rowGlowDown';
 
   // ── Motion ────────────────────────────────────────────────────────────────
@@ -58,7 +58,7 @@ function InstrumentRow({
         onPress={onPress ? () => onPress(symbol) : undefined}
         onPressIn={pressIn}
         onPressOut={pressOut}
-        android_ripple={{ color: vantage.bgPressed }}
+        android_ripple={{ color: vx.bgPressed }}
         accessibilityRole="button"
         style={[styles.row, card && styles.cardRow]}
       >
@@ -78,10 +78,10 @@ function InstrumentRow({
             fontWeight={weights.bold}
             fontFamily={fontFamily}
             upColor={upColor}
-            downColor={vantage.down}
-            neutralColor={vantage.textPrimary}
+            downColor={vx.down}
+            neutralColor={vx.textPrimary}
           />
-          <Text style={[styles.pct, { color: hasChange ? (positive ? upColor : vantage.down) : vantage.textMuted }]}>
+          <Text style={[styles.pct, { color: hasChange ? (positive ? upColor : vx.down) : vx.textMuted }]}>
             {hasChange ? `${positive ? '+' : ''}${effChange.toFixed(2)}%` : '—'}
           </Text>
         </View>
@@ -108,23 +108,23 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: vantage.border,
+    borderBottomColor: vx.border,
   },
   // Grey elevated card per row — matches the upper sections' surface. Removes
   // the divider border and floats each row as its own rounded panel.
   cardRow: {
-    backgroundColor: vantage.bgElevated,
+    backgroundColor: vx.bgElevated,
     borderRadius: radius.lg,
     marginHorizontal: space.lg,
     marginBottom: space.sm,
     borderBottomWidth: 0,
   },
   left: { flex: 1, minWidth: 0 },
-  name: { color: vantage.textPrimary, fontFamily, fontSize: 16, fontWeight: weights.bold },
-  sub: { color: vantage.textMuted, fontFamily, fontSize: 12, marginTop: 2 },
+  name: { color: vx.textPrimary, fontFamily, fontSize: 16, fontWeight: weights.bold },
+  sub: { color: vx.textMuted, fontFamily, fontSize: 12, marginTop: 2 },
   spark: { width: 64 },
   right: { alignItems: 'flex-end', minWidth: 90 },
-  price: { color: vantage.textPrimary, fontFamily, fontSize: 16, fontWeight: weights.bold },
+  price: { color: vx.textPrimary, fontFamily, fontSize: 16, fontWeight: weights.bold },
   pct: { fontFamily, fontSize: 12, marginTop: 2 },
 });
 

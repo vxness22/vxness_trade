@@ -8,15 +8,15 @@ import HomeStack from './HomeStack';
 import MarketsStack from './MarketsStack';
 import TradeStack from './TradeStack';
 import FundsStack from './FundsStack';
-import { BottomNavPill } from '../../components/vantage';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../components/vantage/BottomNavPill';
-import { vantage } from '../../theme/vantageTheme';
+import { BottomNavPill } from '../../components/vx';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../components/vx/BottomNavPill';
+import { vx } from '../../theme/vxTheme';
 import OnboardingTour from '../../components/onboarding/OnboardingTour';
 import { hasSeenTour, markTourSeen, onTourReplay } from '../../components/onboarding/tourStorage';
 
 // Active theme is already applied (index.js) before this module loads, so the
 // branch below picks the right Home icon at evaluation time.
-const LIGHT_THEME = vantage.isDark === false;
+const LIGHT_THEME = vx.isDark === false;
 
 // Light theme uses the brand-coloured logo; dark theme uses the white cut-out.
 const HOME_ICON = LIGHT_THEME

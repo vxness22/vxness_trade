@@ -4,23 +4,23 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
-import { vantage } from '../../../theme/vantageTheme';
+import { vx } from '../../../theme/vxTheme';
 
 const colors = {
-  bgPrimary: vantage.bg,
-  bgSecondary: vantage.bgRaised,
-  bgCard: vantage.bgElevated,
-  bgHover: vantage.bgPressed,
-  border: vantage.border,
-  textPrimary: vantage.textPrimary,
-  textSecondary: vantage.textSecondary,
-  textMuted: vantage.textMuted,
-  primary: vantage.accent,
-  accent: vantage.accent,
-  success: vantage.up,
-  error: vantage.down,
+  bgPrimary: vx.bg,
+  bgSecondary: vx.bgRaised,
+  bgCard: vx.bgElevated,
+  bgHover: vx.bgPressed,
+  border: vx.border,
+  textPrimary: vx.textPrimary,
+  textSecondary: vx.textSecondary,
+  textMuted: vx.textMuted,
+  primary: vx.accent,
+  accent: vx.accent,
+  success: vx.up,
+  error: vx.down,
   warning: '#F59E0B',
-  profitColor: vantage.up,
+  profitColor: vx.up,
 };
 import { useI18n } from '../../../i18n';
 import ScreenHeader from '../../../components/ui/ScreenHeader';
@@ -29,7 +29,7 @@ import ScreenHeader from '../../../components/ui/ScreenHeader';
 // trader app uses. Free, live, and filterable inside the widget itself, so we
 // don't need our own day/impact chips on top.
 export default function EconomicCalendarScreen({ navigation }) {
-  const isDark = vantage.isDark !== false;
+  const isDark = vx.isDark !== false;
   const { t } = useI18n();
   const [reloadKey, setReloadKey] = useState(0);
   const [errored, setErrored] = useState(false);

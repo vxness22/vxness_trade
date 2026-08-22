@@ -3,12 +3,12 @@ import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import { QuickActionTile } from '../../../components/vantage';
-import { vantage, space } from '../../../theme/vantageTheme';
+import { QuickActionTile } from '../../../components/vx';
+import { vx, space } from '../../../theme/vxTheme';
 
 export default function QuickActionsGrid() {
   const nav = useNavigation();
-  const iconColor = vantage.textPrimary;
+  const iconColor = vx.textPrimary;
   return (
     <View style={styles.row}>
       <QuickActionTile

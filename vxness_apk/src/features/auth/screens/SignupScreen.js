@@ -3,8 +3,8 @@ import { ScrollView, View, Text, TextInput, StyleSheet, Pressable, KeyboardAvoid
 import { Ionicons } from '@expo/vector-icons';
 
 import { AuthContext } from '../../../app/providers/AuthContext';
-import { Screen, PillButton, CheckboxRow, showToast } from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
+import { Screen, PillButton, CheckboxRow, showToast } from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 
 const COMMON_COUNTRIES = ['India', 'United States', 'United Kingdom', 'Singapore', 'UAE', 'Australia', 'Canada', 'Germany', 'France', 'Other'];
 
@@ -76,44 +76,44 @@ export default function SignupScreen({ navigation }) {
           </View>
 
           <Text style={styles.label}>Email</Text>
-          <TextInput value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor={vantage.textMuted} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} style={styles.input} />
+          <TextInput value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor={vx.textMuted} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} style={styles.input} />
 
           <Text style={[styles.label, { marginTop: space.md }]}>Password</Text>
           <View style={styles.pwdRow}>
-            <TextInput value={password} onChangeText={setPassword} placeholder="••••••••" placeholderTextColor={vantage.textMuted} secureTextEntry={!showPwd} autoCapitalize="none" autoCorrect={false} style={[styles.input, { flex: 1, marginRight: space.sm }]} />
+            <TextInput value={password} onChangeText={setPassword} placeholder="••••••••" placeholderTextColor={vx.textMuted} secureTextEntry={!showPwd} autoCapitalize="none" autoCorrect={false} style={[styles.input, { flex: 1, marginRight: space.sm }]} />
             <Pressable onPress={() => setShowPwd(!showPwd)} hitSlop={8} style={styles.eye}>
-              <Ionicons name={showPwd ? 'eye-off-outline' : 'eye-outline'} size={20} color={vantage.textMuted} />
+              <Ionicons name={showPwd ? 'eye-off-outline' : 'eye-outline'} size={20} color={vx.textMuted} />
             </Pressable>
           </View>
           {password ? (
             <View style={styles.strengthRow}>
               {[0,1,2,3].map((i) => (
-                <View key={i} style={[styles.strengthBar, { backgroundColor: i < strength.score ? (strength.score < 2 ? vantage.down : strength.score < 4 ? vantage.accent : vantage.up) : vantage.bgPressed }]} />
+                <View key={i} style={[styles.strengthBar, { backgroundColor: i < strength.score ? (strength.score < 2 ? vx.down : strength.score < 4 ? vx.accent : vx.up) : vx.bgPressed }]} />
               ))}
               <Text style={styles.strengthTxt}>{strength.label}</Text>
             </View>
           ) : null}
 
           <Text style={[styles.label, { marginTop: space.md }]}>Full Name</Text>
-          <TextInput value={fullName} onChangeText={setFullName} placeholder="Your full name" placeholderTextColor={vantage.textMuted} autoCapitalize="words" style={styles.input} />
+          <TextInput value={fullName} onChangeText={setFullName} placeholder="Your full name" placeholderTextColor={vx.textMuted} autoCapitalize="words" style={styles.input} />
 
           <Text style={[styles.label, { marginTop: space.md }]}>Country</Text>
           <Pressable onPress={() => setCountryPick(!countryPick)} style={styles.input}>
-            <Text style={{ color: vantage.textPrimary, fontFamily, fontSize: sizes.body }}>{country}</Text>
+            <Text style={{ color: vx.textPrimary, fontFamily, fontSize: sizes.body }}>{country}</Text>
           </Pressable>
           {countryPick ? (
             <View style={styles.dropdown}>
               {COMMON_COUNTRIES.map((c) => (
-                <Pressable key={c} onPress={() => { setCountry(c); setCountryPick(false); }} style={styles.dropdownRow} android_ripple={{ color: vantage.bgPressed }}>
-                  <Text style={{ color: c === country ? vantage.accent : vantage.textPrimary, fontFamily, fontSize: sizes.body }}>{c}</Text>
-                  {c === country ? <Ionicons name="checkmark" size={18} color={vantage.accent} /> : null}
+                <Pressable key={c} onPress={() => { setCountry(c); setCountryPick(false); }} style={styles.dropdownRow} android_ripple={{ color: vx.bgPressed }}>
+                  <Text style={{ color: c === country ? vx.accent : vx.textPrimary, fontFamily, fontSize: sizes.body }}>{c}</Text>
+                  {c === country ? <Ionicons name="checkmark" size={18} color={vx.accent} /> : null}
                 </Pressable>
               ))}
             </View>
           ) : null}
 
-          <Text style={[styles.label, { marginTop: space.md }]}>Referral code <Text style={{ color: vantage.textMuted }}>(optional)</Text></Text>
-          <TextInput value={referral} onChangeText={setReferral} placeholder="REF123" placeholderTextColor={vantage.textMuted} autoCapitalize="characters" autoCorrect={false} style={styles.input} />
+          <Text style={[styles.label, { marginTop: space.md }]}>Referral code <Text style={{ color: vx.textMuted }}>(optional)</Text></Text>
+          <TextInput value={referral} onChangeText={setReferral} placeholder="REF123" placeholderTextColor={vx.textMuted} autoCapitalize="characters" autoCorrect={false} style={styles.input} />
 
           <View style={{ marginTop: space.md }}>
             <CheckboxRow label="I agree to Terms & Privacy Policy" checked={terms} onChange={setTerms} />
@@ -145,21 +145,21 @@ const styles = StyleSheet.create({
   body: { padding: space.xl, paddingTop: space.xxl, flexGrow: 1 },
   brandWrap: { alignItems: 'center', marginBottom: space.xl },
   logo: { width: 160, height: 50, marginBottom: space.md },
-  tagline: { color: vantage.textMuted, fontFamily, fontSize: sizes.body },
-  label: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.xs },
+  tagline: { color: vx.textMuted, fontFamily, fontSize: sizes.body },
+  label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.xs },
   input: {
-    backgroundColor: vantage.bgElevated, borderRadius: radius.md,
+    backgroundColor: vx.bgElevated, borderRadius: radius.md,
     paddingHorizontal: space.md, paddingVertical: space.md,
-    color: vantage.textPrimary, fontFamily, fontSize: sizes.body,
+    color: vx.textPrimary, fontFamily, fontSize: sizes.body,
   },
   pwdRow: { flexDirection: 'row', alignItems: 'center' },
   eye: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   strengthRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: space.xs },
   strengthBar: { flex: 1, height: 4, borderRadius: 2 },
-  strengthTxt: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro, marginLeft: space.sm },
-  dropdown: { backgroundColor: vantage.bgRaised, borderRadius: radius.md, marginTop: space.xs, paddingVertical: space.xs },
+  strengthTxt: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, marginLeft: space.sm },
+  dropdown: { backgroundColor: vx.bgRaised, borderRadius: radius.md, marginTop: space.xs, paddingVertical: space.xs },
   dropdownRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.md, paddingVertical: space.md },
-  link: { color: vantage.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
-  muted: { color: vantage.textMuted, fontFamily, fontSize: sizes.body },
+  link: { color: vx.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
+  muted: { color: vx.textMuted, fontFamily, fontSize: sizes.body },
   loginRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: space.xl },
 });

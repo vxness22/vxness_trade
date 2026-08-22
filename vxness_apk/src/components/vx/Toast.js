@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, Animated, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 import { toMessage } from '../../utils/errorMessage';
 
 let queue = [];
@@ -14,10 +14,10 @@ export function showToast({ message, kind = 'info', duration = 2500 }) {
 }
 
 const KINDS = {
-  info:    { icon: 'information-circle',     color: vantage.textPrimary },
-  success: { icon: 'checkmark-circle',       color: vantage.up },
-  error:   { icon: 'close-circle',           color: vantage.down },
-  warn:    { icon: 'alert-circle',           color: vantage.accent },
+  info:    { icon: 'information-circle',     color: vx.textPrimary },
+  success: { icon: 'checkmark-circle',       color: vx.up },
+  error:   { icon: 'close-circle',           color: vx.down },
+  warn:    { icon: 'alert-circle',           color: vx.accent },
 };
 
 export default function ToastHost() {
@@ -69,12 +69,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.sm,
-    backgroundColor: vantage.bgElevated,
+    backgroundColor: vx.bgElevated,
     borderRadius: radius.pill,
     paddingHorizontal: space.lg,
     paddingVertical: space.md,
     borderWidth: 1,
-    borderColor: vantage.borderStrong,
+    borderColor: vx.borderStrong,
   },
-  txt: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
+  txt: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
 });

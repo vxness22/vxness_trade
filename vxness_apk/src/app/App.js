@@ -16,11 +16,11 @@ import { SettingsProvider } from './providers/SettingsContext';
 import { I18nProvider } from '../i18n';
 import RootNavigator from './navigation/RootNavigator';
 import { ChartHostProvider } from '../features/markets/charts/ChartHost';
-import { ToastHost, AppAlertHost } from '../components/vantage';
-import AppLoader from '../components/vantage/AppLoader';
+import { ToastHost, AppAlertHost } from '../components/vx';
+import AppLoader from '../components/vx/AppLoader';
 import BiometricLockScreen from '../components/BiometricLockScreen';
 import { isBiometricEnabled, getBiometricSupport } from '../services/auth/biometricLock';
-import { vantage } from '../theme/vantageTheme';
+import { vx } from '../theme/vxTheme';
 
 LogBox.ignoreLogs([
   'Non-serializable values were found in the navigation state',
@@ -148,7 +148,7 @@ function AppShell() {
 
   return (
     <>
-      <StatusBar style={vantage.isDark ? 'light' : 'dark'} />
+      <StatusBar style={vx.isDark ? 'light' : 'dark'} />
       <RootNavigator />
       <ToastHost />
       <AppAlertHost />
@@ -165,7 +165,7 @@ function AppShell() {
 
 export default function App() {
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: vantage.bg }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: vx.bg }}>
       <SafeAreaProvider>
         <ThemeProvider>
           <SettingsProvider>
@@ -191,16 +191,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: vantage.bg,
+    backgroundColor: vx.bg,
   },
   errorText: {
-    color: vantage.textPrimary,
+    color: vx.textPrimary,
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
   },
   errorSubtext: {
-    color: vantage.textMuted,
+    color: vx.textMuted,
     fontSize: 14,
   },
 });

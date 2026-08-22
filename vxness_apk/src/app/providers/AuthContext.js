@@ -82,7 +82,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (response.ok && data.access_token) {
-        // TrustEdge backend returns access_token, user_id, role, expires_at
+        // the platform API returns access_token, user_id, role, expires_at
         const userInfo = {
           id: data.user_id,
           email: email,
@@ -147,7 +147,7 @@ export const AuthProvider = ({ children }) => {
       const data = await response.json();
 
       if (response.ok && data.access_token) {
-        // TrustEdge backend returns access_token, user_id, role, expires_at
+        // the platform API returns access_token, user_id, role, expires_at
         const userInfo = {
           id: data.user_id,
           email,

@@ -3,7 +3,7 @@
  * Was previously duplicated inline (toLocaleString with 2-digit options) in
  * 11+ files, drifting in style between screens.
  */
-import { vantage } from '../theme/vantageTheme';
+import { vx } from '../theme/vxTheme';
 
 /** "1,234.56" — account-currency amount without symbol. */
 export function formatMoney(value, { dash = '—' } = {}) {
@@ -32,6 +32,6 @@ export function formatPct(value, { digits = 2, dash = '—' } = {}) {
 /** Theme color for a P&L value: up-green / down-red / muted for null. */
 export function pnlColor(value) {
   const n = Number(value);
-  if (!Number.isFinite(n)) return vantage.textMuted;
-  return n >= 0 ? vantage.up : vantage.down;
+  if (!Number.isFinite(n)) return vx.textMuted;
+  return n >= 0 ? vx.up : vx.down;
 }

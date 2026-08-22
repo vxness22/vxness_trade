@@ -5,9 +5,9 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
-import { Screen, IconButton, showToast } from '../../../components/vantage';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vantage/BottomNavPill';
-import { vantage, space, sizes, weights, fontFamily } from '../../../theme/vantageTheme';
+import { Screen, IconButton, showToast } from '../../../components/vx';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
+import { vx, space, sizes, weights, fontFamily } from '../../../theme/vxTheme';
 import ApiService from '../../../services/api/ApiService';
 
 // Razorpay Checkout runs inside a WebView (no native SDK needed — same
@@ -91,14 +91,14 @@ export default function RazorpayCheckout() {
   return (
     <Screen edges={['top']}>
       <View style={styles.header}>
-        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
+        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
         <Text style={styles.title}>Pay with Razorpay</Text>
         <View style={{ width: 40 }} />
       </View>
 
       {!keyId || !orderId ? (
         <View style={styles.center}>
-          <Ionicons name="alert-circle-outline" size={36} color={vantage.down} />
+          <Ionicons name="alert-circle-outline" size={36} color={vx.down} />
           <Text style={styles.muted}>Missing payment details.</Text>
         </View>
       ) : (
@@ -111,14 +111,14 @@ export default function RazorpayCheckout() {
           onMessage={onMessage}
           startInLoadingState
           renderLoading={() => (
-            <View style={styles.center}><ActivityIndicator color={vantage.accent} /></View>
+            <View style={styles.center}><ActivityIndicator color={vx.accent} /></View>
           )}
         />
       )}
 
       {verifying ? (
         <View style={styles.overlay}>
-          <ActivityIndicator color={vantage.accent} />
+          <ActivityIndicator color={vx.accent} />
           <Text style={styles.muted}>Verifying payment…</Text>
         </View>
       ) : null}
@@ -128,9 +128,9 @@ export default function RazorpayCheckout() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
   web: { flex: 1, backgroundColor: '#000' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.sm },
-  muted: { color: vantage.textMuted, fontFamily, fontSize: sizes.body },
+  muted: { color: vx.textMuted, fontFamily, fontSize: sizes.body },
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center', gap: space.sm },
 });

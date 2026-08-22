@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Card from './Card';
 import SymbolIcon from './SymbolIcon';
 import Sparkline from './Sparkline';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 export default function StrategyCard({
   name,
@@ -24,7 +24,7 @@ export default function StrategyCard({
   const hasMetric = typeof metricValue === 'number' && Number.isFinite(metricValue);
   const positive = (metricValue ?? 0) >= 0;
   // Home Copy-Trade cards use the brand gold for positive returns.
-  const metricColor = metricSigned ? (positive ? '#FBAA45' : vantage.down) : '#FBAA45';
+  const metricColor = metricSigned ? (positive ? '#FBAA45' : vx.down) : '#FBAA45';
 
   const chart = Array.isArray(chartData) && chartData.length >= 2
     ? chartData
@@ -49,7 +49,7 @@ export default function StrategyCard({
           </Text>
         </View>
         <View style={styles.chart}>
-          <Sparkline data={chart} color={vantage.accent} width={chartW} height={72} strokeWidth={2} fill />
+          <Sparkline data={chart} color={vx.accent} width={chartW} height={72} strokeWidth={2} fill />
         </View>
       </View>
     </Card>
@@ -60,7 +60,7 @@ function Stat({ icon, label, value }) {
   return (
     <View style={styles.stat}>
       <View style={styles.statHead}>
-        <Ionicons name={icon} size={13} color={vantage.textMuted} />
+        <Ionicons name={icon} size={13} color={vx.textMuted} />
         <Text style={styles.statLab} numberOfLines={1}>{label}</Text>
       </View>
       <Text style={styles.statVal} numberOfLines={1}>{value}</Text>
@@ -94,17 +94,17 @@ const styles = StyleSheet.create({
   left: { flex: 1, minWidth: 0 },
   head: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginBottom: space.sm },
   headText: { flex: 1, minWidth: 0 },
-  name: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy },
-  category: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro, marginTop: 1 },
-  full: { backgroundColor: vantage.bgPressed, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: radius.sm },
-  fullTxt: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro, fontWeight: weights.semibold },
-  lab: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  name: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy },
+  category: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, marginTop: 1 },
+  full: { backgroundColor: vx.bgPressed, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: radius.sm },
+  fullTxt: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, fontWeight: weights.semibold },
+  lab: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
   val: { fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy, marginTop: 2 },
   chart: { justifyContent: 'flex-end', paddingLeft: space.sm },
-  divider: { height: 1, backgroundColor: vantage.border, marginVertical: space.md },
+  divider: { height: 1, backgroundColor: vx.border, marginVertical: space.md },
   stats: { flexDirection: 'row', justifyContent: 'space-between', gap: space.sm },
   stat: { flex: 1, minWidth: 0 },
   statHead: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  statLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro, flexShrink: 1 },
-  statVal: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold, marginTop: 3 },
+  statLab: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, flexShrink: 1 },
+  statVal: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold, marginTop: 3 },
 });

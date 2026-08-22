@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, Text, ScrollView, StyleSheet } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
-import { vantage, space, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 // Brand accent for the active chip (warm red → orange gradient).
 const ACCENT = '#2FBF71';
@@ -47,7 +47,7 @@ export default function CategoryTabs({ value, onChange, options }) {
                 {
                   // Selected chip: white in dark theme; black in light theme so
                   // it stays readable (the bright pill can wash out white text).
-                  color: active ? (vantage.isDark ? '#FFFFFF' : '#000000') : vantage.textSecondary,
+                  color: active ? (vx.isDark ? '#FFFFFF' : '#000000') : vx.textSecondary,
                   fontWeight: active ? weights.bold : weights.medium,
                 },
               ]}
@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  chipIdle: { backgroundColor: vantage.bgElevated, borderWidth: 1, borderColor: vantage.border },
+  chipIdle: { backgroundColor: vx.bgElevated, borderWidth: 1, borderColor: vx.border },
   chipActive: { borderWidth: 1, borderColor: ACCENT },
   label: { fontFamily, fontSize: 14, letterSpacing: 0.2 },
 });

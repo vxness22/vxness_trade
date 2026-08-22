@@ -1,8 +1,8 @@
-# Plan B — Vantage Redesign: Home Screen (Phase 2)
+# Plan B — Vxness Redesign: Home Screen (Phase 2)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans. Steps use `- [ ]` checkboxes.
 
-**Goal:** Replace the Home placeholder screen with the real Vantage-style dashboard, wired to the live Vxness backend.
+**Goal:** Replace the Home placeholder screen with the real Vxness-style dashboard, wired to the live Vxness backend.
 
 **Architecture:** Composition of six small section components (`HomeHeader`, `BalanceBlock`, `QuickActionsGrid`, `PromoBanner`, `StrategyCarousel`, `WatchlistSection`) orchestrated by `HomeScreen.js`. Each section owns its own fetch logic via the existing `ApiService` (`src/services/ApiService.js`). Watchlist live-updates from `WebSocketService` (`src/services/WebSocketService.js`). Pinned watchlist symbols + hidden-balance flag persist in `expo-secure-store`. Sparkline OHLC bars fetched on demand and cached in-memory for 60 s. No new third-party deps.
 
@@ -209,8 +209,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
 import { AuthContext } from '../../context/AuthContext';
-import { IconButton } from '../../components/vantage';
-import { vantage, space } from '../../theme/vantageTheme';
+import { IconButton } from '../../components/vx';
+import { vx, space } from '../../theme/vxTheme';
 
 const AVATAR_PLACEHOLDER = null; // future: cache profile.avatar_url
 
@@ -232,7 +232,7 @@ export default function HomeHeader({ unreadSupport = 0 }) {
             <Image source={{ uri: AVATAR_PLACEHOLDER }} style={styles.avatar} />
           ) : (
             <View style={[styles.avatar, styles.avatarFallback]}>
-              <Ionicons name="person" size={22} color={vantage.textPrimary} />
+              <Ionicons name="person" size={22} color={vx.textPrimary} />
             </View>
           )}
         </View>
@@ -241,13 +241,13 @@ export default function HomeHeader({ unreadSupport = 0 }) {
       <View style={{ flex: 1 }} />
 
       <IconButton
-        icon={<Ionicons name="search" size={20} color={vantage.textPrimary} />}
+        icon={<Ionicons name="search" size={20} color={vx.textPrimary} />}
         accessibilityLabel="Search"
         onPress={() => nav.navigate('Search')}
       />
       <IconButton
-        icon={<Ionicons name="chatbubble-outline" size={20} color={vantage.textPrimary} />}
-        badgeColor={unreadSupport > 0 ? vantage.down : undefined}
+        icon={<Ionicons name="chatbubble-outline" size={20} color={vx.textPrimary} />}
+        badgeColor={unreadSupport > 0 ? vx.down : undefined}
         accessibilityLabel="Support"
         onPress={() => nav.navigate('Support')}
       />
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     width: 36, height: 36, borderRadius: 18,
   },
   avatarFallback: {
-    backgroundColor: vantage.bgRaised,
+    backgroundColor: vx.bgRaised,
     alignItems: 'center', justifyContent: 'center',
   },
 });
@@ -279,7 +279,7 @@ Note: `ProfileMenu`, `Search`, and `Support` are not yet routes — they'll get 
 
 - [ ] **Step 2: Smoke check** — file exists, imports resolve via grep:
 ```bash
-grep -n "from '../../components/vantage'" /Users/tarundewangan/Downloads/Projects/Vxness/vxness_apk/src/screens/home/HomeHeader.js
+grep -n "from '../../components/vx'" /Users/tarundewangan/Downloads/Projects/Vxness/vxness_apk/src/screens/home/HomeHeader.js
 ```
 
 ---
@@ -297,31 +297,31 @@ import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import { QuickActionTile } from '../../components/vantage';
-import { vantage, space } from '../../theme/vantageTheme';
+import { QuickActionTile } from '../../components/vx';
+import { vx, space } from '../../theme/vxTheme';
 
 export default function QuickActionsGrid({ hasNewBanners = false }) {
   const nav = useNavigation();
   return (
     <View style={styles.row}>
       <QuickActionTile
-        icon={<Ionicons name="gift-outline" size={24} color={vantage.textPrimary} />}
+        icon={<Ionicons name="gift-outline" size={24} color={vx.textPrimary} />}
         label="Promotion"
         badge={hasNewBanners ? 'New' : undefined}
         onPress={() => nav.navigate('Notifications')}
       />
       <QuickActionTile
-        icon={<Ionicons name="calendar-outline" size={24} color={vantage.textPrimary} />}
+        icon={<Ionicons name="calendar-outline" size={24} color={vx.textPrimary} />}
         label="Calendar"
         onPress={() => nav.navigate('EconomicCalendar')}
       />
       <QuickActionTile
-        icon={<Ionicons name="school-outline" size={24} color={vantage.textPrimary} />}
+        icon={<Ionicons name="school-outline" size={24} color={vx.textPrimary} />}
         label="Academy"
         onPress={() => nav.navigate('Academy')}
       />
       <QuickActionTile
-        icon={<Ionicons name="people-outline" size={24} color={vantage.textPrimary} />}
+        icon={<Ionicons name="people-outline" size={24} color={vx.textPrimary} />}
         label="IB"
         onPress={() => nav.navigate('Business', { initialTab: 'ib' })}
       />
@@ -355,8 +355,8 @@ import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Card } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { Card } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 export default function PromoBanner({ banner, onPress }) {
   if (!banner) return null;
@@ -375,7 +375,7 @@ export default function PromoBanner({ banner, onPress }) {
           <Image source={{ uri: imageUrl }} style={styles.thumb} resizeMode="contain" />
         ) : (
           <View style={[styles.thumb, styles.thumbFallback]}>
-            <Ionicons name="trophy" size={32} color={vantage.accent} />
+            <Ionicons name="trophy" size={32} color={vx.accent} />
           </View>
         )}
         <View style={styles.body}>
@@ -390,11 +390,11 @@ export default function PromoBanner({ banner, onPress }) {
 const styles = StyleSheet.create({
   card: { marginHorizontal: space.lg, marginVertical: space.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  thumb: { width: 64, height: 64, borderRadius: 12, backgroundColor: vantage.bgRaised },
+  thumb: { width: 64, height: 64, borderRadius: 12, backgroundColor: vx.bgRaised },
   thumbFallback: { alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, minWidth: 0 },
-  title: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy },
-  cta: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, marginTop: 4 },
+  title: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy },
+  cta: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginTop: 4 },
 });
 ```
 
@@ -413,8 +413,8 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import { StrategyCard } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { StrategyCard } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 export default function StrategyCarousel({ strategies = [], onSeeAll }) {
   const nav = useNavigation();
@@ -424,7 +424,7 @@ export default function StrategyCarousel({ strategies = [], onSeeAll }) {
       <View style={styles.headerRow}>
         <Text style={styles.heading}>Best Overall Strategies</Text>
         <Pressable onPress={onSeeAll || (() => nav.navigate('TradeTab'))} hitSlop={8} accessibilityRole="button" accessibilityLabel="See all strategies">
-          <Ionicons name="chevron-forward" size={20} color={vantage.textMuted} />
+          <Ionicons name="chevron-forward" size={20} color={vx.textMuted} />
         </Pressable>
       </View>
       {strategies.length === 0 ? (
@@ -462,8 +462,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg,
     paddingBottom: space.sm,
   },
-  heading: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
-  empty: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, paddingHorizontal: space.lg, paddingBottom: space.md },
+  heading: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
+  empty: { color: vx.textMuted, fontFamily, fontSize: sizes.label, paddingHorizontal: space.lg, paddingBottom: space.md },
   row: { gap: space.md, paddingHorizontal: space.lg, paddingBottom: space.sm },
 });
 ```
@@ -485,8 +485,8 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import { InstrumentRow } from '../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { InstrumentRow } from '../../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 import { getWatchlist } from '../../utils/watchlistStorage';
 import { getSparkData } from '../../utils/sparklineCache';
 
@@ -539,7 +539,7 @@ export default function WatchlistSection({ pricesBySymbol = {}, onSeeAll }) {
       <View style={styles.headerRow}>
         <Text style={styles.heading}>Watchlist</Text>
         <Pressable onPress={handleSeeAll} hitSlop={8} accessibilityRole="button" accessibilityLabel="View all watchlist">
-          <Ionicons name="chevron-forward" size={20} color={vantage.textMuted} />
+          <Ionicons name="chevron-forward" size={20} color={vx.textMuted} />
         </Pressable>
       </View>
       {symbols.map((sym) => {
@@ -575,10 +575,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg,
     paddingBottom: space.sm,
   },
-  heading: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
-  empty: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, paddingHorizontal: space.lg, paddingBottom: space.md },
+  heading: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
+  empty: { color: vx.textMuted, fontFamily, fontSize: sizes.label, paddingHorizontal: space.lg, paddingBottom: space.md },
   viewMore: { alignItems: 'center', paddingVertical: space.md },
-  viewMoreTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
+  viewMoreTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
 });
 ```
 
@@ -598,12 +598,12 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { ScrollView, RefreshControl, View, StyleSheet, Pressable } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
-import { Screen, BalanceBlock } from '../components/vantage';
-import { vantage, space } from '../theme/vantageTheme';
+import { Screen, BalanceBlock } from '../components/vx';
+import { vx, space } from '../theme/vxTheme';
 import ApiService from '../services/ApiService';
 import webSocketService from '../services/WebSocketService';
 import { useHiddenBalance } from '../utils/hiddenBalance';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../components/vantage/BottomNavPill';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../components/vx/BottomNavPill';
 
 import HomeHeader from './home/HomeHeader';
 import QuickActionsGrid from './home/QuickActionsGrid';
@@ -707,7 +707,7 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: BOTTOM_NAV_PILL_HEIGHT + space.huge }]}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vantage.accent} colors={[vantage.accent]} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vx.accent} colors={[vx.accent]} />
         }
       >
         <HomeHeader unreadSupport={unreadSupport} />
@@ -751,7 +751,7 @@ const styles = StyleSheet.create({
 - [ ] **Step 2: Sanity check imports**
 
 ```bash
-grep -nE "from '\.\./(components/vantage|theme/vantageTheme|services|utils|context)" /Users/tarundewangan/Downloads/Projects/Vxness/vxness_apk/src/screens/HomeScreen.js
+grep -nE "from '\.\./(components/vx|theme/vxTheme|services|utils|context)" /Users/tarundewangan/Downloads/Projects/Vxness/vxness_apk/src/screens/HomeScreen.js
 ```
 
 All paths should be relative-correct.

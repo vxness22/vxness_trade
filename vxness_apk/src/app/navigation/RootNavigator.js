@@ -6,10 +6,10 @@ import { AuthContext } from '../providers/AuthContext';
 import { AccountProvider } from '../providers/AccountContext';
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
-import AppLoader from '../../components/vantage/AppLoader';
+import AppLoader from '../../components/vx/AppLoader';
 import NotificationsBridge from '../../components/NotificationsBridge';
 import { navigationRef } from './navigationRef';
-import { vantage } from '../../theme/vantageTheme';
+import { vx } from '../../theme/vxTheme';
 
 export default function RootNavigator() {
   const auth = useContext(AuthContext);
@@ -21,12 +21,12 @@ export default function RootNavigator() {
       theme={{
         dark: true,
         colors: {
-          primary: vantage.accent,
-          background: vantage.bg,
-          card: vantage.bg,
-          text: vantage.textPrimary,
-          border: vantage.border,
-          notification: vantage.accent,
+          primary: vx.accent,
+          background: vx.bg,
+          card: vx.bg,
+          text: vx.textPrimary,
+          border: vx.border,
+          notification: vx.accent,
         },
         fonts: {
           regular: { fontFamily: 'System', fontWeight: '400' },

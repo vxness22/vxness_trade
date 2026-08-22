@@ -1,12 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { vantage } from '../../theme/vantageTheme';
+import { vx } from '../../theme/vxTheme';
 
 const colors = {
-  bgCard: vantage.bgElevated,
-  border: vantage.border,
-  textMuted: vantage.textMuted,
-  textPrimary: vantage.textPrimary,
+  bgCard: vx.bgElevated,
+  border: vx.border,
+  textMuted: vx.textMuted,
+  textPrimary: vx.textPrimary,
 };
 
 export default function StatCard({ label, value, valueColor, prefix = '', suffix = '' }) {

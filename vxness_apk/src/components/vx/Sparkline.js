@@ -1,7 +1,7 @@
 import React, { memo, useMemo, useId } from 'react';
 import { View } from 'react-native';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
-import { vantage } from '../../theme/vantageTheme';
+import { vx } from '../../theme/vxTheme';
 
 function Sparkline({
   data = [],
@@ -14,7 +14,7 @@ function Sparkline({
   const gid = useId().replace(/[^a-zA-Z0-9]/g, '');
   const { path, areaPath, autoColor } = useMemo(() => {
     if (!Array.isArray(data) || data.length < 2) {
-      return { path: '', areaPath: '', autoColor: vantage.textMuted };
+      return { path: '', areaPath: '', autoColor: vx.textMuted };
     }
     const min = Math.min(...data);
     const max = Math.max(...data);
@@ -31,7 +31,7 @@ function Sparkline({
     // Close the area down to the baseline and back for an optional gradient fill.
     const area = `${d} L ${width.toFixed(2)} ${height.toFixed(2)} L 0 ${height.toFixed(2)} Z`;
     const up = data[data.length - 1] >= data[0];
-    return { path: d, areaPath: area, autoColor: up ? vantage.up : vantage.down };
+    return { path: d, areaPath: area, autoColor: up ? vx.up : vx.down };
   }, [data, width, height]);
 
   const stroke = color || autoColor;

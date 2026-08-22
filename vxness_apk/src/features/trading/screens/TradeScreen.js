@@ -2,12 +2,12 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { ScrollView, RefreshControl, View, StyleSheet } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 
-import { Screen, SegmentedTabs } from '../../../components/vantage';
-import { vantage, space } from '../../../theme/vantageTheme';
+import { Screen, SegmentedTabs } from '../../../components/vx';
+import { vx, space } from '../../../theme/vxTheme';
 import ApiService from '../../../services/api/ApiService';
 import webSocketService from '../../../services/websocket/WebSocketService';
 import * as SecureStore from 'expo-secure-store';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vantage/BottomNavPill';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 
 import { useAccount } from '../../../app/providers/AccountContext';
 import TradeCFDs from './TradeCFDs';
@@ -231,7 +231,7 @@ export default function TradeScreen() {
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: BOTTOM_NAV_PILL_HEIGHT + space.huge }]}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vantage.accent} colors={[vantage.accent]} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vx.accent} colors={[vx.accent]} />
         }
         keyboardShouldPersistTaps="handled"
       >

@@ -16,7 +16,7 @@ import logger from '../../../utils/logger';
 import { useTheme } from '../../../app/providers/ThemeContext';
 import { useAccount } from '../../../app/providers/AccountContext';
 import AccountSwitcher from '../components/AccountSwitcher';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vantage/BottomNavPill';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 
 const TIMEFRAMES = [
   { label: '1M', period: '1m' },

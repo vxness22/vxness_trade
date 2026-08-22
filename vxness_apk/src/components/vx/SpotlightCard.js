@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Defs, RadialGradient, Stop, Circle, Text as SvgText } from 'react-native-svg';
 import Card from './Card';
 import SymbolIcon from './SymbolIcon';
-import { vantage, space, sizes, weights, fontFamily } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily } from '../../theme/vxTheme';
 
 export default function SpotlightCard({ title = 'Spotlight', items, brandLabel = 'Vxness' }) {
   return (
@@ -13,15 +13,15 @@ export default function SpotlightCard({ title = 'Spotlight', items, brandLabel =
         <Svg width={56} height={56} style={styles.glow}>
           <Defs>
             <RadialGradient id="glow" cx="50%" cy="50%" r="50%">
-              <Stop offset="0" stopColor={vantage.accentGlow} stopOpacity="0.95" />
-              <Stop offset="1" stopColor={vantage.accent} stopOpacity="0" />
+              <Stop offset="0" stopColor={vx.accentGlow} stopOpacity="0.95" />
+              <Stop offset="1" stopColor={vx.accent} stopOpacity="0" />
             </RadialGradient>
           </Defs>
           <Circle cx="28" cy="28" r="26" fill="url(#glow)" />
           <SvgText
             x="28" y="34"
             fontSize="13" fontWeight="800"
-            fill={vantage.textPrimary}
+            fill={vx.textPrimary}
             textAnchor="middle"
           >{brandLabel}</SvgText>
         </Svg>
@@ -41,7 +41,7 @@ export default function SpotlightCard({ title = 'Spotlight', items, brandLabel =
                 return (
                   <>
                     <Text style={styles.price}>{hasPrice ? Number(it.price).toLocaleString('en-US', { maximumFractionDigits: 2 }) : '—'}</Text>
-                    <Text style={[styles.pct, { color: hasPct ? (it.changePct >= 0 ? vantage.up : vantage.down) : vantage.textMuted }]}>
+                    <Text style={[styles.pct, { color: hasPct ? (it.changePct >= 0 ? vx.up : vx.down) : vx.textMuted }]}>
                       {hasPct ? `${it.changePct >= 0 ? '+' : ''}${Number(it.changePct).toFixed(2)}%` : '—'}
                     </Text>
                   </>
@@ -57,13 +57,13 @@ export default function SpotlightCard({ title = 'Spotlight', items, brandLabel =
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: space.lg, paddingBottom: 0 },
-  title: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
+  title: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
   glow: {},
   body: { margin: space.md, padding: space.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.sm },
-  rowBorder: { borderBottomColor: vantage.border, borderBottomWidth: StyleSheet.hairlineWidth },
-  sym: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
-  sub: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
-  price: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
+  rowBorder: { borderBottomColor: vx.border, borderBottomWidth: StyleSheet.hairlineWidth },
+  sym: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
+  sub: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  price: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
   pct: { fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, marginTop: 2 },
 });

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable, TextInput, StyleSheet } from 'react-native';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 export default function NumberStepper({
   value,
@@ -48,18 +48,18 @@ export default function NumberStepper({
 
 const styles = StyleSheet.create({
   wrap: { gap: space.xs },
-  label: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label },
+  label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: vantage.bgRaised,
+    backgroundColor: vx.bgRaised,
     borderRadius: radius.md,
     paddingHorizontal: space.sm,
     height: 40,
   },
   btn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  btnTxt: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy },
+  btnTxt: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy },
   center: { flex: 1, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  input: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold, textAlign: 'center', minWidth: 40, padding: 0 },
-  suffix: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginLeft: space.xs },
+  input: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold, textAlign: 'center', minWidth: 40, padding: 0 },
+  suffix: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginLeft: space.xs },
 });

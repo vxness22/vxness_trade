@@ -6,9 +6,9 @@ import {
   ShieldCheck, LifeBuoy,
 } from 'lucide-react-native';
 
-import { Screen } from '../../../components/vantage';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vantage/BottomNavPill';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
+import { Screen } from '../../../components/vx';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 import ApiService from '../../../services/api/ApiService';
 import logger from '../../../utils/logger';
 
@@ -16,18 +16,18 @@ import logger from '../../../utils/logger';
 // icon + accent colour.
 function iconFor(type) {
   const t = String(type || '').toLowerCase();
-  if (t.includes('deposit')) return { C: Wallet, color: vantage.up };
-  if (t.includes('withdraw')) return { C: ArrowDownCircle, color: vantage.accent };
-  if (t.includes('sl') || t.includes('stop')) return { C: AlertCircle, color: vantage.down };
-  if (t.includes('tp') || t.includes('take_profit') || t.includes('profit')) return { C: Trophy, color: vantage.up };
-  if (t.includes('close')) return { C: CheckCircle2, color: vantage.up };
-  if (t.includes('pending') || t.includes('order')) return { C: Clock, color: vantage.accent };
-  if (t.includes('open') || t.includes('trade')) return { C: TrendingUp, color: vantage.accent };
-  if (t.includes('triggered') || t.includes('flash')) return { C: Zap, color: vantage.accent };
-  if (t.includes('copy')) return { C: Copy, color: vantage.accent };
-  if (t.includes('kyc') || t.includes('security')) return { C: ShieldCheck, color: vantage.up };
-  if (t.includes('support') || t.includes('ticket')) return { C: LifeBuoy, color: vantage.accent };
-  return { C: Bell, color: vantage.textSecondary };
+  if (t.includes('deposit')) return { C: Wallet, color: vx.up };
+  if (t.includes('withdraw')) return { C: ArrowDownCircle, color: vx.accent };
+  if (t.includes('sl') || t.includes('stop')) return { C: AlertCircle, color: vx.down };
+  if (t.includes('tp') || t.includes('take_profit') || t.includes('profit')) return { C: Trophy, color: vx.up };
+  if (t.includes('close')) return { C: CheckCircle2, color: vx.up };
+  if (t.includes('pending') || t.includes('order')) return { C: Clock, color: vx.accent };
+  if (t.includes('open') || t.includes('trade')) return { C: TrendingUp, color: vx.accent };
+  if (t.includes('triggered') || t.includes('flash')) return { C: Zap, color: vx.accent };
+  if (t.includes('copy')) return { C: Copy, color: vx.accent };
+  if (t.includes('kyc') || t.includes('security')) return { C: ShieldCheck, color: vx.up };
+  if (t.includes('support') || t.includes('ticket')) return { C: LifeBuoy, color: vx.accent };
+  return { C: Bell, color: vx.textSecondary };
 }
 
 function withAlpha(hex, a) {
@@ -102,12 +102,12 @@ export default function NotificationsScreen({ navigation }) {
     <Screen edges={['top']}>
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.iconBtn} accessibilityLabel="Back">
-          <ChevronLeft size={24} color={vantage.textPrimary} />
+          <ChevronLeft size={24} color={vx.textPrimary} />
         </Pressable>
         <Text style={styles.title}>Notifications</Text>
         {unreadCount > 0 ? (
           <Pressable onPress={markAllAsRead} hitSlop={8} style={styles.markAll} accessibilityLabel="Mark all read">
-            <CheckCheck size={16} color={vantage.accent} />
+            <CheckCheck size={16} color={vx.accent} />
             <Text style={styles.markAllTxt}>Read all</Text>
           </Pressable>
         ) : (
@@ -123,16 +123,16 @@ export default function NotificationsScreen({ navigation }) {
       ) : null}
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator color={vantage.accent} /></View>
+        <View style={styles.center}><ActivityIndicator color={vx.accent} /></View>
       ) : (
         <ScrollView
           contentContainerStyle={{ paddingBottom: BOTTOM_NAV_PILL_HEIGHT + space.huge }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vantage.accent} colors={[vantage.accent]} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vx.accent} colors={[vx.accent]} />}
           showsVerticalScrollIndicator={false}
         >
           {notifications.length === 0 ? (
             <View style={styles.empty}>
-              <View style={styles.emptyIcon}><BellOff size={40} color={vantage.textMuted} /></View>
+              <View style={styles.emptyIcon}><BellOff size={40} color={vx.textMuted} /></View>
               <Text style={styles.emptyTitle}>No notifications</Text>
               <Text style={styles.emptyTxt}>You're all caught up. New alerts will show up here.</Text>
             </View>
@@ -147,7 +147,7 @@ export default function NotificationsScreen({ navigation }) {
                       key={n._id}
                       onPress={() => onPressNotif(n)}
                       style={[styles.card, !n.read && styles.cardUnread]}
-                      android_ripple={{ color: vantage.bgPressed }}
+                      android_ripple={{ color: vx.bgPressed }}
                     >
                       {!n.read ? <View style={styles.unreadBar} /> : null}
                       <View style={[styles.iconWrap, { backgroundColor: withAlpha(color, '22') }]}>
@@ -196,39 +196,39 @@ function formatTime(s) {
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
   markAll: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: space.sm, paddingVertical: 6, minWidth: 80, justifyContent: 'flex-end' },
-  markAllTxt: { color: vantage.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
+  markAllTxt: { color: vx.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
 
-  banner: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginHorizontal: space.lg, marginBottom: space.sm, paddingHorizontal: space.md, paddingVertical: space.sm, backgroundColor: vantage.accentMuted, borderRadius: radius.md },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: vantage.accent },
-  bannerTxt: { color: vantage.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginHorizontal: space.lg, marginBottom: space.sm, paddingHorizontal: space.md, paddingVertical: space.sm, backgroundColor: vx.accentMuted, borderRadius: radius.md },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: vx.accent },
+  bannerTxt: { color: vx.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   group: { marginBottom: space.sm },
-  groupLabel: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.bold, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: space.lg, paddingVertical: space.sm },
+  groupLabel: { color: vx.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.bold, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: space.lg, paddingVertical: space.sm },
 
   card: {
     flexDirection: 'row', alignItems: 'flex-start', gap: space.md,
     marginHorizontal: space.lg, marginBottom: space.sm,
     padding: space.md, paddingLeft: space.lg,
-    backgroundColor: vantage.bgElevated, borderRadius: radius.lg,
-    borderWidth: 1, borderColor: vantage.border,
+    backgroundColor: vx.bgElevated, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: vx.border,
     overflow: 'hidden',
   },
-  cardUnread: { backgroundColor: vantage.bgRaised, borderColor: withAlpha(vantage.accent, '55') },
-  unreadBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: vantage.accent, borderTopLeftRadius: radius.lg, borderBottomLeftRadius: radius.lg },
+  cardUnread: { backgroundColor: vx.bgRaised, borderColor: withAlpha(vx.accent, '55') },
+  unreadBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: vx.accent, borderTopLeftRadius: radius.lg, borderBottomLeftRadius: radius.lg },
 
   iconWrap: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, minWidth: 0 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm, marginBottom: 3 },
-  notifTitle: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
-  time: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro },
-  message: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, lineHeight: 19 },
+  notifTitle: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
+  time: { color: vx.textMuted, fontFamily, fontSize: sizes.micro },
+  message: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, lineHeight: 19 },
 
   empty: { alignItems: 'center', paddingTop: 80, paddingHorizontal: space.xxl },
-  emptyIcon: { width: 84, height: 84, borderRadius: 42, backgroundColor: vantage.bgElevated, alignItems: 'center', justifyContent: 'center', marginBottom: space.lg },
-  emptyTitle: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy, marginBottom: space.xs },
-  emptyTxt: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, textAlign: 'center', lineHeight: 20 },
+  emptyIcon: { width: 84, height: 84, borderRadius: 42, backgroundColor: vx.bgElevated, alignItems: 'center', justifyContent: 'center', marginBottom: space.lg },
+  emptyTitle: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy, marginBottom: space.xs },
+  emptyTxt: { color: vx.textMuted, fontFamily, fontSize: sizes.body, textAlign: 'center', lineHeight: 20 },
 });

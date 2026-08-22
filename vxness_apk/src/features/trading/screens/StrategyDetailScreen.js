@@ -4,9 +4,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
 import { AuthContext } from '../../../app/providers/AuthContext';
-import { Screen, Card, PillButton, SymbolIcon, IconButton, StatCard, showToast } from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vantage/BottomNavPill';
+import { Screen, Card, PillButton, SymbolIcon, IconButton, StatCard, showToast } from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 import ApiService from '../../../services/api/ApiService';
 
 export default function StrategyDetailScreen() {
@@ -169,8 +169,8 @@ export default function StrategyDetailScreen() {
         ) : isCopying ? (
           <Card style={{ marginTop: space.xl }}>
             <View style={styles.selfRow}>
-              <View style={[styles.selfBadge, { backgroundColor: vantage.upMuted, borderColor: vantage.up }]}>
-                <Text style={[styles.selfBadgeTxt, { color: vantage.up }]}>Copying</Text>
+              <View style={[styles.selfBadge, { backgroundColor: vx.upMuted, borderColor: vx.up }]}>
+                <Text style={[styles.selfBadgeTxt, { color: vx.up }]}>Copying</Text>
               </View>
               <Text style={styles.selfTxt}>You’re already copying this master — their trades are mirrored to your account (below). A master can only be copied once.</Text>
             </View>
@@ -194,7 +194,7 @@ export default function StrategyDetailScreen() {
               onChangeText={(t) => setAmount(t.replace(/[^0-9.]/g, ''))}
               keyboardType="decimal-pad"
               placeholder={provider.min_investment ? `Min ${provider.min_investment}` : '0.00'}
-              placeholderTextColor={vantage.textMuted}
+              placeholderTextColor={vx.textMuted}
               style={styles.copyInput}
             />
 
@@ -211,7 +211,7 @@ export default function StrategyDetailScreen() {
                         onPress={() => setSelectedAccountId(id)}
                         style={[styles.acctChip, active && styles.acctChipActive]}
                       >
-                        <Text style={[styles.acctChipTxt, active && { color: vantage.textPrimary }]}>
+                        <Text style={[styles.acctChipTxt, active && { color: vx.textPrimary }]}>
                           {a.account_number || a.group || id}
                         </Text>
                       </Pressable>
@@ -272,12 +272,12 @@ function ActRow({ t, open, last }) {
     <View style={[styles.actRow, !last && styles.actBorder]}>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={styles.actSym} numberOfLines={1}>{t.symbol}</Text>
-        <Text style={[styles.actSide, { color: side === 'buy' ? vantage.up : vantage.down }]} numberOfLines={1}>
+        <Text style={[styles.actSide, { color: side === 'buy' ? vx.up : vx.down }]} numberOfLines={1}>
           {side.toUpperCase()} {t.lots} @ {Number(t.open_price).toFixed(5)}
           {!open && t.close_price != null ? ` → ${Number(t.close_price).toFixed(5)}` : ''}
         </Text>
       </View>
-      <Text style={[styles.actPnl, { color: pos ? vantage.up : vantage.down }]}>
+      <Text style={[styles.actPnl, { color: pos ? vx.up : vx.down }]}>
         {pos ? '+' : ''}{Number(t.profit ?? 0).toFixed(2)}
       </Text>
     </View>
@@ -287,7 +287,7 @@ function ActRow({ t, open, last }) {
 function BackHeader({ onBack }) {
   return (
     <View style={styles.header}>
-      <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={onBack} />
+      <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={onBack} />
     </View>
   );
 }
@@ -303,41 +303,41 @@ function Row({ label, value, last }) {
 
 const styles = StyleSheet.create({
   header: { paddingHorizontal: space.sm, paddingTop: space.sm },
-  empty: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, padding: space.huge, textAlign: 'center' },
+  empty: { color: vx.textMuted, fontFamily, fontSize: sizes.body, padding: space.huge, textAlign: 'center' },
   head: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  name: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy },
-  sub: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
-  full: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, backgroundColor: vantage.bgPressed, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: 6 },
+  name: { color: vx.textPrimary, fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy },
+  sub: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  full: { color: vx.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, backgroundColor: vx.bgPressed, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: 6 },
   statsRow: { flexDirection: 'row', gap: space.md, marginTop: space.lg, flexWrap: 'wrap' },
-  copyTitle: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy, marginBottom: space.md },
+  copyTitle: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy, marginBottom: space.md },
   selfRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  selfBadge: { backgroundColor: vantage.accentMuted, borderWidth: 1, borderColor: vantage.accent, paddingHorizontal: space.md, paddingVertical: space.xs, borderRadius: radius.pill },
-  selfBadgeTxt: { color: vantage.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.heavy },
-  selfTxt: { flex: 1, color: vantage.textSecondary, fontFamily, fontSize: sizes.label, lineHeight: 18 },
-  actHeader: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: space.sm },
-  actEmpty: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, padding: space.lg, textAlign: 'center' },
+  selfBadge: { backgroundColor: vx.accentMuted, borderWidth: 1, borderColor: vx.accent, paddingHorizontal: space.md, paddingVertical: space.xs, borderRadius: radius.pill },
+  selfBadgeTxt: { color: vx.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.heavy },
+  selfTxt: { flex: 1, color: vx.textSecondary, fontFamily, fontSize: sizes.label, lineHeight: 18 },
+  actHeader: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: space.sm },
+  actEmpty: { color: vx.textMuted, fontFamily, fontSize: sizes.label, padding: space.lg, textAlign: 'center' },
   actRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: space.md },
-  actBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: vantage.border },
-  actSym: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
+  actBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: vx.border },
+  actSym: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
   actSide: { fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, marginTop: 2 },
   actPnl: { fontFamily, fontSize: sizes.body, fontWeight: weights.heavy },
-  copyLabel: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, marginTop: space.md, marginBottom: space.xs },
+  copyLabel: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginTop: space.md, marginBottom: space.xs },
   copyInput: {
-    backgroundColor: vantage.bgRaised, borderRadius: radius.md,
+    backgroundColor: vx.bgRaised, borderRadius: radius.md,
     paddingHorizontal: space.md, paddingVertical: space.md,
-    color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold,
+    color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold,
   },
   acctRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  acctChip: { paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.pill, backgroundColor: vantage.bgRaised, borderWidth: 1, borderColor: vantage.border },
-  acctChipActive: { borderColor: vantage.accent, backgroundColor: vantage.accentMuted },
-  acctChipTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
-  copyHint: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: space.sm },
-  cancelTxt: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  acctChip: { paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.pill, backgroundColor: vx.bgRaised, borderWidth: 1, borderColor: vx.border },
+  acctChipActive: { borderColor: vx.accent, backgroundColor: vx.accentMuted },
+  acctChipTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  copyHint: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: space.sm },
+  cancelTxt: { color: vx.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
 });
 
 const rowStyles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: space.sm, gap: space.md },
-  border: { borderBottomColor: vantage.border, borderBottomWidth: StyleSheet.hairlineWidth },
-  label: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, flexShrink: 0 },
-  value: { flex: 1, textAlign: 'right', color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
+  border: { borderBottomColor: vx.border, borderBottomWidth: StyleSheet.hairlineWidth },
+  label: { color: vx.textMuted, fontFamily, fontSize: sizes.body, flexShrink: 0 },
+  value: { flex: 1, textAlign: 'right', color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
 });

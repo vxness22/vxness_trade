@@ -3,9 +3,9 @@ import { ScrollView, View, Text, TextInput, Pressable, StyleSheet } from 'react-
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import { Screen, PillButton, IconButton, showToast } from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vantage/BottomNavPill';
+import { Screen, PillButton, IconButton, showToast } from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 import ApiService from '../../../services/api/ApiService';
 import { showWithdrawKycGate } from '../../../utils/kycGate';
 
@@ -56,7 +56,7 @@ export default function WithdrawCrypto() {
   return (
     <Screen edges={['top']}>
       <View style={styles.header}>
-        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
+        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
         <Text style={styles.title}>Crypto Withdrawal</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -65,16 +65,16 @@ export default function WithdrawCrypto() {
         <View style={styles.chainRow}>
           {NETWORKS.map((c) => (
             <Pressable key={c.network} onPress={() => setNetwork(c.network)} style={[styles.chainChip, network === c.network && styles.chainChipActive]}>
-              <Text style={[styles.chainTxt, network === c.network && { color: vantage.textPrimary, fontWeight: weights.bold }]}>{c.label.replace('USDT ', '')}</Text>
+              <Text style={[styles.chainTxt, network === c.network && { color: vx.textPrimary, fontWeight: weights.bold }]}>{c.label.replace('USDT ', '')}</Text>
             </Pressable>
           ))}
         </View>
 
         <Text style={[styles.label, { marginTop: space.md }]}>Destination address</Text>
-        <TextInput value={address} onChangeText={setAddress} placeholder={opt.hint} placeholderTextColor={vantage.textMuted} style={styles.input} autoCapitalize="none" autoCorrect={false} />
+        <TextInput value={address} onChangeText={setAddress} placeholder={opt.hint} placeholderTextColor={vx.textMuted} style={styles.input} autoCapitalize="none" autoCorrect={false} />
 
         <Text style={[styles.label, { marginTop: space.md }]}>Amount (USDT)</Text>
-        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={vantage.textMuted} style={styles.input} />
+        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={vx.textMuted} style={styles.input} />
 
         <Text style={styles.warn}>Triple-check the address. Crypto withdrawals are irreversible.</Text>
 
@@ -86,12 +86,12 @@ export default function WithdrawCrypto() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
-  label: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
   chainRow: { flexDirection: 'row', gap: space.sm },
-  chainChip: { flex: 1, paddingVertical: space.sm, backgroundColor: vantage.bgElevated, borderRadius: radius.pill, borderWidth: 1, borderColor: vantage.border, alignItems: 'center' },
-  chainChipActive: { backgroundColor: vantage.bgRaised, borderColor: vantage.accent },
-  chainTxt: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
-  input: { backgroundColor: vantage.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
-  warn: { color: vantage.down, fontFamily, fontSize: sizes.label, marginTop: space.md, textAlign: 'center' },
+  chainChip: { flex: 1, paddingVertical: space.sm, backgroundColor: vx.bgElevated, borderRadius: radius.pill, borderWidth: 1, borderColor: vx.border, alignItems: 'center' },
+  chainChipActive: { backgroundColor: vx.bgRaised, borderColor: vx.accent },
+  chainTxt: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
+  input: { backgroundColor: vx.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vx.textPrimary, fontFamily, fontSize: sizes.body },
+  warn: { color: vx.down, fontFamily, fontSize: sizes.label, marginTop: space.md, textAlign: 'center' },
 });

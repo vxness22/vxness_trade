@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 // Imperative, themed replacement for the OS-default Alert.alert — same
 // fire-and-forget API as showToast, but renders a centered popup that matches
@@ -68,34 +68,34 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 340,
-    backgroundColor: vantage.bgElevated,
+    backgroundColor: vx.bgElevated,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: vantage.border,
+    borderColor: vx.border,
     padding: space.xl,
   },
   title: {
-    color: vantage.textPrimary,
+    color: vx.textPrimary,
     fontFamily,
     fontSize: sizes.h2,
     fontWeight: weights.heavy,
     marginBottom: space.sm,
   },
   message: {
-    color: vantage.textSecondary,
+    color: vx.textSecondary,
     fontFamily,
     fontSize: sizes.body,
     lineHeight: 20,
     marginBottom: space.lg,
   },
   btn: {
-    backgroundColor: vantage.accent,
+    backgroundColor: vx.accent,
     borderRadius: radius.md,
     paddingVertical: space.md,
     alignItems: 'center',
   },
   btnTxt: {
-    color: vantage.textInverse,
+    color: vx.textInverse,
     fontFamily,
     fontSize: sizes.body,
     fontWeight: weights.heavy,

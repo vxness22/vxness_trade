@@ -3,9 +3,9 @@ import { ScrollView, View, Text, TextInput, Pressable, StyleSheet } from 'react-
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import { Screen, Card, PillButton, IconButton, showToast } from '../../../components/vantage';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vantage/BottomNavPill';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
+import { Screen, Card, PillButton, IconButton, showToast } from '../../../components/vx';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 import ApiService from '../../../services/api/ApiService';
 import { authedFetch } from '../../../services/api/authedFetch';
 
@@ -100,14 +100,14 @@ export default function BecomeMasterScreen() {
   return (
     <Screen edges={['top']}>
       <View style={styles.header}>
-        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
+        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
         <Text style={styles.title}>Become a Master</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: BOTTOM_NAV_PILL_HEIGHT + space.huge }}>
         <View style={styles.hero}>
-          <View style={styles.heroIcon}><Ionicons name="ribbon" size={36} color={vantage.accent} /></View>
+          <View style={styles.heroIcon}><Ionicons name="ribbon" size={36} color={vx.accent} /></View>
           <Text style={styles.heroTitle}>Earn from your trading</Text>
           <Text style={styles.heroSub}>Approved masters accept followers/investors and earn a performance fee on profits.</Text>
         </View>
@@ -120,7 +120,7 @@ export default function BecomeMasterScreen() {
             const active = t.key === type;
             return (
               <Pressable key={t.key} onPress={() => setType(t.key)} style={[styles.typeChip, active && styles.typeChipActive]}>
-                <Text style={[styles.typeTxt, active && { color: vantage.textInverse }]}>{t.label}</Text>
+                <Text style={[styles.typeTxt, active && { color: vx.textInverse }]}>{t.label}</Text>
               </Pressable>
             );
           })}
@@ -158,9 +158,9 @@ export default function BecomeMasterScreen() {
                 <Text style={styles.loading}>Loading…</Text>
               ) : criteria.map((c, i) => (
                 <View key={c.label} style={[styles.critRow, i > 0 && styles.critBorder]}>
-                  <Ionicons name={c.ok ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={c.ok ? vantage.up : vantage.textMuted} />
+                  <Ionicons name={c.ok ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={c.ok ? vx.up : vx.textMuted} />
                   <Text style={styles.critLabel}>{c.label}</Text>
-                  <Text style={[styles.critVal, { color: c.ok ? vantage.up : vantage.textSecondary }]}>{c.cur}</Text>
+                  <Text style={[styles.critVal, { color: c.ok ? vx.up : vx.textSecondary }]}>{c.cur}</Text>
                 </View>
               ))}
             </Card>
@@ -196,7 +196,7 @@ function Field({ label, value, onChange, hint, last }) {
         onChangeText={(t) => onChange(t.replace(/[^0-9.]/g, ''))}
         keyboardType="decimal-pad"
         style={fieldStyles.input}
-        placeholderTextColor={vantage.textMuted}
+        placeholderTextColor={vx.textMuted}
       />
     </View>
   );
@@ -204,35 +204,35 @@ function Field({ label, value, onChange, hint, last }) {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
   hero: { alignItems: 'center', paddingVertical: space.md },
-  heroIcon: { width: 72, height: 72, borderRadius: 36, backgroundColor: vantage.accentMuted, alignItems: 'center', justifyContent: 'center', marginBottom: space.md },
-  heroTitle: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
-  heroSub: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, textAlign: 'center', marginTop: space.sm, lineHeight: 20 },
-  sectionTitle: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, textTransform: 'uppercase', letterSpacing: 1, marginTop: space.lg, marginBottom: space.sm },
+  heroIcon: { width: 72, height: 72, borderRadius: 36, backgroundColor: vx.accentMuted, alignItems: 'center', justifyContent: 'center', marginBottom: space.md },
+  heroTitle: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  heroSub: { color: vx.textMuted, fontFamily, fontSize: sizes.body, textAlign: 'center', marginTop: space.sm, lineHeight: 20 },
+  sectionTitle: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold, textTransform: 'uppercase', letterSpacing: 1, marginTop: space.lg, marginBottom: space.sm },
   typeRow: { flexDirection: 'row', gap: space.sm },
-  typeChip: { flex: 1, alignItems: 'center', paddingVertical: space.md, borderRadius: radius.md, backgroundColor: vantage.bgElevated, borderWidth: 1, borderColor: vantage.border },
-  typeChipActive: { backgroundColor: vantage.accent, borderColor: vantage.accent },
-  typeTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
-  typeDesc: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: space.sm, lineHeight: 18 },
-  loading: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, padding: space.lg, textAlign: 'center' },
+  typeChip: { flex: 1, alignItems: 'center', paddingVertical: space.md, borderRadius: radius.md, backgroundColor: vx.bgElevated, borderWidth: 1, borderColor: vx.border },
+  typeChipActive: { backgroundColor: vx.accent, borderColor: vx.accent },
+  typeTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
+  typeDesc: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: space.sm, lineHeight: 18 },
+  loading: { color: vx.textMuted, fontFamily, fontSize: sizes.body, padding: space.lg, textAlign: 'center' },
   critRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: space.md },
-  critBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: vantage.border },
-  critLabel: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
+  critBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: vx.border },
+  critLabel: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.body },
   critVal: { fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
-  cardTitle: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy },
-  cardSub: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, marginTop: space.sm, lineHeight: 20 },
-  hint: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: space.sm },
+  cardTitle: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy },
+  cardSub: { color: vx.textMuted, fontFamily, fontSize: sizes.body, marginTop: space.sm, lineHeight: 20 },
+  hint: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: space.sm },
 });
 
 const fieldStyles = StyleSheet.create({
   wrap: { flexDirection: 'row', alignItems: 'center', paddingVertical: space.md },
-  border: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: vantage.border },
-  label: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
-  hint: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro, marginTop: 2 },
+  border: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: vx.border },
+  label: { color: vx.textPrimary, fontFamily, fontSize: sizes.body },
+  hint: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, marginTop: 2 },
   input: {
     minWidth: 80, textAlign: 'right',
-    color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold,
+    color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold,
     paddingVertical: 0,
   },
 });

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 
 import AccountSwitcher from '../components/AccountSwitcher';
 import PositionsList from '../positions/PositionsList';
@@ -35,10 +35,10 @@ export default function TradeCFDs({
       <View style={styles.headerRow}>
         <Pressable onPress={() => setAccountSheet(true)} style={styles.accountChip} accessibilityRole="button">
           <Text style={styles.accountTxt} numberOfLines={1}>
-            <Text style={{ color: vantage.accent, fontWeight: weights.bold }}>{accLabel} </Text>
+            <Text style={{ color: vx.accent, fontWeight: weights.bold }}>{accLabel} </Text>
             {accName ? `${accName} ` : ''}{accNumber}
           </Text>
-          <Ionicons name="chevron-down" size={14} color={vantage.textMuted} />
+          <Ionicons name="chevron-down" size={14} color={vx.textMuted} />
         </Pressable>
         <View style={styles.equityCol}>
           <View style={styles.equityLabRow}>
@@ -74,18 +74,18 @@ const styles = StyleSheet.create({
   },
   accountChip: {
     flexDirection: 'row', alignItems: 'center', gap: space.xs,
-    backgroundColor: vantage.bgElevated, borderWidth: 1, borderColor: vantage.border,
+    backgroundColor: vx.bgElevated, borderWidth: 1, borderColor: vx.border,
     borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: space.sm,
     maxWidth: '62%',
   },
-  accountTxt: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  accountTxt: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
   equityCol: { alignItems: 'flex-end' },
   equityLabRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  equityLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
-  equityValue: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, marginTop: 1 },
+  equityLab: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
+  equityValue: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, marginTop: 1 },
   symbolRow: {
     flexDirection: 'row', alignItems: 'center', gap: space.xs,
     paddingHorizontal: space.lg, paddingVertical: space.md,
   },
-  symbolName: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy },
+  symbolName: { color: vx.textPrimary, fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy },
 });

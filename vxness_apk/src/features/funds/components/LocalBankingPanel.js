@@ -4,8 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 
-import { Card, PillButton, showToast } from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
+import { Card, PillButton, showToast } from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 import ApiService from '../../../services/api/ApiService';
 
 // Website local-banking flow as a self-contained panel so it can live inside
@@ -137,7 +137,7 @@ export default function LocalBankingPanel({ amount = '' }) {
   return (
     <View>
       <Card style={styles.infoCard}>
-        <Ionicons name="information-circle-outline" size={20} color={vantage.accent} />
+        <Ionicons name="information-circle-outline" size={20} color={vx.accent} />
         <Text style={styles.infoTxt}>
           Submit this request and our team will share a payment link (Razorpay, bank transfer or UPI) with you shortly. Your wallet is credited once payment is confirmed.
         </Text>
@@ -202,7 +202,7 @@ function RequestCard({
     : proofSubmitted ? 'Proof submitted — verifying'
     : hasLink ? 'Payment details ready'
     : 'Awaiting admin review';
-  const stageColor = isApproved ? vantage.up : isRejected ? vantage.down : vantage.textMuted;
+  const stageColor = isApproved ? vx.up : isRejected ? vx.down : vx.textMuted;
   // Razorpay paths are NOT gated by proofSubmitted — an LB request created
   // with an amount still needs to be paid via Razorpay (mirrors the website).
   const rzpActive = (isRzpAwaiting || isRzpOrder) && !isApproved && !isRejected;
@@ -246,7 +246,7 @@ function RequestCard({
               onChangeText={setRzpAmount}
               keyboardType="decimal-pad"
               placeholder="e.g. 100"
-              placeholderTextColor={vantage.textMuted}
+              placeholderTextColor={vx.textMuted}
               style={[styles.cInput, { flex: 1 }]}
             />
             <Pressable onPress={onPayAwaiting} disabled={rzpBusy || !(Number(rzpAmount) > 0)} style={[styles.smallBtn, styles.payBtn, (rzpBusy || !(Number(rzpAmount) > 0)) && { opacity: 0.6 }]} accessibilityRole="button">
@@ -260,10 +260,10 @@ function RequestCard({
       {confirming ? (
         <View style={styles.confirmBox}>
           <Text style={styles.cLabel}>Amount paid (USD)</Text>
-          <TextInput value={cAmount} onChangeText={setCAmount} keyboardType="decimal-pad" placeholder="e.g. 100" placeholderTextColor={vantage.textMuted} style={styles.cInput} />
+          <TextInput value={cAmount} onChangeText={setCAmount} keyboardType="decimal-pad" placeholder="e.g. 100" placeholderTextColor={vx.textMuted} style={styles.cInput} />
 
           <Text style={[styles.cLabel, { marginTop: space.sm }]}>UTR / UPI reference</Text>
-          <TextInput value={cTxId} onChangeText={setCTxId} placeholder="Transaction reference" placeholderTextColor={vantage.textMuted} style={styles.cInput} autoCapitalize="none" />
+          <TextInput value={cTxId} onChangeText={setCTxId} placeholder="Transaction reference" placeholderTextColor={vx.textMuted} style={styles.cInput} autoCapitalize="none" />
 
           <Text style={[styles.cLabel, { marginTop: space.sm }]}>Payment proof (screenshot)</Text>
           <Pressable onPress={pickProof} style={styles.proofBtn} accessibilityRole="button">
@@ -271,7 +271,7 @@ function RequestCard({
               <Image source={{ uri: cFile.uri }} style={styles.proofImg} resizeMode="cover" />
             ) : (
               <View style={styles.proofPlaceholder}>
-                <Ionicons name="image-outline" size={26} color={vantage.textMuted} />
+                <Ionicons name="image-outline" size={26} color={vx.textMuted} />
                 <Text style={styles.proofTxt}>Tap to choose image</Text>
               </View>
             )}
@@ -285,24 +285,24 @@ function RequestCard({
 }
 
 const styles = StyleSheet.create({
-  infoCard: { flexDirection: 'row', gap: space.md, backgroundColor: vantage.accentMuted },
-  infoTxt: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.label, lineHeight: 18 },
-  sectionTitle: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold, marginTop: space.xl, marginBottom: space.sm },
+  infoCard: { flexDirection: 'row', gap: space.md, backgroundColor: vx.accentMuted },
+  infoTxt: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.label, lineHeight: 18 },
+  sectionTitle: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold, marginTop: space.xl, marginBottom: space.sm },
   reqTop: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  reqAmt: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
+  reqAmt: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
   reqStage: { fontFamily, fontSize: sizes.label, marginTop: 2 },
   reqBtns: { flexDirection: 'row', gap: space.xs, flexShrink: 0 },
   smallBtn: { paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
-  payBtn: { backgroundColor: vantage.accent },
-  payTxt: { color: vantage.textInverse, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
-  paidBtn: { borderWidth: 1, borderColor: vantage.textPrimary },
-  paidTxt: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
+  payBtn: { backgroundColor: vx.accent },
+  payTxt: { color: vx.textInverse, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
+  paidBtn: { borderWidth: 1, borderColor: vx.textPrimary },
+  paidTxt: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
   rzpRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  confirmBox: { marginTop: space.md, paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: vantage.border },
-  cLabel: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.xs },
-  cInput: { backgroundColor: vantage.bgRaised, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.sm, color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
-  proofBtn: { backgroundColor: vantage.bgRaised, borderRadius: radius.md, overflow: 'hidden', minHeight: 120, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: vantage.border, borderStyle: 'dashed' },
+  confirmBox: { marginTop: space.md, paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: vx.border },
+  cLabel: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.xs },
+  cInput: { backgroundColor: vx.bgRaised, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.sm, color: vx.textPrimary, fontFamily, fontSize: sizes.body },
+  proofBtn: { backgroundColor: vx.bgRaised, borderRadius: radius.md, overflow: 'hidden', minHeight: 120, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: vx.border, borderStyle: 'dashed' },
   proofImg: { width: '100%', height: 160 },
   proofPlaceholder: { alignItems: 'center', padding: space.lg, gap: space.xs },
-  proofTxt: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  proofTxt: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
 });

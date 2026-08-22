@@ -1,4 +1,4 @@
-# Vxness APK — Vantage-style UI Redesign
+# Vxness APK — Vxness-style UI Redesign
 
 **Date:** 2026-06-03
 **Status:** Approved for implementation planning
@@ -8,7 +8,7 @@
 
 ## 1. Goal
 
-Rebuild the Vxness mobile app's UI to match the visual language of Vantage (CFD trading app) while keeping only the features that exist in the Vxness backend. The current PipHigh-fork UI is replaced with a design system extracted from Vantage screenshots: pure-black background, orange (`#2FBF71`) accent, sparkline-rich watchlists, a floating pill bottom-nav, and the signature Sell-pink / Buy-grey split order ticket.
+Rebuild the Vxness mobile app's UI to match the visual language of Vxness (CFD trading app) while keeping only the features that exist in the Vxness backend. The current PipHigh-fork UI is replaced with a design system extracted from Vxness screenshots: pure-black background, orange (`#2FBF71`) accent, sparkline-rich watchlists, a floating pill bottom-nav, and the signature Sell-pink / Buy-grey split order ticket.
 
 ---
 
@@ -24,8 +24,8 @@ Rebuild the Vxness mobile app's UI to match the visual language of Vantage (CFD 
 ### Out of scope
 - Web project (`Vxness/`) — no changes.
 - Backend changes — none. Backend endpoints already match what the app calls.
-- Features that exist in Vantage but not in Vxness backend: Earn tab (crypto savings APR), FX TV, Webinar, Analysis articles, dedicated news feed.
-- Light theme — dark-only for v1 (Vantage is dark-only).
+- Features that exist in Vxness but not in Vxness backend: Earn tab (crypto savings APR), FX TV, Webinar, Analysis articles, dedicated news feed.
+- Light theme — dark-only for v1 (Vxness is dark-only).
 - Native Razorpay SDK — v1 uses WebView Razorpay Checkout (no new native dep). May upgrade later.
 - Test suite — no Jest/RTL set up. Manual smoke-checks per phase.
 
@@ -33,7 +33,7 @@ Rebuild the Vxness mobile app's UI to match the visual language of Vantage (CFD 
 
 ## 3. Design Tokens
 
-**File:** `src/theme/vantageTheme.js` (new). Replaces `src/theme/colors.js`.
+**File:** `src/theme/vxTheme.js` (new). Replaces `src/theme/colors.js`.
 
 ```js
 // Surfaces
@@ -78,13 +78,13 @@ space:        { xs:4, sm:8, md:12, lg:16, xl:20, xxl:24, xxxl:32, huge:48 }
 radius:       { sm:8, md:12, lg:16, xl:20, pill:999 }
 ```
 
-`ThemeContext` keeps the same shape but only exports `vantage` tokens. Light theme branch removed.
+`ThemeContext` keeps the same shape but only exports `vx` tokens. Light theme branch removed.
 
 ---
 
 ## 4. Shared Component Library
 
-**Path:** `src/components/vantage/`. All components are presentational (no data fetching), single default export, RN primitives + react-native-svg only.
+**Path:** `src/components/vx/`. All components are presentational (no data fetching), single default export, RN primitives + react-native-svg only.
 
 | Component | Purpose |
 |---|---|
@@ -195,7 +195,7 @@ RootNavigator (conditional on AuthContext.user)
 
 **Behaviors:** pull-to-refresh re-fetches; live ticks patch rows individually via `React.memo`; hidden-balance state persisted to SecureStore (`@vxness/balance-hidden`).
 
-**Dropped Vantage features:** ❌ News tile, ❌ Webinar tile (not in backend).
+**Dropped Vxness features:** ❌ News tile, ❌ Webinar tile (not in backend).
 
 ---
 
@@ -350,16 +350,16 @@ Secondary screens get visual restyle only (layout unchanged):
 | Screen | Action |
 |---|---|
 | `KycScreen.js` | Token swap, file-upload tiles as Cards, orange Submit |
-| `NotificationsScreen.js` | Empty state Vantage-style, rows as Card with colored accent strip |
+| `NotificationsScreen.js` | Empty state Vxness-style, rows as Card with colored accent strip |
 | `SupportScreen.js` | Ticket cards, orange FAB |
-| `AcademyScreen.js` | Phase cards Vantage style, orange progress bars |
+| `AcademyScreen.js` | Phase cards Vxness style, orange progress bars |
 | `PortfolioScreen.js` | Stats via `<StatCard>`, dark chart |
 | `IBScreen.js` / `BusinessScreen.js` | Card grid layout |
 | `PammScreen.js` | "My PAMM Investments" view only (other PAMM UX moved into Copy sub-view) |
 | `OrderBookScreen.js` | Row restyle |
 | `RiskCalculatorScreen.js` | Inputs dark style, orange result card |
 | `EconomicCalendarScreen.js` | Reuses `<CalendarStrip>` |
-| `InstructionsScreen.js` | Step cards Vantage style |
+| `InstructionsScreen.js` | Step cards Vxness style |
 
 **Deletions at end of Phase 8:**
 - `src/theme/colors.js`
@@ -384,7 +384,7 @@ Secondary screens get visual restyle only (layout unchanged):
 ### Accessibility
 - `accessibilityLabel` on every Pressable.
 - `accessibilityRole="button"` on PillButtons.
-- WCAG AA contrast on Vantage tokens against black bg.
+- WCAG AA contrast on Vxness tokens against black bg.
 
 ### Testing
 - No automated suite. Each phase ships with a manual smoke checklist (physical Android via Expo Go).
@@ -395,8 +395,8 @@ Secondary screens get visual restyle only (layout unchanged):
 
 | Phase | Deliverable | User-visible result |
 |---|---|---|
-| 0 | Design tokens + shared components in `src/theme/` and `src/components/vantage/` | None (foundation) |
-| 1 | Navigation shell — `App.js` swap to BottomNavPill, 4-tab routes scaffolded | First Vantage look lands (bottom nav) |
+| 0 | Design tokens + shared components in `src/theme/` and `src/components/vx/` | None (foundation) |
+| 1 | Navigation shell — `App.js` swap to BottomNavPill, 4-tab routes scaffolded | First Vxness look lands (bottom nav) |
 | 2 | Home screen | Visible redesign of landing screen |
 | 3 | Markets screen (Watchlist + Explore) | Markets browse-able |
 | 4 | Trade screen — CFDs sub-view + Copy sub-view | Order ticket + Copy trading flow |
@@ -436,8 +436,8 @@ Everything else (`react-native-svg`, `react-native-webview`, `expo-image-picker`
 ## 16. Files added / replaced / deleted (summary)
 
 **Added (~50 new files):**
-- `src/theme/vantageTheme.js`
-- `src/components/vantage/*` (~24 components)
+- `src/theme/vxTheme.js`
+- `src/components/vx/*` (~24 components)
 - `src/screens/HomeScreen.js`
 - `src/screens/MarketsScreen.js`, `InstrumentDetailScreen.js`, `WatchlistEditScreen.js`
 - `src/screens/TradeScreen.js`, `trade/OrderTicket.js`, `trade/ChartPanel.js`, `trade/PositionsList.js`, `trade/AccountSwitcher.js`, `trade/StrategyDetailScreen.js`, `trade/PositionDetailScreen.js`

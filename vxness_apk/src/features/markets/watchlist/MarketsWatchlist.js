@@ -3,8 +3,8 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import { InstrumentRow, CategoryTabs, GradientActionButton } from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
+import { InstrumentRow, CategoryTabs, GradientActionButton } from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 import { bySegment } from '../../../utils/marketMovers';
 
 const WATCHLIST_PAGE = 15;
@@ -52,13 +52,13 @@ export default function MarketsWatchlist({
           <CategoryTabs value={filter} onChange={setFilter} options={FILTER_OPTIONS} />
         </View>
         <Pressable onPress={onEdit || (() => {})} hitSlop={8} accessibilityRole="button" accessibilityLabel="Edit watchlist filters">
-          <Ionicons name="options-outline" size={22} color={vantage.textMuted} />
+          <Ionicons name="options-outline" size={22} color={vx.textMuted} />
         </Pressable>
       </View>
 
       {pinnedSymbols.length === 0 ? (
         <View style={styles.emptyWrap}>
-          <Ionicons name="bookmark-outline" size={48} color={vantage.textMuted} />
+          <Ionicons name="bookmark-outline" size={48} color={vx.textMuted} />
           <Text style={styles.emptyTitle}>No pinned instruments</Text>
           <Text style={styles.emptySub}>Tap + Add to pin symbols here.</Text>
         </View>
@@ -92,7 +92,7 @@ export default function MarketsWatchlist({
           accessibilityLabel={`Show ${Math.min(WATCHLIST_PAGE, remaining)} more pinned instruments`}
         >
           <Text style={styles.showMoreTxt}>Show more ({remaining} remaining)</Text>
-          <Ionicons name="chevron-down" size={16} color={vantage.textSecondary} />
+          <Ionicons name="chevron-down" size={16} color={vx.textSecondary} />
         </Pressable>
       ) : null}
 
@@ -109,15 +109,15 @@ export default function MarketsWatchlist({
 const styles = StyleSheet.create({
   filterRow: { flexDirection: 'row', alignItems: 'center', paddingRight: space.lg, gap: space.sm },
   emptyWrap: { alignItems: 'center', paddingVertical: space.huge, paddingHorizontal: space.xl, gap: space.sm },
-  emptyTitle: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
-  emptySub: { color: vantage.textMuted, fontFamily, fontSize: sizes.body },
-  emptyInline: { color: vantage.textMuted, fontFamily, fontSize: sizes.body, padding: space.lg, textAlign: 'center' },
+  emptyTitle: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
+  emptySub: { color: vx.textMuted, fontFamily, fontSize: sizes.body },
+  emptyInline: { color: vx.textMuted, fontFamily, fontSize: sizes.body, padding: space.lg, textAlign: 'center' },
   showMoreBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     marginHorizontal: space.lg, marginTop: space.sm, paddingVertical: space.md,
-    borderWidth: 1, borderColor: vantage.border, borderRadius: radius.md, backgroundColor: vantage.bgRaised,
+    borderWidth: 1, borderColor: vx.border, borderRadius: radius.md, backgroundColor: vx.bgRaised,
   },
-  showMoreTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  showMoreTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
   addSymbol: {
     marginHorizontal: space.lg, marginTop: space.lg,
   },

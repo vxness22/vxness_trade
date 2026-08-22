@@ -2,8 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Card } from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily } from '../../../theme/vantageTheme';
+import { Card } from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily } from '../../../theme/vxTheme';
 
 export default function PromoBanner({ banner, onPress }) {
   if (!banner) return null;
@@ -22,7 +22,7 @@ export default function PromoBanner({ banner, onPress }) {
           <Image source={{ uri: imageUrl }} style={styles.thumb} resizeMode="contain" />
         ) : (
           <View style={[styles.thumb, styles.thumbFallback]}>
-            <Ionicons name="trophy" size={32} color={vantage.accent} />
+            <Ionicons name="trophy" size={32} color={vx.accent} />
           </View>
         )}
         <View style={styles.body}>
@@ -37,9 +37,9 @@ export default function PromoBanner({ banner, onPress }) {
 const styles = StyleSheet.create({
   card: { marginHorizontal: space.lg, marginVertical: space.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  thumb: { width: 64, height: 64, borderRadius: 12, backgroundColor: vantage.bgRaised },
+  thumb: { width: 64, height: 64, borderRadius: 12, backgroundColor: vx.bgRaised },
   thumbFallback: { alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, minWidth: 0 },
-  title: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy },
-  cta: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, marginTop: 4 },
+  title: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy },
+  cta: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginTop: 4 },
 });

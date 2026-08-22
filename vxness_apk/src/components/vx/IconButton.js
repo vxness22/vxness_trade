@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, View, StyleSheet } from 'react-native';
-import { vantage, space } from '../../theme/vantageTheme';
+import { vx, space } from '../../theme/vxTheme';
 
 const SIZES = { sm: 32, md: 40, lg: 48 };
 
@@ -14,7 +14,7 @@ export default function IconButton({
   style,
 }) {
   const dim = SIZES[size];
-  const bg = variant === 'filled' ? vantage.bgRaised : 'transparent';
+  const bg = variant === 'filled' ? vx.bgRaised : 'transparent';
   return (
     <Pressable
       onPress={onPress}
@@ -26,7 +26,7 @@ export default function IconButton({
           width: dim,
           height: dim,
           borderRadius: dim / 2,
-          backgroundColor: pressed ? vantage.bgPressed : bg,
+          backgroundColor: pressed ? vx.bgPressed : bg,
         },
         style,
       ]}

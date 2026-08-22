@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import Sheet from './Sheet';
 import PillButton from './PillButton';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 // Pure-JS From→To calendar picker (no native date-picker dependency, so it
 // ships over OTA updates). Tap once to set FROM, tap again to set TO — the
@@ -88,7 +88,7 @@ export default function DateRangeSheet({ visible, onClose, initialFrom, initialT
             <Text style={styles.fromToLab}>FROM</Text>
             <Text style={styles.fromToVal}>{fmtChip(from)}</Text>
           </View>
-          <Ionicons name="arrow-forward" size={16} color={vantage.textMuted} />
+          <Ionicons name="arrow-forward" size={16} color={vx.textMuted} />
           <View style={styles.fromToBox}>
             <Text style={styles.fromToLab}>TO</Text>
             <Text style={styles.fromToVal}>{fmtChip(to != null ? to : from)}</Text>
@@ -98,11 +98,11 @@ export default function DateRangeSheet({ visible, onClose, initialFrom, initialT
         {/* Month navigation */}
         <View style={styles.monthRow}>
           <Pressable onPress={() => shiftMonth(-1)} hitSlop={10} style={styles.monthBtn} accessibilityRole="button" accessibilityLabel="Previous month">
-            <Ionicons name="chevron-back" size={18} color={vantage.textPrimary} />
+            <Ionicons name="chevron-back" size={18} color={vx.textPrimary} />
           </Pressable>
           <Text style={styles.monthLab}>{MONTHS[month.getMonth()]} {month.getFullYear()}</Text>
           <Pressable onPress={() => shiftMonth(1)} hitSlop={10} style={styles.monthBtn} accessibilityRole="button" accessibilityLabel="Next month">
-            <Ionicons name="chevron-forward" size={18} color={vantage.textPrimary} />
+            <Ionicons name="chevron-forward" size={18} color={vx.textPrimary} />
           </Pressable>
         </View>
 
@@ -134,8 +134,8 @@ export default function DateRangeSheet({ visible, onClose, initialFrom, initialT
               >
                 <Text style={[
                   styles.cellTxt,
-                  isFuture && { color: vantage.textMuted, opacity: 0.4 },
-                  isToday && !isFrom && !isTo && { color: vantage.accent },
+                  isFuture && { color: vx.textMuted, opacity: 0.4 },
+                  isToday && !isFrom && !isTo && { color: vx.accent },
                   (isFrom || isTo) && styles.cellTxtPicked,
                 ]}>
                   {date.getDate()}
@@ -170,29 +170,29 @@ const styles = StyleSheet.create({
   wrap: { paddingHorizontal: space.lg, paddingBottom: space.lg },
   fromToRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginBottom: space.md },
   fromToBox: {
-    flex: 1, borderWidth: 1, borderColor: vantage.border, borderRadius: radius.md,
-    backgroundColor: vantage.bgRaised, paddingHorizontal: space.md, paddingVertical: space.sm,
+    flex: 1, borderWidth: 1, borderColor: vx.border, borderRadius: radius.md,
+    backgroundColor: vx.bgRaised, paddingHorizontal: space.md, paddingVertical: space.sm,
   },
-  fromToLab: { color: vantage.textMuted, fontFamily, fontSize: 10, fontWeight: weights.bold, letterSpacing: 1 },
-  fromToVal: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold, marginTop: 2 },
+  fromToLab: { color: vx.textMuted, fontFamily, fontSize: 10, fontWeight: weights.bold, letterSpacing: 1 },
+  fromToVal: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold, marginTop: 2 },
   monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: space.sm },
   monthBtn: {
     width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: vantage.bgRaised, borderWidth: 1, borderColor: vantage.border,
+    backgroundColor: vx.bgRaised, borderWidth: 1, borderColor: vx.border,
   },
-  monthLab: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.heavy },
+  monthLab: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.heavy },
   weekRow: { flexDirection: 'row', marginBottom: 2 },
-  weekLab: { width: CELL, textAlign: 'center', color: vantage.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  weekLab: { width: CELL, textAlign: 'center', color: vx.textMuted, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   cell: { width: CELL, aspectRatio: 1.15, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm },
-  cellRange: { backgroundColor: vantage.bgRaised },
-  cellPicked: { backgroundColor: vantage.accent },
-  cellTxt: { color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
+  cellRange: { backgroundColor: vx.bgRaised },
+  cellPicked: { backgroundColor: vx.accent },
+  cellTxt: { color: vx.textPrimary, fontFamily, fontSize: sizes.body },
   cellTxtPicked: { color: '#ffffff', fontWeight: weights.heavy },
   btnRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: space.lg },
   clearBtn: {
     paddingHorizontal: space.xl, paddingVertical: 12, borderRadius: 999,
-    borderWidth: 1, borderColor: vantage.border, backgroundColor: vantage.bgRaised,
+    borderWidth: 1, borderColor: vx.border, backgroundColor: vx.bgRaised,
   },
-  clearTxt: { color: vantage.textSecondary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
+  clearTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
 });

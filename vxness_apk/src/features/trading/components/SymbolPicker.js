@@ -2,8 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, TextInput, FlatList, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Sheet, SymbolIcon } from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
+import { Sheet, SymbolIcon } from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 import { getInstruments } from '../../../utils/instrumentsCache';
 
 export default function SymbolPicker({ visible, onClose, onSelect }) {
@@ -33,12 +33,12 @@ export default function SymbolPicker({ visible, onClose, onSelect }) {
   return (
     <Sheet visible={visible} onClose={onClose} title="Choose symbol" height="80%">
       <View style={styles.searchWrap}>
-        <Ionicons name="search" size={18} color={vantage.textMuted} style={{ marginRight: space.sm }} />
+        <Ionicons name="search" size={18} color={vx.textMuted} style={{ marginRight: space.sm }} />
         <TextInput
           value={query}
           onChangeText={setQuery}
           placeholder="Search"
-          placeholderTextColor={vantage.textMuted}
+          placeholderTextColor={vx.textMuted}
           style={styles.searchInput}
           autoCapitalize="characters"
           autoCorrect={false}
@@ -46,7 +46,7 @@ export default function SymbolPicker({ visible, onClose, onSelect }) {
         />
         {query ? (
           <Pressable onPress={() => setQuery('')} hitSlop={8}>
-            <Ionicons name="close-circle" size={18} color={vantage.textMuted} />
+            <Ionicons name="close-circle" size={18} color={vx.textMuted} />
           </Pressable>
         ) : null}
       </View>
@@ -59,7 +59,7 @@ export default function SymbolPicker({ visible, onClose, onSelect }) {
             <Pressable
               onPress={() => { onSelect(sym); onClose(); }}
               style={styles.row}
-              android_ripple={{ color: vantage.bgPressed }}
+              android_ripple={{ color: vx.bgPressed }}
             >
               <SymbolIcon symbol={sym} size={32} />
               <View style={styles.rowText}>
@@ -77,13 +77,13 @@ export default function SymbolPicker({ visible, onClose, onSelect }) {
 const styles = StyleSheet.create({
   searchWrap: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: vantage.bgRaised,
+    backgroundColor: vx.bgRaised,
     borderRadius: radius.md, paddingHorizontal: space.md, height: 44,
     marginBottom: space.md,
   },
-  searchInput: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.body, padding: 0 },
+  searchInput: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.body, padding: 0 },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md },
   rowText: { flex: 1 },
-  rowSym: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
-  rowName: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  rowSym: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
+  rowName: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
 });

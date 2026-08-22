@@ -3,9 +3,9 @@ import { ScrollView, View, Text, TextInput, Pressable, StyleSheet } from 'react-
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import { Screen, Sheet, MenuRow, PillButton, IconButton, showToast } from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vantage/BottomNavPill';
+import { Screen, Sheet, MenuRow, PillButton, IconButton, showToast } from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 import ApiService from '../../../services/api/ApiService';
 
 const MAIN_WALLET = { id: 'main', isMain: true };
@@ -68,7 +68,7 @@ export default function TransferScreen() {
   return (
     <Screen edges={['top']}>
       <View style={styles.header}>
-        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
+        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
         <Text style={styles.title}>Transfer</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -76,17 +76,17 @@ export default function TransferScreen() {
         <Text style={styles.label}>From</Text>
         <Pressable onPress={() => setPicking('from')} style={styles.pickRow}>
           <Text style={styles.pickTxt}>{fromAccount ? labelOf(fromAccount) : 'Select source account'}</Text>
-          <Ionicons name="chevron-down" size={18} color={vantage.textMuted} />
+          <Ionicons name="chevron-down" size={18} color={vx.textMuted} />
         </Pressable>
 
         <Text style={[styles.label, { marginTop: space.md }]}>To</Text>
         <Pressable onPress={() => setPicking('to')} style={styles.pickRow}>
           <Text style={styles.pickTxt}>{toAccount ? labelOf(toAccount) : 'Select destination account'}</Text>
-          <Ionicons name="chevron-down" size={18} color={vantage.textMuted} />
+          <Ionicons name="chevron-down" size={18} color={vx.textMuted} />
         </Pressable>
 
         <Text style={[styles.label, { marginTop: space.md }]}>Amount</Text>
-        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={vantage.textMuted} style={styles.input} />
+        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={vx.textMuted} style={styles.input} />
 
         <PillButton label={submitting ? 'Transferring…' : 'Submit Transfer'} variant="primary" size="lg" loading={submitting} disabled={!fromAccount || !toAccount || !(Number(amount) > 0) || submitting} onPress={submit} style={{ marginTop: space.xl }} />
       </ScrollView>
@@ -95,7 +95,7 @@ export default function TransferScreen() {
         {[MAIN_WALLET, ...accounts].map((a) => (
           <MenuRow
             key={a.id || a._id}
-            icon={<Ionicons name={a.isMain ? 'wallet-outline' : 'card-outline'} size={20} color={vantage.textPrimary} />}
+            icon={<Ionicons name={a.isMain ? 'wallet-outline' : 'card-outline'} size={20} color={vx.textPrimary} />}
             label={labelOf(a)}
             value={a.isMain
               ? (mainBalance != null ? `${mainBalance.toFixed(2)} USD` : '')
@@ -118,9 +118,9 @@ function labelOf(a) {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
-  label: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
-  pickRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: vantage.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md },
-  pickTxt: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
-  input: { backgroundColor: vantage.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
+  pickRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: vx.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md },
+  pickTxt: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.body },
+  input: { backgroundColor: vx.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vx.textPrimary, fontFamily, fontSize: sizes.body },
 });

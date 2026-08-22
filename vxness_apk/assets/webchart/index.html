@@ -29,8 +29,8 @@
    * The WebView makes NO network calls of its own (CORS from a file:// origin
    * would block them). Instead the React-Native host does ALL data work with
    * the user's token and feeds this page over the bridge:
-   *   RN → WebView :  window.SC.onBars(reqId, bars) | onSymbol(reqId, info)
-   *                   window.SC.pushTick(bar) | setConfig({...})
+   *   RN → WebView :  window.VX.onBars(reqId, bars) | onSymbol(reqId, info)
+   *                   window.VX.pushTick(bar) | setConfig({...})
    *   WebView → RN :  postMessage({type:'getBars'|'resolveSymbol'|...})
    * ───────────────────────────────────────────────────────────────────── */
   (function () {
@@ -64,7 +64,7 @@
     var lastBar = {}; // "symbol|res" -> bar (enforce non-decreasing time)
 
     // Public bridge surface RN calls into:
-    window.SC = {
+    window.VX = {
       setConfig: function (c) { for (var k in c) CFG[k] = c[k]; },
       onBars: function (id, bars) { var r = pending[id]; if (r) { delete pending[id]; r(bars || []); } },
       onSymbol: function (id, info) { var r = pending[id]; if (r) { delete pending[id]; r(info || null); } },
@@ -102,9 +102,9 @@
     // current symbol. SL/TP lines are DRAGGABLE (native line drag); the entry
     // line is locked and just shows live P&L.
     function syncLines() {
-      if (!window.SC._widget) return;
+      if (!window.VX._widget) return;
       var chart;
-      try { chart = window.SC._widget.chart(); } catch (e) { return; }
+      try { chart = window.VX._widget.chart(); } catch (e) { return; }
       var sym = (CFG.symbol || '').toUpperCase();
       var mine = POSITIONS.filter(function (p) { return String(p.symbol).toUpperCase() === sym; });
       var digits = (INSTR[sym] && INSTR[sym].digits) || CFG.digits || 5;
@@ -165,7 +165,7 @@
       // the visible price range, widen the range (auto-scale off) to include it.
       // With NO position lines we restore auto-scale so the candles fit normally.
       // The stale-scale risk from the old version is handled by resetting
-      // auto-scale on every symbol switch (see window.SC.setSymbol).
+      // auto-scale on every symbol switch (see window.VX.setSymbol).
       try {
         var pane = chart.getPanes()[0];
         var ps = pane && pane.getMainSourcePriceScale && pane.getMainSourcePriceScale();
@@ -195,8 +195,8 @@
     function initOverlay() {
       var container = document.getElementById('tv_chart');
       var overlay = document.getElementById('ov');
-      if (!container || !overlay || !window.SC._widget) return;
-      var chart = window.SC._widget.chart();
+      if (!container || !overlay || !window.VX._widget) return;
+      var chart = window.VX._widget.chart();
       var BTN_W = 24, BTN_GAP = 4, RIGHT_PX = 60;
       var groups = {};            // positionId -> { p, slEl, tpEl, closeEl }
       var lastMouseY = null, calibOffset = null, calibSamples = [];
@@ -436,13 +436,13 @@
       stage('4 widget created, waiting onChartReady');
       widget.onChartReady(function () {
         var el = document.getElementById('boot'); if (el) el.style.display = 'none';
-        window.SC._widget = widget;
+        window.VX._widget = widget;
         initOverlay();    // on-chart [SL][TP][x] buttons + drag → RN
         syncLines();      // draw any already-injected position lines
         post({ type: 'ready', symbol: (CFG.symbol || '').toUpperCase() });
         // Let RN switch symbol/interval live without a reload; re-sync the
         // position lines for the new symbol just after.
-        window.SC.setSymbol = function (sym) {
+        window.VX.setSymbol = function (sym) {
           try {
             // Keep CFG.symbol in lockstep — syncLines()/digitsFor() filter the
             // position lines by CFG.symbol, so without this a live symbol switch
@@ -465,7 +465,7 @@
             widget.chart().setSymbol(sym, function () { setTimeout(syncLines, 60); });
           } catch (e) {}
         };
-        window.SC.setInterval = function (iv) {
+        window.VX.setInterval = function (iv) {
           try { widget.chart().setResolution(iv, function () { setTimeout(syncLines, 60); }); } catch (e) {}
         };
       });
@@ -473,9 +473,9 @@
 
     // RN injects window.__SC_CONFIG (+ __SC_AUTOBOOT) before content loads via
     // injectedJavaScriptBeforeContentLoaded, so we can boot immediately with the
-    // right symbol/interval/theme. Otherwise RN calls SC.setConfig()+SC.boot().
+    // right symbol/interval/theme. Otherwise RN calls VX.setConfig()+SC.boot().
     post({ type: 'bridgeReady' });
-    if (window.__SC_CONFIG) window.SC.setConfig(window.__SC_CONFIG);
+    if (window.__SC_CONFIG) window.VX.setConfig(window.__SC_CONFIG);
     // URL query string is AUTHORITATIVE and applied LAST so it always wins.
     // Unlike the injected __SC_CONFIG (which can be missed on a fast remount or
     // when the WebView serves cached content → chart stuck on the default
@@ -490,7 +490,7 @@
       if (__q.get('interval')) __cfg.interval = String(__q.get('interval'));
       if (__q.get('theme'))    __cfg.theme    = String(__q.get('theme'));
       if (__q.get('digits'))   __cfg.digits   = Number(__q.get('digits')) || undefined;
-      if (__cfg.symbol) window.SC.setConfig(__cfg);
+      if (__cfg.symbol) window.VX.setConfig(__cfg);
     } catch (e) {}
     // Boot UNCONDITIONALLY — don't gate on __SC_AUTOBOOT. On a small/fast-
     // mounting WebView the pre-load config injection sometimes lost the race,
@@ -499,7 +499,7 @@
     // if the symbol wasn't injected yet it starts on the default and RN's
     // setSymbol updates it. A short retry covers a very-late config injection.
     boot();
-    setTimeout(function () { if (!widget) { if (window.__SC_CONFIG) window.SC.setConfig(window.__SC_CONFIG); boot(); } }, 500);
+    setTimeout(function () { if (!widget) { if (window.__SC_CONFIG) window.VX.setConfig(window.__SC_CONFIG); boot(); } }, 500);
   })();
   </script>
 </body>

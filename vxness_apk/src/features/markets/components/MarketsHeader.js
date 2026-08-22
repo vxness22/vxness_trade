@@ -2,8 +2,8 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { SegmentedTabs, IconButton } from '../../../components/vantage';
-import { vantage, space } from '../../../theme/vantageTheme';
+import { SegmentedTabs, IconButton } from '../../../components/vx';
+import { vx, space } from '../../../theme/vxTheme';
 
 export default function MarketsHeader({ view, onChangeView, onSearch }) {
   return (
@@ -19,7 +19,7 @@ export default function MarketsHeader({ view, onChangeView, onSearch }) {
         />
       </View>
       <IconButton
-        icon={<Ionicons name="search" size={18} color={vantage.textPrimary} />}
+        icon={<Ionicons name="search" size={18} color={vx.textPrimary} />}
         accessibilityLabel="Search"
         onPress={onSearch}
       />

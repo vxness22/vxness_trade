@@ -16,23 +16,23 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import ApiService from '../../../services/api/ApiService';
 import logger from '../../../utils/logger';
-import { vantage } from '../../../theme/vantageTheme';
-import ScreenGlow from '../../../components/vantage/ScreenGlow';
+import { vx } from '../../../theme/vxTheme';
+import ScreenGlow from '../../../components/vx/ScreenGlow';
 import IBScreen from './IBScreen';
 
-// Vantage dark/orange palette mapped onto the legacy `colors` keys.
+// Vxness dark/orange palette mapped onto the legacy `colors` keys.
 const colors = {
-  bgPrimary: vantage.bg,
-  bgSecondary: vantage.bgRaised,
-  bgCard: vantage.bgElevated,
-  bgHover: vantage.bgPressed,
-  border: vantage.border,
-  textPrimary: vantage.textPrimary,
-  textSecondary: vantage.textSecondary,
-  textMuted: vantage.textMuted,
-  primary: vantage.accent,
-  accent: vantage.accent,
-  profitColor: vantage.up,
+  bgPrimary: vx.bg,
+  bgSecondary: vx.bgRaised,
+  bgCard: vx.bgElevated,
+  bgHover: vx.bgPressed,
+  border: vx.border,
+  textPrimary: vx.textPrimary,
+  textSecondary: vx.textSecondary,
+  textMuted: vx.textMuted,
+  primary: vx.accent,
+  accent: vx.accent,
+  profitColor: vx.up,
 };
 const isDark = true;
 

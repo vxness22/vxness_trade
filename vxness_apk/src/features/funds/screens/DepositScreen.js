@@ -6,9 +6,9 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 
-import { Screen, Card, PillButton, IconButton, SegmentedTabs, showToast } from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vantage/BottomNavPill';
+import { Screen, Card, PillButton, IconButton, SegmentedTabs, showToast } from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 import ApiService from '../../../services/api/ApiService';
 import LocalBankingPanel from '../components/LocalBankingPanel';
 
@@ -81,7 +81,7 @@ export default function DepositScreen() {
   return (
     <Screen edges={['top']}>
       <View style={styles.header}>
-        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
+        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
         <Text style={styles.title}>Deposit</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -93,7 +93,7 @@ export default function DepositScreen() {
           onChangeText={setAmount}
           keyboardType="decimal-pad"
           placeholder="0.00"
-          placeholderTextColor={vantage.textMuted}
+          placeholderTextColor={vx.textMuted}
           style={styles.amountInput}
         />
         <View style={styles.quickRow}>
@@ -162,7 +162,7 @@ export default function DepositScreen() {
                 <Text style={styles.orNote}>Or pay manually to the address above and submit your transaction hash below.</Text>
 
                 <Text style={[styles.label, { marginTop: space.md }]}>Transaction reference / tx hash</Text>
-                <TextInput value={txId} onChangeText={setTxId} placeholder="On-chain tx hash, UTR, or reference" placeholderTextColor={vantage.textMuted} style={styles.input} autoCapitalize="none" autoCorrect={false} />
+                <TextInput value={txId} onChangeText={setTxId} placeholder="On-chain tx hash, UTR, or reference" placeholderTextColor={vx.textMuted} style={styles.input} autoCapitalize="none" autoCorrect={false} />
 
                 <Text style={[styles.label, { marginTop: space.md }]}>Payment proof (screenshot)</Text>
                 <Pressable onPress={pickProof} style={styles.proofBtn} accessibilityRole="button">
@@ -170,7 +170,7 @@ export default function DepositScreen() {
                     <Image source={{ uri: proof.uri }} style={styles.proofImg} resizeMode="cover" />
                   ) : (
                     <View style={styles.proofPlaceholder}>
-                      <Ionicons name="image-outline" size={28} color={vantage.textMuted} />
+                      <Ionicons name="image-outline" size={28} color={vx.textMuted} />
                       <Text style={styles.proofTxt}>Tap to choose image</Text>
                     </View>
                   )}
@@ -207,34 +207,34 @@ function Detail({ label, value }) {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
-  label: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
   amountInput: {
-    backgroundColor: vantage.bgElevated, borderRadius: radius.md,
+    backgroundColor: vx.bgElevated, borderRadius: radius.md,
     paddingHorizontal: space.md, paddingVertical: space.lg,
-    color: vantage.textPrimary, fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy,
+    color: vx.textPrimary, fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy,
   },
   quickRow: { flexDirection: 'row', gap: space.sm, marginTop: space.sm, flexWrap: 'wrap' },
-  quickChip: { paddingHorizontal: space.lg, paddingVertical: space.sm, backgroundColor: vantage.bgRaised, borderRadius: radius.pill },
-  quickTxt: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
-  input: { backgroundColor: vantage.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
+  quickChip: { paddingHorizontal: space.lg, paddingVertical: space.sm, backgroundColor: vx.bgRaised, borderRadius: radius.pill },
+  quickTxt: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
+  input: { backgroundColor: vx.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vx.textPrimary, fontFamily, fontSize: sizes.body },
 
   payCard: { gap: space.xs },
-  payTitle: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro, fontWeight: weights.bold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: space.xs },
+  payTitle: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, fontWeight: weights.bold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: space.xs },
   adminQr: { width: 150, height: 150, borderRadius: radius.md, backgroundColor: '#FFFFFF', marginBottom: space.sm },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3, gap: space.md },
-  detailLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
-  detailVal: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold, flexShrink: 1, textAlign: 'right' },
-  walletBox: { marginTop: space.sm, paddingTop: space.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: vantage.border, gap: space.sm },
-  walletLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro, fontWeight: weights.bold, letterSpacing: 1, textTransform: 'uppercase' },
+  detailLab: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
+  detailVal: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold, flexShrink: 1, textAlign: 'right' },
+  walletBox: { marginTop: space.sm, paddingTop: space.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: vx.border, gap: space.sm },
+  walletLab: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, fontWeight: weights.bold, letterSpacing: 1, textTransform: 'uppercase' },
   walletRow: { flexDirection: 'row', gap: space.md, alignItems: 'flex-start' },
   qrChip: { padding: space.xs, backgroundColor: '#FFFFFF', borderRadius: 8 },
-  walletAddr: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
-  copyTxt: { color: vantage.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.bold, marginTop: space.xs },
-  hint: { color: vantage.textMuted, fontFamily, fontSize: sizes.micro, lineHeight: 15 },
-  orNote: { color: vantage.textMuted, fontFamily, fontSize: sizes.label, textAlign: 'center', marginTop: space.lg },
-  proofBtn: { backgroundColor: vantage.bgElevated, borderRadius: radius.md, overflow: 'hidden', minHeight: 140, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: vantage.border, borderStyle: 'dashed' },
+  walletAddr: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  copyTxt: { color: vx.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.bold, marginTop: space.xs },
+  hint: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, lineHeight: 15 },
+  orNote: { color: vx.textMuted, fontFamily, fontSize: sizes.label, textAlign: 'center', marginTop: space.lg },
+  proofBtn: { backgroundColor: vx.bgElevated, borderRadius: radius.md, overflow: 'hidden', minHeight: 140, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: vx.border, borderStyle: 'dashed' },
   proofImg: { width: '100%', height: 200 },
   proofPlaceholder: { alignItems: 'center', padding: space.lg, gap: space.sm },
-  proofTxt: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  proofTxt: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
 });

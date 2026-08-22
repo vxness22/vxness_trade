@@ -4,9 +4,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 
-import { Screen, Card, PillButton, IconButton, showToast } from '../../../components/vantage';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../../theme/vantageTheme';
-import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vantage/BottomNavPill';
+import { Screen, Card, PillButton, IconButton, showToast } from '../../../components/vx';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
+import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 import ApiService from '../../../services/api/ApiService';
 
 export default function DepositManual() {
@@ -72,7 +72,7 @@ export default function DepositManual() {
   return (
     <Screen edges={['top']}>
       <View style={styles.header}>
-        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vantage.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
+        <IconButton icon={<Ionicons name="chevron-back" size={22} color={vx.textPrimary} />} accessibilityLabel="Back" onPress={() => nav.goBack()} />
         <Text style={styles.title}>Manual Deposit</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -102,10 +102,10 @@ export default function DepositManual() {
         ) : null}
 
         <Text style={styles.label}>Amount (USD)</Text>
-        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={vantage.textMuted} style={styles.input} />
+        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={vx.textMuted} style={styles.input} />
 
         <Text style={[styles.label, { marginTop: space.md }]}>Your transaction reference</Text>
-        <TextInput value={transactionId} onChangeText={setTransactionId} placeholder="UTR / UPI ref" placeholderTextColor={vantage.textMuted} style={styles.input} autoCapitalize="none" />
+        <TextInput value={transactionId} onChangeText={setTransactionId} placeholder="UTR / UPI ref" placeholderTextColor={vx.textMuted} style={styles.input} autoCapitalize="none" />
 
         <Text style={[styles.label, { marginTop: space.md }]}>Payment proof (screenshot)</Text>
         <Pressable onPress={pickProof} style={styles.proofBtn} accessibilityRole="button">
@@ -113,7 +113,7 @@ export default function DepositManual() {
             <Image source={{ uri: proof.uri }} style={styles.proofImg} resizeMode="cover" />
           ) : (
             <View style={styles.proofPlaceholder}>
-              <Ionicons name="image-outline" size={28} color={vantage.textMuted} />
+              <Ionicons name="image-outline" size={28} color={vx.textMuted} />
               <Text style={styles.proofTxt}>Tap to choose image</Text>
             </View>
           )}
@@ -144,17 +144,17 @@ function Detail({ label, value }) {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs },
-  title: { flex: 1, color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
-  label: { color: vantage.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
-  sectionTitle: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold, marginBottom: space.sm },
-  input: { backgroundColor: vantage.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vantage.textPrimary, fontFamily, fontSize: sizes.body },
+  title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
+  label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
+  sectionTitle: { color: vx.textPrimary, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold, marginBottom: space.sm },
+  input: { backgroundColor: vx.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vx.textPrimary, fontFamily, fontSize: sizes.body },
   detailBlock: { paddingVertical: space.sm },
-  detailBorder: { borderBottomColor: vantage.border, borderBottomWidth: StyleSheet.hairlineWidth },
+  detailBorder: { borderBottomColor: vx.border, borderBottomWidth: StyleSheet.hairlineWidth },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  detailLab: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
-  detailVal: { color: vantage.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
-  proofBtn: { backgroundColor: vantage.bgElevated, borderRadius: radius.md, overflow: 'hidden', minHeight: 140, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: vantage.border, borderStyle: 'dashed' },
+  detailLab: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
+  detailVal: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
+  proofBtn: { backgroundColor: vx.bgElevated, borderRadius: radius.md, overflow: 'hidden', minHeight: 140, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: vx.border, borderStyle: 'dashed' },
   proofImg: { width: '100%', height: 200 },
   proofPlaceholder: { alignItems: 'center', padding: space.lg, gap: space.sm },
-  proofTxt: { color: vantage.textMuted, fontFamily, fontSize: sizes.label },
+  proofTxt: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
 });

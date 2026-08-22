@@ -2,7 +2,7 @@ import React from 'react';
 import { Modal, View, Pressable, StyleSheet, Text, Keyboard, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { vantage, space, sizes, weights, fontFamily, radius } from '../../theme/vantageTheme';
+import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 export default function Sheet({ visible, onClose, title, children, height }) {
   // Lift the bottom-anchored sheet above the on-screen keyboard so inputs
@@ -44,7 +44,7 @@ export default function Sheet({ visible, onClose, title, children, height }) {
           <View style={styles.titleRow}>
             <Text style={styles.title}>{title}</Text>
             <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Close">
-              <Ionicons name="close" size={22} color={vantage.textPrimary} />
+              <Ionicons name="close" size={22} color={vx.textPrimary} />
             </Pressable>
           </View>
         ) : null}
@@ -57,7 +57,7 @@ export default function Sheet({ visible, onClose, title, children, height }) {
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
   sheet: {
-    backgroundColor: vantage.bgElevated,
+    backgroundColor: vx.bgElevated,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     paddingHorizontal: space.lg,
@@ -65,8 +65,8 @@ const styles = StyleSheet.create({
     paddingBottom: space.md,
     maxHeight: '85%',
   },
-  handle: { width: 36, height: 4, backgroundColor: vantage.borderStrong, borderRadius: 2, alignSelf: 'center', marginBottom: space.md },
+  handle: { width: 36, height: 4, backgroundColor: vx.borderStrong, borderRadius: 2, alignSelf: 'center', marginBottom: space.md },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: space.md },
-  title: { color: vantage.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
+  title: { color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy },
   body: {},
 });

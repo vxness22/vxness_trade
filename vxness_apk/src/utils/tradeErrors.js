@@ -1,5 +1,5 @@
-import { showToast } from '../components/vantage/Toast';
-import { showAppAlert } from '../components/vantage/AppAlert';
+import { showToast } from '../components/vx/Toast';
+import { showAppAlert } from '../components/vx/AppAlert';
 
 // Trade actions occasionally fail for reasons that aren't really user-facing
 // "errors": a MAM/mirrored position is closed by the master (not the follower),
