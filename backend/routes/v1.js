@@ -15,6 +15,11 @@ import Trade from '../models/Trade.js'
 import TradingAccount from '../models/TradingAccount.js'
 import Transaction from '../models/Transaction.js'
 import Wallet from '../models/Wallet.js'
+import MasterTrader from '../models/MasterTrader.js'
+import CopyFollower from '../models/CopyFollower.js'
+import AccountType from '../models/AccountType.js'
+import KYC from '../models/KYC.js'
+import { instrumentCatalogue } from './prices.js'
 import AlgoKey from '../models/AlgoKey.js'
 import TerminalRefreshToken, { REFRESH_TTL_DAYS } from '../models/TerminalRefreshToken.js'
 import infowayService, { SUPPORTED_SYMBOLS } from '../services/infowayService.js'
@@ -876,6 +881,684 @@ router.post('/wallet/transfer-trading-to-main', jwtAuth, async (req, res) => {
       message: `Transferred $${amount.toFixed(2)} to the main wallet`,
       main_wallet_balance: money(wallet.balance),
       account_balance: money(debited.balance),
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+/* ────────────────  social: masters and the money following them  ──────────── */
+
+// What this platform actually runs is COPY TRADING, not a pooled PAMM fund.
+//
+// The app was written against a backend with pooled allocations - money leaves
+// the wallet, a sub-account is created, units are held. Here a follower keeps
+// their own balance and their own account, and a master's fills are mirrored
+// into it at a size the follower chose. So "invest 500 with this manager" maps
+// onto "copy this manager, sized at 500", and "withdraw" onto "stop copying".
+// The numbers below are all real - followers, P/L, commission - but nothing
+// here pools capital, and the naming in the responses is the app's, not ours.
+
+const masterJson = (m) => ({
+  id: String(m._id),
+  manager_name: m.displayName ||
+    [m.userId?.firstName, m.userId?.lastName].filter(Boolean).join(' ') || 'Manager',
+  master_type: 'COPY',
+  description: m.description || '',
+  // The follower sets their own size, so there is no house minimum to quote.
+  min_investment: 0,
+  performance_fee_pct: m.approvedCommissionPercentage ?? m.requestedCommissionPercentage ?? 0,
+  active_investors: m.stats?.activeFollowers || 0,
+  total_investors: m.stats?.totalFollowers || 0,
+  total_trades: m.stats?.totalTrades || 0,
+  win_rate_pct: money(m.stats?.winRate),
+  total_profit_generated: money(m.stats?.totalProfitGenerated),
+  // Neither of these is tracked per-master yet: a real return figure needs an
+  // equity curve, and a drawdown needs its low-water mark. Sending an invented
+  // number to a screen that ranks managers by it would be worse than a zero.
+  total_return_pct: 0,
+  max_drawdown_pct: 0,
+})
+
+// GET /api/v1/social/mamm-pamm  (alias: /social/masters) - the managers on offer.
+const listMasters = async (req, res) => {
+  try {
+    const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page, 10) || 50))
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1)
+    const masters = await MasterTrader.find({ status: 'ACTIVE' })
+      .populate('userId', 'firstName lastName')
+      .sort({ 'stats.activeFollowers': -1, createdAt: -1 })
+      .skip((page - 1) * perPage)
+      .limit(perPage)
+    res.json({ items: masters.map(masterJson), page, per_page: perPage })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+}
+router.get('/social/mamm-pamm', jwtAuth, listMasters)
+router.get('/social/masters', jwtAuth, listMasters)
+
+// One follower row, in the shape the allocations screen reads.
+const allocationJson = (f) => {
+  const profit = f.stats?.totalProfit || 0
+  const loss = f.stats?.totalLoss || 0
+  const pnl = profit - loss
+  const size = f.copyValue || 0
+  return {
+    id: String(f._id),
+    master_id: String(f.masterId?._id || f.masterId),
+    manager_name: f.masterId?.displayName || 'Manager',
+    master_type: 'COPY',
+    status: f.status,
+    copy_mode: f.copyMode,
+    allocation_amount: money(size),
+    current_value: money(size + pnl),
+    total_pnl: money(pnl),
+    total_pnl_pct: size > 0 ? money((pnl / size) * 100) : 0,
+    copied_trades: f.stats?.totalCopiedTrades || 0,
+    open_copied_trades: f.stats?.activeCopiedTrades || 0,
+    commission_paid: money(f.stats?.totalCommissionPaid),
+    joined_at: f.startedAt?.toISOString?.() || f.createdAt?.toISOString?.() || '',
+  }
+}
+
+// GET /api/v1/social/my-allocations  (aliases: /my-copies, /subscriptions)
+const listAllocations = async (req, res) => {
+  try {
+    const rows = await CopyFollower.find({
+      followerId: req.user._id,
+      status: { $in: ['ACTIVE', 'PAUSED'] },
+    }).populate('masterId', 'displayName approvedCommissionPercentage').sort({ createdAt: -1 })
+
+    const items = rows.map(allocationJson)
+    const invested = items.reduce((t, i) => t + i.allocation_amount, 0)
+    const value = items.reduce((t, i) => t + i.current_value, 0)
+    const pnl = items.reduce((t, i) => t + i.total_pnl, 0)
+    res.json({
+      items,
+      summary: {
+        total_invested: money(invested),
+        total_current_value: money(value),
+        total_pnl: money(pnl),
+        overall_pnl_pct: invested > 0 ? money((pnl / invested) * 100) : 0,
+      },
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+}
+router.get('/social/my-allocations', jwtAuth, listAllocations)
+router.get('/social/my-copies', jwtAuth, listAllocations)
+router.get('/social/subscriptions', jwtAuth, listAllocations)
+
+// POST /api/v1/social/mamm-pamm/:masterId/invest?amount=&account_id=
+//
+// Starts copying, sized at `amount`. No money moves: the follower trades their
+// own account, and that is what the size means here.
+router.post('/social/mamm-pamm/:masterId/invest', jwtAuth, async (req, res) => {
+  try {
+    const amount = money(req.query.amount ?? req.body?.amount)
+    if (!(amount > 0)) return fail(res, 400, 'amount must be greater than 0')
+
+    const master = await MasterTrader.findById(String(req.params.masterId))
+    if (!master || master.status !== 'ACTIVE') return fail(res, 404, 'Manager not found')
+
+    // The follower's own account carries the copied trades. Named explicitly
+    // when the app knows it, otherwise their first active live account.
+    let account = req.query.account_id
+      ? await ownedAccount(req.user._id, req.query.account_id)
+      : null
+    if (!account) {
+      const own = await TradingAccount.find({ userId: req.user._id, status: 'Active' })
+        .populate('accountTypeId', 'isDemo').sort({ createdAt: 1 })
+      account = own.find(a => !(a.isDemo || a.accountTypeId?.isDemo)) || null
+    }
+    if (!account) return fail(res, 400, 'No live trading account to copy into')
+    if (String(master.tradingAccountId) === String(account._id)) {
+      return fail(res, 400, 'A manager cannot copy their own account')
+    }
+
+    const existing = await CopyFollower.findOne({
+      followerId: req.user._id,
+      masterId: master._id,
+      status: { $in: ['ACTIVE', 'PAUSED'] },
+    })
+    if (existing) {
+      // Already following: treat a second "invest" as a resize rather than a
+      // duplicate subscription, which is what the screen's button means.
+      existing.copyValue = amount
+      existing.status = 'ACTIVE'
+      await existing.save()
+      return res.json({ message: 'Allocation updated', ...allocationJson(existing) })
+    }
+
+    const follower = await CopyFollower.create({
+      followerId: req.user._id,
+      masterId: master._id,
+      followerAccountId: account._id,
+      status: 'ACTIVE',
+      copyMode: 'BALANCE_BASED',
+      copyValue: amount,
+      startedAt: new Date(),
+    })
+    await MasterTrader.updateOne({ _id: master._id }, {
+      $inc: { 'stats.totalFollowers': 1, 'stats.activeFollowers': 1 },
+    })
+    res.json({ message: 'Copying started', ...allocationJson(follower) })
+  } catch (e) {
+    fail(res, 400, e.message)
+  }
+})
+
+// DELETE /api/v1/social/mamm-pamm/:masterId/withdraw - stop copying.
+//
+// The app sends the ALLOCATION id here, not the master's, so both are accepted.
+// Positions already copied stay open and belong to the follower; this only
+// stops new ones being mirrored.
+router.delete('/social/mamm-pamm/:masterId/withdraw', jwtAuth, async (req, res) => {
+  try {
+    const id = String(req.params.masterId)
+    let row = null
+    try { row = await CopyFollower.findOne({ _id: id, followerId: req.user._id }) } catch { row = null }
+    if (!row) {
+      row = await CopyFollower.findOne({
+        followerId: req.user._id, masterId: id, status: { $in: ['ACTIVE', 'PAUSED'] },
+      })
+    }
+    if (!row) return fail(res, 404, 'Allocation not found')
+    if (row.status === 'STOPPED') return res.json({ message: 'Already stopped' })
+
+    row.status = 'STOPPED'
+    row.stoppedAt = new Date()
+    await row.save()
+    await MasterTrader.updateOne({ _id: row.masterId }, {
+      $inc: { 'stats.activeFollowers': -1 },
+    })
+    res.json({ message: 'Copying stopped', id: String(row._id) })
+  } catch (e) {
+    fail(res, 400, e.message)
+  }
+})
+
+// GET /api/v1/social/masters/eligibility - may this user offer themselves as one.
+router.get('/social/masters/eligibility', jwtAuth, async (req, res) => {
+  try {
+    const existing = await MasterTrader.findOne({ userId: req.user._id })
+    const user = await User.findById(req.user._id).select('kycApproved')
+    res.json({
+      is_master: !!existing && existing.status === 'ACTIVE',
+      status: existing?.status || 'NONE',
+      eligible: !!user?.kycApproved && !existing,
+      requirements: {
+        kyc_approved: !!user?.kycApproved,
+        already_applied: !!existing,
+      },
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// GET /api/v1/social/master-performance - the signed-in user AS a manager.
+router.get('/social/master-performance', jwtAuth, async (req, res) => {
+  try {
+    const m = await MasterTrader.findOne({ userId: req.user._id })
+      .populate('userId', 'firstName lastName')
+    if (!m) return res.json({ is_master: false })
+    res.json({
+      is_master: true,
+      status: m.status,
+      ...masterJson(m),
+      pending_commission: money(m.pendingCommission),
+      total_commission_earned: money(m.totalCommissionEarned),
+      total_commission_withdrawn: money(m.totalCommissionWithdrawn),
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// GET /api/v1/social/master-investors - who is copying the signed-in manager.
+router.get('/social/master-investors', jwtAuth, async (req, res) => {
+  try {
+    const m = await MasterTrader.findOne({ userId: req.user._id })
+    if (!m) return res.json({ items: [] })
+    const rows = await CopyFollower.find({
+      masterId: m._id, status: { $in: ['ACTIVE', 'PAUSED'] },
+    }).populate('followerId', 'firstName lastName').sort({ createdAt: -1 })
+    res.json({
+      items: rows.map(f => ({
+        id: String(f._id),
+        investor_name: [f.followerId?.firstName, f.followerId?.lastName]
+          .filter(Boolean).join(' ') || 'Investor',
+        status: f.status,
+        allocation_amount: money(f.copyValue),
+        total_pnl: money((f.stats?.totalProfit || 0) - (f.stats?.totalLoss || 0)),
+        copied_trades: f.stats?.totalCopiedTrades || 0,
+        joined_at: f.startedAt?.toISOString?.() || '',
+      })),
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// GET /api/v1/social/follow-requests - always empty, and that is the truth.
+//
+// Following here needs no approval: a follower subscribes and copying starts.
+// The app has a screen for managers to accept or decline requests; there are
+// none to show, and answering 404 would put a red error on a screen that is
+// simply not part of this platform's flow.
+router.get('/social/follow-requests', jwtAuth, (_req, res) => res.json({ items: [] }))
+
+/* ─────────────────────────  profile  ───────────────────────── */
+
+const profileJson = (u) => ({
+  id: String(u._id),
+  first_name: u.firstName || '',
+  last_name: u.lastName || '',
+  full_name: [u.firstName, u.lastName].filter(Boolean).join(' '),
+  email: u.email || '',
+  phone: u.phone || '',
+  country_code: u.countryCode || '',
+  profile_image: u.profileImage || '',
+  kyc_approved: !!u.kycApproved,
+  is_ib: !!u.isIB,
+  ib_status: u.ibStatus || 'NONE',
+  referral_code: u.referralCode || '',
+  wallet_balance: money(u.walletBalance),
+  created_at: u.createdAt?.toISOString?.() || '',
+})
+
+// GET /api/v1/profile
+router.get('/profile', jwtAuth, async (req, res) => {
+  try {
+    const u = await User.findById(req.user._id)
+    if (!u) return fail(res, 404, 'User not found')
+    res.json(profileJson(u))
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// PUT /api/v1/profile - only the fields a trader owns.
+//
+// Email is deliberately NOT editable here: it is the sign-in identity and the
+// address every notice goes to, so changing it belongs behind a verification
+// flow, not a profile form.
+router.put('/profile', jwtAuth, async (req, res) => {
+  try {
+    const b = req.body || {}
+    const set = {}
+    const take = (from, to) => {
+      const v = b[from] ?? b[to]
+      if (typeof v === 'string' && v.trim()) set[to] = v.trim()
+    }
+    take('first_name', 'firstName')
+    take('last_name', 'lastName')
+    take('phone', 'phone')
+    take('country_code', 'countryCode')
+    take('profile_image', 'profileImage')
+    if (!Object.keys(set).length) return fail(res, 400, 'Nothing to update')
+
+    const u = await User.findByIdAndUpdate(req.user._id, { $set: set }, { new: true })
+    if (!u) return fail(res, 404, 'User not found')
+    res.json(profileJson(u))
+  } catch (e) {
+    fail(res, 400, e.message)
+  }
+})
+
+// GET /api/v1/profile/documents - what KYC holds for this user.
+router.get('/profile/documents', jwtAuth, async (req, res) => {
+  try {
+    const k = await KYC.findOne({ userId: req.user._id }).sort({ createdAt: -1 })
+    if (!k) return res.json({ status: 'NOT_SUBMITTED', items: [] })
+    const docs = []
+    for (const [key, val] of Object.entries(k.toObject())) {
+      if (val && typeof val === 'object' && (val.url || val.path || val.fileUrl)) {
+        docs.push({
+          type: key,
+          url: val.url || val.path || val.fileUrl,
+          status: val.status || k.status || 'PENDING',
+          uploaded_at: val.uploadedAt?.toISOString?.() || '',
+        })
+      }
+    }
+    res.json({ status: k.status || 'PENDING', items: docs })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// POST /api/v1/profile/push-token  {token, platform}
+router.post('/profile/push-token', jwtAuth, async (req, res) => {
+  try {
+    const token = String(req.body?.token || '').trim()
+    if (!token) return fail(res, 400, 'token is required')
+    const platform = ['ios', 'android', 'web'].includes(req.body?.platform)
+      ? req.body.platform : 'unknown'
+
+    // One row per device: the same token re-registering updates in place rather
+    // than stacking duplicates that would each get their own copy of every push.
+    await User.updateOne({ _id: req.user._id }, { $pull: { pushTokens: { token } } })
+    await User.updateOne({ _id: req.user._id },
+      { $push: { pushTokens: { token, platform, updatedAt: new Date() } } })
+    res.json({ message: 'Push token registered' })
+  } catch (e) {
+    fail(res, 400, e.message)
+  }
+})
+
+// DELETE /api/v1/profile/push-token  {token} - sign-out on that device.
+router.delete('/profile/push-token', jwtAuth, async (req, res) => {
+  try {
+    const token = String(req.body?.token || '').trim()
+    if (!token) return fail(res, 400, 'token is required')
+    await User.updateOne({ _id: req.user._id }, { $pull: { pushTokens: { token } } })
+    res.json({ message: 'Push token removed' })
+  } catch (e) {
+    fail(res, 400, e.message)
+  }
+})
+
+/* ──────────────────  notifications and banners  ────────────────── */
+
+// This platform has no notification store, and no banner store either - the
+// website does not have these features, so there is nothing to mirror. They
+// answer empty rather than 404 so the screens render "nothing here" instead of
+// a red error, and so the day either feature exists the app needs no change.
+router.get('/notifications', jwtAuth, (_req, res) => res.json({ items: [], unread: 0, page: 1, pages: 1 }))
+router.post('/notifications/:id/read', jwtAuth, (_req, res) => res.json({ message: 'ok' }))
+router.post('/notifications/read-all', jwtAuth, (_req, res) => res.json({ message: 'ok' }))
+router.delete('/notifications/:id', jwtAuth, (_req, res) => res.json({ message: 'ok' }))
+router.get('/banners', jwtAuth, (_req, res) => res.json({ items: [] }))
+router.post('/banners/:id/click', jwtAuth, (_req, res) => res.json({ message: 'ok' }))
+
+/* ─────────────────────────  instruments  ───────────────────────── */
+
+// GET /api/v1/instruments/ - the catalogue, without prices. Same source as the
+// website's /api/prices/instruments, so the two can never disagree.
+const catalogueJson = () => instrumentCatalogue().map(i => ({
+  symbol: i.symbol,
+  name: i.name,
+  category: i.category,
+  digits: i.digits,
+  contract_size: i.contractSize,
+  min_volume: i.minVolume,
+  max_volume: i.maxVolume,
+  volume_step: i.volumeStep,
+  popular: i.popular,
+}))
+
+router.get('/instruments', jwtAuth, (_req, res) => res.json({ items: catalogueJson() }))
+router.get('/instruments/', jwtAuth, (_req, res) => res.json({ items: catalogueJson() }))
+
+router.get('/instruments/prices/all', jwtAuth, (_req, res) => {
+  const items = []
+  for (const i of instrumentCatalogue()) {
+    const q = infowayService.getPrice(i.symbol)
+    if (!q) continue
+    items.push({
+      symbol: i.symbol,
+      name: i.name,
+      category: i.category,
+      digits: i.digits,
+      bid: q.bid,
+      ask: q.ask,
+      // Spread in points, the unit the platform quotes it in everywhere else.
+      spread: money((q.ask - q.bid) * Math.pow(10, (i.digits || 5) - 1)),
+      time: q.timestamp || q.time || null,
+      market_open: isMarketOpen(i.symbol),
+    })
+  }
+  res.json({ items })
+})
+
+/* ────────────────  account summary, groups, opening  ──────────────── */
+
+// GET /api/v1/accounts/:id/summary - the numbers under the balance on Home.
+router.get('/accounts/:id/summary', jwtAuth, async (req, res) => {
+  try {
+    const account = await ownedAccount(req.user._id, req.params.id)
+    if (!account) return fail(res, 404, 'Trading account not found for this user')
+
+    const open = await Trade.find({ tradingAccountId: account._id, status: 'OPEN' })
+    let used = 0
+    let floating = 0
+    for (const t of open) {
+      used += t.marginUsed || 0
+      const q = liveQuote(t.symbol)
+      if (q) floating += tradeEngine.calculateFloatingPnl(t, q.bid, q.ask)
+    }
+    const balance = account.balance || 0
+    const credit = account.credit || 0
+    const equity = balance + credit + floating
+
+    res.json({
+      account_id: String(account._id),
+      account_number: account.accountId,
+      currency: 'USD',
+      leverage: account.leverage,
+      balance: money(balance),
+      credit: money(credit),
+      equity: money(equity),
+      total_equity: money(equity),
+      floating_pnl: money(floating),
+      open_pnl: money(floating),
+      margin_used: money(used),
+      free_margin: money(equity - used),
+      margin_level: used > 0 ? money((equity / used) * 100) : 0,
+      open_positions_count: open.length,
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// GET /api/v1/accounts/available-groups - the account types on offer.
+router.get('/accounts/available-groups', jwtAuth, async (_req, res) => {
+  try {
+    const types = await AccountType.find({ isActive: true }).sort({ minDeposit: 1 })
+    res.json({
+      items: types.map(t => ({
+        id: String(t._id),
+        name: t.name,
+        description: t.description || '',
+        min_deposit: money(t.minDeposit),
+        leverage: t.leverage,
+        is_demo: !!t.isDemo,
+        demo_balance: money(t.demoBalance),
+        commission: money(t.commission),
+        min_spread: t.minSpread ?? null,
+      })),
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// POST /api/v1/accounts/open  {group_id|account_type_id, leverage?}
+router.post('/accounts/open', jwtAuth, async (req, res) => {
+  try {
+    const typeId = req.body?.group_id || req.body?.account_type_id || req.body?.accountTypeId
+    const type = typeId ? await AccountType.findById(String(typeId)) : null
+    if (!type || !type.isActive) return fail(res, 400, 'Choose an available account type')
+
+    const user = await User.findById(req.user._id).select('kycApproved')
+    // A demo account is a sandbox and needs no identity check; a live one moves
+    // real money and does.
+    if (!type.isDemo && !user?.kycApproved) {
+      return fail(res, 403, 'Complete KYC verification before opening a live account')
+    }
+
+    const leverage = String(req.body?.leverage || type.leverage || '1:100')
+    const accountId = String(Date.now()).slice(-8)
+    const account = await TradingAccount.create({
+      userId: req.user._id,
+      accountTypeId: type._id,
+      accountId,
+      leverage,
+      balance: type.isDemo ? (type.demoBalance || 0) : 0,
+      credit: 0,
+      status: 'Active',
+      isDemo: !!type.isDemo,
+    })
+    res.json({
+      message: 'Account created',
+      account_id: String(account._id),
+      account_number: account.accountId,
+      is_demo: !!account.isDemo,
+      balance: money(account.balance),
+      leverage: account.leverage,
+    })
+  } catch (e) {
+    fail(res, 400, e.message)
+  }
+})
+
+/* ─────────────────────────  portfolio  ───────────────────────── */
+
+// The accounts a portfolio call covers: one when named, otherwise all of them.
+async function portfolioAccounts(userId, accountId) {
+  if (accountId) {
+    const a = await ownedAccount(userId, accountId)
+    return a ? [a] : []
+  }
+  return TradingAccount.find({ userId, status: 'Active' })
+}
+
+// GET /api/v1/portfolio/summary?account_id=
+router.get('/portfolio/summary', jwtAuth, async (req, res) => {
+  try {
+    const accounts = await portfolioAccounts(req.user._id, req.query.account_id)
+    if (!accounts.length) return fail(res, 404, 'Trading account not found for this user')
+    const ids = accounts.map(a => a._id)
+
+    const open = await Trade.find({ tradingAccountId: { $in: ids }, status: 'OPEN' })
+    let floating = 0
+    let used = 0
+    const bySymbol = new Map()
+    for (const t of open) {
+      used += t.marginUsed || 0
+      const q = liveQuote(t.symbol)
+      const pnl = q ? tradeEngine.calculateFloatingPnl(t, q.bid, q.ask) : 0
+      floating += pnl
+      const cur = bySymbol.get(t.symbol) || { symbol: t.symbol, lots: 0, positions: 0, unrealized_pnl: 0 }
+      cur.lots += t.quantity || 0
+      cur.positions += 1
+      cur.unrealized_pnl += pnl
+      bySymbol.set(t.symbol, cur)
+    }
+
+    const balance = accounts.reduce((t, a) => t + (a.balance || 0), 0)
+    const credit = accounts.reduce((t, a) => t + (a.credit || 0), 0)
+    const equity = balance + credit + floating
+
+    // Today's realised P/L, from midnight UTC - the same boundary the rest of
+    // the platform counts a trading day by.
+    const since = new Date(); since.setUTCHours(0, 0, 0, 0)
+    const closedToday = await Trade.find({
+      tradingAccountId: { $in: ids }, status: 'CLOSED', closedAt: { $gte: since },
+    }).select('realizedPnl commission swap')
+    const realizedToday = closedToday.reduce((t, c) => t + (c.realizedPnl || 0), 0)
+
+    res.json({
+      balance: money(balance),
+      total_balance: money(balance),
+      credit: money(credit),
+      equity: money(equity),
+      total_equity: money(equity),
+      total_unrealized_pnl: money(floating),
+      today_pnl: money(realizedToday),
+      margin_used: money(used),
+      free_margin: money(equity - used),
+      open_positions_count: open.length,
+      holdings: [...bySymbol.values()].map(h => ({
+        ...h,
+        lots: money(h.lots),
+        unrealized_pnl: money(h.unrealized_pnl),
+      })).sort((a, b) => b.unrealized_pnl - a.unrealized_pnl),
+      pnl_breakdown: {
+        unrealized: money(floating),
+        realized_today: money(realizedToday),
+        commission_today: money(closedToday.reduce((t, c) => t + (c.commission || 0), 0)),
+        swap_today: money(closedToday.reduce((t, c) => t + (c.swap || 0), 0)),
+      },
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// GET /api/v1/portfolio/performance?period=&account_id=
+//
+// Built from CLOSED trades only, and the equity curve is a running total of
+// realised P/L rather than true equity: nothing snapshots equity over time, and
+// a curve drawn from floating P/L would rewrite its own history on every tick.
+router.get('/portfolio/performance', jwtAuth, async (req, res) => {
+  try {
+    const accounts = await portfolioAccounts(req.user._id, req.query.account_id)
+    if (!accounts.length) return fail(res, 404, 'Trading account not found for this user')
+    const ids = accounts.map(a => a._id)
+
+    const days = { '7d': 7, '1m': 30, '3m': 90, '6m': 180, '1y': 365 }[String(req.query.period || '1m')] || 30
+    const since = new Date(Date.now() - days * 86400000)
+
+    const closed = await Trade.find({
+      tradingAccountId: { $in: ids }, status: 'CLOSED', closedAt: { $gte: since },
+    }).sort({ closedAt: 1 }).select('symbol realizedPnl closedAt quantity side')
+
+    let running = 0
+    const curve = []
+    const perSymbol = new Map()
+    const perMonth = new Map()
+    let wins = 0
+    let grossWin = 0
+    let grossLoss = 0
+    let best = 0
+    let worst = 0
+
+    for (const t of closed) {
+      const pnl = t.realizedPnl || 0
+      running += pnl
+      curve.push({ t: t.closedAt?.toISOString?.() || '', value: money(running) })
+
+      if (pnl > 0) { wins += 1; grossWin += pnl } else { grossLoss += Math.abs(pnl) }
+      if (pnl > best) best = pnl
+      if (pnl < worst) worst = pnl
+
+      const sy = perSymbol.get(t.symbol) || { symbol: t.symbol, trades: 0, pnl: 0, lots: 0 }
+      sy.trades += 1; sy.pnl += pnl; sy.lots += t.quantity || 0
+      perSymbol.set(t.symbol, sy)
+
+      const key = (t.closedAt || new Date()).toISOString().slice(0, 7)
+      const mo = perMonth.get(key) || { month: key, trades: 0, pnl: 0 }
+      mo.trades += 1; mo.pnl += pnl
+      perMonth.set(key, mo)
+    }
+
+    res.json({
+      period: String(req.query.period || '1m'),
+      equity_curve: curve,
+      stats: {
+        total_trades: closed.length,
+        wins,
+        losses: closed.length - wins,
+        win_rate_pct: closed.length ? money((wins / closed.length) * 100) : 0,
+        total_pnl: money(running),
+        best_trade: money(best),
+        worst_trade: money(worst),
+        profit_factor: grossLoss > 0 ? money(grossWin / grossLoss) : (grossWin > 0 ? 0 : 0),
+        gross_profit: money(grossWin),
+        gross_loss: money(grossLoss),
+      },
+      symbol_breakdown: [...perSymbol.values()]
+        .map(x => ({ ...x, pnl: money(x.pnl), lots: money(x.lots) }))
+        .sort((a, b) => b.pnl - a.pnl),
+      monthly_breakdown: [...perMonth.values()]
+        .map(x => ({ ...x, pnl: money(x.pnl) }))
+        .sort((a, b) => a.month.localeCompare(b.month)),
     })
   } catch (e) {
     fail(res, 500, e.message)

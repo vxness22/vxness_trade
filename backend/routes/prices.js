@@ -37,6 +37,29 @@ function isIndexSymbol(symbol) {
 }
 
 // Helper function to categorize symbols (must align with Charges.segment: Forex, Metals, Crypto, Indices, Commodities)
+// The instrument catalogue, in one place.
+//
+// /api/v1/instruments serves this same list to the mobile app: two hand-kept
+// copies of 125 symbols' names, digits and contract sizes would disagree the
+// first time one of them was edited, and the app would price a trade off
+// different metadata than the website.
+export function instrumentCatalogue() {
+  return SUPPORTED_SYMBOLS.map(symbol => {
+    const category = categorizeSymbol(symbol)
+    return {
+      symbol,
+      name: getInstrumentName(symbol),
+      category,
+      digits: getDigits(symbol),
+      contractSize: getContractSize(symbol),
+      minVolume: 0.01,
+      maxVolume: 100,
+      volumeStep: 0.01,
+      popular: POPULAR_INSTRUMENTS[category]?.includes(symbol) || false,
+    }
+  })
+}
+
 function categorizeSymbol(symbol) {
   if (!symbol) return 'Forex'
   const s = symbol.toUpperCase()
@@ -97,21 +120,7 @@ router.get('/instruments', async (req, res) => {
   try {
     console.log('Returning Infoway supported instruments')
     
-    const instruments = SUPPORTED_SYMBOLS.map(symbol => {
-      const category = categorizeSymbol(symbol)
-      const isPopular = POPULAR_INSTRUMENTS[category]?.includes(symbol) || false
-      return {
-        symbol,
-        name: getInstrumentName(symbol),
-        category,
-        digits: getDigits(symbol),
-        contractSize: getContractSize(symbol),
-        minVolume: 0.01,
-        maxVolume: 100,
-        volumeStep: 0.01,
-        popular: isPopular
-      }
-    })
+    const instruments = instrumentCatalogue()
     
     console.log('Returning', instruments.length, 'Infoway instruments')
     res.json({ success: true, instruments })

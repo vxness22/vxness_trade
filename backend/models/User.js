@@ -129,6 +129,14 @@ const userSchema = new mongoose.Schema({
   },
   
   // KYC Status
+  // Expo push tokens, one row per device the account is signed in on.
+  // Registered by the mobile app; the platform can deliver to these while the
+  // app is closed. Stale ones are simply overwritten by the same device.
+  pushTokens: [{
+    token: { type: String, required: true },
+    platform: { type: String, enum: ['ios', 'android', 'web', 'unknown'], default: 'unknown' },
+    updatedAt: { type: Date, default: Date.now },
+  }],
   kycApproved: {
     type: Boolean,
     default: false
