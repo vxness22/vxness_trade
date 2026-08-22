@@ -115,6 +115,39 @@ initBarHub(httpServer)
 // stealing /socket.io/ handshakes.
 initAlgoPriceHub(httpServer)
 
+// A WebSocket upgrade to a path nobody serves must be ANSWERED, not dropped.
+//
+// This took the whole API down in ten-second bursts. The mobile app opens
+// /ws/prices, which is not a path this server has; every hub above returns
+// early for a path that is not its own, so the socket sat unhandled and was
+// eventually destroyed without a single response header ever being written.
+// nginx reads that as "upstream prematurely closed connection", counts it
+// against the upstream, and after one failure takes 127.0.0.1:5000 out of
+// rotation for fail_timeout - during which EVERY request, from every client,
+// gets 502 "no live upstreams". A handshake to a route that does not exist was
+// knocking out the routes that do.
+//
+// Registered last, and it only speaks for paths none of the hubs claim, so the
+// ones that are served are already handled by the time it runs.
+const WS_PATHS = ['/ws/bars', '/ws/algo/prices']
+httpServer.on('upgrade', (req, socket) => {
+  let pathname = '/'
+  try { pathname = new URL(req.url, 'http://localhost').pathname }
+  catch { pathname = (req.url || '').split('?')[0] }
+  if (WS_PATHS.includes(pathname) || pathname.startsWith('/socket.io/')) return
+  if (socket.destroyed) return
+  // CRLF by code point: an escape sequence here is one careless editor away
+  // from becoming a real newline, and a malformed status line would put us
+  // right back to nginx seeing a broken upstream.
+  const CRLF = String.fromCharCode(13, 10)
+  socket.write(
+    'HTTP/1.1 404 Not Found' + CRLF +
+    'Connection: close' + CRLF +
+    'Content-Length: 0' + CRLF + CRLF
+  )
+  socket.destroy()
+})
+
 
 
 // Socket.IO for real-time updates

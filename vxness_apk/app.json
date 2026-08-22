@@ -1,0 +1,98 @@
+{
+  "expo": {
+    "name": "Vxness",
+    "slug": "vxness",
+    "version": "1.0.0",
+    "runtimeVersion": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/brand/vxness-icon.png",
+    "backgroundColor": "#000000",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "jsEngine": "hermes",
+    "splash": {
+      "image": "./assets/brand/vxness-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000",
+      "dark": {
+        "image": "./assets/brand/vxness-logo.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#000000"
+      }
+    },
+    "_note_expo_account": [
+      "This app has no Expo project of its own yet. The owner, the EAS project",
+      "id and the updates URL that used to sit here belonged to the account the",
+      "build was white-labelled from - leaving them in would have sent this",
+      "app's OTA updates and its push tokens to somebody else's project.",
+      "",
+      "On the Vxness Expo account, run `eas init` in this folder. It writes",
+      "`owner`, `extra.eas.projectId` and `updates.url` back into this file, and",
+      "the push token in src/services/notifications/pushNotifications.js starts",
+      "resolving from expoConfig instead of returning null."
+    ],
+    "updates": {
+      "enabled": true,
+      "fallbackToCacheTimeout": 3000
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false,
+          "NSAllowsLocalNetworking": true,
+          "NSExceptionDomains": {
+            "vxness.in": {
+              "NSIncludesSubdomains": true,
+              "NSExceptionAllowsInsecureHTTPLoads": false,
+              "NSExceptionRequiresForwardSecrecy": true,
+              "NSExceptionMinimumTLSVersion": "TLSv1.2"
+            }
+          }
+        }
+      },
+      "bundleIdentifier": "com.vxness.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/brand/vxness-icon.png",
+        "backgroundColor": "#000000"
+      },
+      "edgeToEdgeEnabled": true,
+      "backgroundColor": "#000000",
+      "package": "com.vxness.app",
+      "splash": {
+        "image": "./assets/brand/vxness-logo.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#000000",
+        "dark": {
+          "image": "./assets/brand/vxness-logo.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
+        }
+      }
+    },
+    "web": {
+      "favicon": "./assets/brand/vxness-favicon.png"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-updates",
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Vxness to use Face ID to unlock the app."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#2FBF71"
+        }
+      ],
+      "./plugins/withWebChart.js"
+    ],
+    "extra": {}
+  }
+}
