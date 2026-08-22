@@ -7,8 +7,8 @@ import { Screen, Card, IconButton } from '../../../components/vx';
 import { vx, space, sizes, weights, fontFamily } from '../../../theme/vxTheme';
 import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 
+// Bank and UPI only, which is what the platform actually pays out through.
 const METHODS = [
-  { key: 'crypto', icon: 'link-outline', title: 'Crypto Withdrawal', subtitle: 'TRC20 / BEP20 / ERC20', route: 'WithdrawCrypto' },
   { key: 'manual', icon: 'business-outline', title: 'Manual UPI / Bank', subtitle: 'Admin-reviewed payout', route: 'WithdrawManual' },
 ];
 

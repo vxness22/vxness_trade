@@ -250,13 +250,10 @@ export default function ProfileMenuScreen() {
         </Section>
 
         <Section title="PROGRAMS">
-          <MenuRow icon={<Ionicons name="briefcase-outline" size={18} color={vx.textPrimary} />} label="Business / Sub-Broker" onPress={() => nav.navigate('Business')} />
           <MenuRow icon={<Ionicons name="bar-chart-outline" size={18} color={vx.textPrimary} />} label="PAMM Investments" onPress={() => nav.navigate('Pamm')} />
         </Section>
 
         <Section title="TOOLS">
-          <MenuRow icon={<Ionicons name="school-outline" size={18} color={vx.textPrimary} />} label="Academy" onPress={() => nav.navigate('Academy')} />
-          <MenuRow icon={<Ionicons name="calculator-outline" size={18} color={vx.textPrimary} />} label="Risk Calculator" onPress={() => nav.navigate('RiskCalculator')} />
           <MenuRow icon={<Ionicons name="calendar-outline" size={18} color={vx.textPrimary} />} label="Economic Calendar" onPress={() => nav.navigate('EconomicCalendar')} />
           {/* One source of truth for orders/history: the Trade tab (live,
               paginated, on-brand). The old Order Book screen duplicated it. */}
@@ -314,7 +311,6 @@ export default function ProfileMenuScreen() {
 
         <Section title="HELP">
           <MenuRow icon={<Ionicons name="chatbubble-outline" size={18} color={vx.textPrimary} />} label="Support" onPress={() => nav.navigate('Support')} />
-          <MenuRow icon={<Ionicons name="notifications-outline" size={18} color={vx.textPrimary} />} label="Notifications" onPress={() => nav.navigate('Notifications')} />
           <MenuRow icon={<Ionicons name="book-outline" size={18} color={vx.textPrimary} />} label="How to use" onPress={() => nav.navigate('Instructions')} />
           <MenuRow
             icon={<Ionicons name="map-outline" size={18} color={vx.textPrimary} />}

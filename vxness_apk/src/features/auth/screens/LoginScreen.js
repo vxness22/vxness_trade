@@ -120,8 +120,11 @@ export default function LoginScreen({ navigation }) {
     setSubmitting(true);
     const res = await login(email.trim(), password);
     setSubmitting(false);
+    // No second-factor step: this platform signs in with email and password.
+    // The flag is still read so a backend that grows one is not silently
+    // ignored - it just says so instead of pretending to have a screen.
     if (res.twoFactorRequired) {
-      navigation.navigate('TwoFactor', { email: email.trim(), password });
+      showToast({ kind: 'error', message: res.message || 'Two-factor sign-in is not available' });
       return;
     }
     if (!res.success) showToast({ kind: 'error', message: res.message || 'Login failed' });

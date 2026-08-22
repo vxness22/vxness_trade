@@ -9,7 +9,7 @@ import { IconButton } from '../../../components/vx';
 import { parseAvatar, renderAvatar } from '../../../utils/avatarRender';
 import { vx, space, sizes, weights, fontFamily } from '../../../theme/vxTheme';
 
-export default function HomeHeader({ unreadNotifications = 0, accountLabel, onPickAccount, onAddAccount }) {
+export default function HomeHeader({ accountLabel, onPickAccount, onAddAccount }) {
   const nav = useNavigation();
   const { user } = useContext(AuthContext) || {};
   const av = parseAvatar(user?.avatar);   // reflects the avatar chosen in Profile
@@ -57,13 +57,8 @@ export default function HomeHeader({ unreadNotifications = 0, accountLabel, onPi
       <View style={{ flex: 1 }} />
 
       {/* No search icon on Home — instrument search lives in the Markets tab,
-          which has its own header search. */}
-      <IconButton
-        icon={<Ionicons name="notifications-outline" size={18} color={vx.textPrimary} />}
-        badgeColor={unreadNotifications > 0 ? vx.down : undefined}
-        accessibilityLabel="Notifications"
-        onPress={() => nav.navigate('Notifications')}
-      />
+          which has its own header search. And no bell: the platform has no
+          notification feed to ring about, on the web or here. */}
     </View>
   );
 }

@@ -100,34 +100,6 @@ export default {
     calendar: 'Calendar',
   },
 
-  // Academy
-  academy: {
-    title: 'Vxness Academy',
-    subtitle: 'Master Forex Trading from Beginner to Professional',
-    phases: 'Phases',
-    modules: 'Modules',
-    completed: 'Completed',
-    studyTime: 'Study Time',
-    progress: 'Progress',
-    startPhase: 'Start Phase',
-    continuePhase: 'Continue',
-    locked: 'Locked',
-    quiz: 'Quiz',
-    beginQuiz: 'Begin Quiz',
-    questionOf: 'Question {current} of {total}',
-    correct: 'Correct!',
-    incorrect: 'Incorrect',
-    quizComplete: 'Quiz Complete',
-    yourScore: 'Your Score: {score}%',
-    passMessage: 'Congratulations! You passed!',
-    failMessage: 'Keep studying and try again.',
-    retakeQuiz: 'Retake Quiz',
-    beginner: 'Beginner',
-    intermediate: 'Intermediate',
-    advanced: 'Advanced',
-    professional: 'Professional',
-  },
-
   // Transaction History
   transactions: {
     title: 'Transaction History',

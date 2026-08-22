@@ -33,7 +33,6 @@ export default function HomeScreen() {
   const [perfDay, setPerfDay] = useState(null);
   const [strategies, setStrategies] = useState([]);
   const [banners, setBanners] = useState([]);
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [pricesBySymbol, setPricesBySymbol] = useState({});
   // Global account selection — synced across Home / Trade / instrument detail.
   const { accounts, selectedAccount, selectAccount, refreshAccounts } = useAccount();
@@ -69,11 +68,6 @@ export default function HomeScreen() {
         }
         setPricesBySymbol(map);
       }).catch(() => setPricesBySymbol({})),
-      ApiService.getNotifications(1, 20).then((res) => {
-        const list = Array.isArray(res) ? res : (Array.isArray(res?.items) ? res.items : []);
-        const unread = list.filter((n) => !n?.is_read && !n?.read).length;
-        setUnreadNotifications(unread);
-      }).catch(() => setUnreadNotifications(0)),
       refreshAccounts(),
     ]);
   }, [refreshAccounts]);
@@ -191,9 +185,8 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={vx.accent} colors={[vx.accent]} />
         }
       >
-        <Pressable onLongPress={() => __DEV__ && nav.navigate('ComponentGallery')}>
+        <Pressable>
           <HomeHeader
-            unreadNotifications={unreadNotifications}
             accountLabel={acctLabel}
             onPickAccount={() => setAccountSheet(true)}
           />

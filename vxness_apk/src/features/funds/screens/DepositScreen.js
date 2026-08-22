@@ -45,11 +45,6 @@ export default function DepositScreen() {
     showToast({ kind: 'success', message: 'Address copied' });
   }, []);
 
-  const openGateway = useCallback(() => {
-    if (!(Number(amount) > 0)) { showToast({ kind: 'warn', message: 'Enter a deposit amount first' }); return; }
-    nav.navigate('DepositOxapay', { amount: Number(amount) });
-  }, [amount, nav]);
-
   const pickProof = useCallback(async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) { showToast({ kind: 'warn', message: 'Permission required to pick image' }); return; }

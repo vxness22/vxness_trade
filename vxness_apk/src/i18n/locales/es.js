@@ -37,16 +37,6 @@ export default {
     previousVal: 'Anterior', currency: 'Moneda', noEvents: 'Sin eventos para este período',
     liveNews: 'Noticias en Vivo', calendar: 'Calendario',
   },
-  academy: {
-    title: 'Academia Vxness', subtitle: 'Domine el Trading de Forex de Principiante a Profesional',
-    phases: 'Fases', modules: 'Módulos', completed: 'Completado', studyTime: 'Tiempo de Estudio',
-    progress: 'Progreso', startPhase: 'Iniciar Fase', continuePhase: 'Continuar', locked: 'Bloqueado',
-    quiz: 'Cuestionario', beginQuiz: 'Iniciar Cuestionario', questionOf: 'Pregunta {current} de {total}',
-    correct: '¡Correcto!', incorrect: 'Incorrecto', quizComplete: 'Cuestionario Completo',
-    yourScore: 'Tu Puntuación: {score}%', passMessage: '¡Felicidades! ¡Aprobaste!',
-    failMessage: 'Sigue estudiando e inténtalo de nuevo.', retakeQuiz: 'Repetir Cuestionario',
-    beginner: 'Principiante', intermediate: 'Intermedio', advanced: 'Avanzado', professional: 'Profesional',
-  },
   transactions: {
     title: 'Historial de Transacciones', subtitle: 'Vea todos sus registros financieros',
     deposits: 'Depósitos', withdrawals: 'Retiros', transfers: 'Transferencias',

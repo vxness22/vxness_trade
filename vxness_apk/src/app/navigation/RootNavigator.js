@@ -7,7 +7,6 @@ import { AccountProvider } from '../providers/AccountContext';
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
 import AppLoader from '../../components/vx/AppLoader';
-import NotificationsBridge from '../../components/NotificationsBridge';
 import { navigationRef } from './navigationRef';
 import { vx } from '../../theme/vxTheme';
 
@@ -41,7 +40,6 @@ export default function RootNavigator() {
       ) : auth?.user ? (
         <AccountProvider>
           <MainTabs />
-          <NotificationsBridge />
         </AccountProvider>
       ) : (
         <AuthStack />

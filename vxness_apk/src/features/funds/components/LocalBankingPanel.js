@@ -73,37 +73,9 @@ export default function LocalBankingPanel({ amount = '' }) {
     }
   }, [amount, loadRequests, nav]);
 
-  // Razorpay — "awaiting" state: user enters amount, we create the order then
-  // open Checkout in the WebView screen.
-  const payAwaiting = useCallback(async (req) => {
-    const amt = Number(rzpAmounts[req.id]);
-    if (!(amt > 0)) { showToast({ kind: 'warn', message: 'Enter an amount to pay' }); return; }
-    setRzpBusyId(req.id);
-    try {
-      const order = await ApiService.createLbRazorpayOrder(req.id, amt);
-      nav.navigate('RazorpayCheckout', { keyId: order.key_id, orderId: order.order_id, amountInr: order.amount_inr, depositId: req.id });
-    } catch (e) {
-      showToast({ kind: 'error', message: e?.message || 'Could not create Razorpay order' });
-    } finally {
-      setRzpBusyId(null);
-    }
-  }, [rzpAmounts, nav]);
-
-  // Razorpay — order already created (payment_link "razorpay:<order_id>").
-  const payOrder = useCallback(async (req) => {
-    const orderId = req.transaction_id;
-    if (!orderId) { showToast({ kind: 'warn', message: 'No Razorpay order on this deposit yet' }); return; }
-    setRzpBusyId(req.id);
-    try {
-      const meta = await ApiService.getRazorpayOrderMeta(orderId);
-      if (!meta?.key_id) { showToast({ kind: 'error', message: 'Razorpay is not configured' }); return; }
-      nav.navigate('RazorpayCheckout', { keyId: meta.key_id, orderId, amountInr: meta.amount_inr, depositId: req.id });
-    } catch (e) {
-      showToast({ kind: 'error', message: e?.message || 'Could not load payment details' });
-    } finally {
-      setRzpBusyId(null);
-    }
-  }, [nav]);
+  // No card gateway here. The platform settles local deposits by bank transfer,
+  // UPI or QR, with an admin reviewing the proof - the same three the website
+  // offers - so there is nothing to hand off to a checkout screen.
 
   const pickProof = useCallback(async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
