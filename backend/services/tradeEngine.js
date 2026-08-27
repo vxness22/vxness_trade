@@ -1368,17 +1368,32 @@ class TradeEngine {
 
   async applySwap() {
 
+    // strictPopulate: false here is not tidiness, it is the whole fix.
+    //
+    // Trade.tradingAccountId is a refPath: it points at a TradingAccount OR a
+    // ChallengeAccount (models/Trade.js). ChallengeAccount has no
+    // accountTypeId, so asking for it threw StrictPopulateError the moment one
+    // challenge trade was open - and the throw happened on the QUERY, before
+    // the loop, so NOBODY on the platform got swap that night. Three nights
+    // out of forty-seven died that way, silently, behind a caught error in
+    // server.js that only ever reached the log.
     const openTrades = await Trade.find({ status: 'OPEN' }).populate({
 
       path: 'tradingAccountId',
 
-      populate: { path: 'accountTypeId' }
+      populate: { path: 'accountTypeId', strictPopulate: false }
 
     })
 
 
 
+    // One trade per iteration, each in its own try: a single unpriceable
+    // symbol or unsaveable row must cost that row its swap, not cost every
+    // other open trade on the platform theirs. That is the same failure the
+    // populate above caused, one level down.
     for (const trade of openTrades) {
+
+      try {
 
       const segmentForCharges = resolveTradeSegment(trade.symbol, trade.segment)
 
@@ -1427,6 +1442,12 @@ class TradeEngine {
       trade.swap += swapAmount
 
       await trade.save()
+
+      } catch (error) {
+
+        console.error(`[SWAP] ${trade.tradeId || trade._id} skipped:`, error.message)
+
+      }
 
     }
 
