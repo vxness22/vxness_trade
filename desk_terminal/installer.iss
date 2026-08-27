@@ -27,7 +27,7 @@ AppName={#MyApp}
 ; unversioned (see OutputBaseFilename), so bumping this does not require
 ; touching the website link — only the ?v= cache-buster on it
 ; (frontend/src/website/src/components/desktop-terminal-download.jsx).
-AppVersion=1.1.5
+AppVersion=1.1.6
 AppPublisher=Vxness
 DefaultDirName={autopf}\Vxness Terminal
 DefaultGroupName=Vxness Terminal

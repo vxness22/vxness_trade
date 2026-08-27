@@ -33,12 +33,12 @@ import { Monitor } from "lucide-react"
 // certificate: desk_terminal/sign.ps1 and make-installer.ps1 are already wired
 // for one, and the day it exists this can go back to handing out the .exe
 // directly -- see "Code signing" in desk_terminal/README.md.
-export const WINDOWS_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.exe?v=1.1.5"
+export const WINDOWS_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.exe?v=1.1.6"
 
 // The same build as a zip. Not linked from the panel - the button hands out the
 // installer - but it stays published for a visitor whose browser refuses the
 // .exe, and support can send this link.
-export const WINDOWS_ZIP_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.zip?v=1.1.5"
+export const WINDOWS_ZIP_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.zip?v=1.1.6"
 
 // Flip to the .dmg URL once a macOS build has been produced and uploaded — the
 // installer can only be built and notarised on a Mac.
