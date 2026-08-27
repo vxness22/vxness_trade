@@ -196,6 +196,16 @@ const TradingPage = () => {
   const [pendingOrders, setPendingOrders] = useState([])
 
   const [tradeHistory, setTradeHistory] = useState([])
+  // History date filter.
+  //
+  // The blotter listed every close an account had ever had, newest first, and
+  // nothing else - so finding yesterday's trades on an account with a year of
+  // history meant scrolling. Filtered here rather than server-side because
+  // GET /trade/history returns the whole list unpaged (limit=0 by default), so
+  // the client already holds everything the filter needs.
+  const [historyRange, setHistoryRange] = useState('all')
+  const [historyFrom, setHistoryFrom] = useState('')
+  const [historyTo, setHistoryTo] = useState('')
 
   // Positions view: false = one netted row per currency (with trade count badge),
   // true = flat list of every individual trade across all currencies.
@@ -1513,6 +1523,59 @@ const TradingPage = () => {
 
 
   // Fetch trade history (closed trades)
+
+  // The [from, to) window a range key stands for. Weeks start on MONDAY: the
+  // FX week opens Sunday night and runs Monday to Friday, so a Sunday-start
+  // week would put a Monday morning trade in "last week" for the whole day.
+  // "Last month" is the previous CALENDAR month, matching how This/Last Week
+  // read - use the custom period for a rolling window.
+  const historyWindow = useMemo(() => {
+    const now = new Date()
+    const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
+    const mondayOf = (d) => {
+      const x = startOfDay(d)
+      x.setDate(x.getDate() - ((x.getDay() + 6) % 7))   // Mon=0 ... Sun=6
+      return x
+    }
+    switch (historyRange) {
+      case 'today':
+        return { from: startOfDay(now), to: null }
+      case 'week':
+        return { from: mondayOf(now), to: null }
+      case 'lastWeek': {
+        const thisMonday = mondayOf(now)
+        const lastMonday = new Date(thisMonday)
+        lastMonday.setDate(lastMonday.getDate() - 7)
+        return { from: lastMonday, to: thisMonday }
+      }
+      case 'lastMonth':
+        return {
+          from: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+          to: new Date(now.getFullYear(), now.getMonth(), 1),
+        }
+      case 'custom':
+        return {
+          from: historyFrom ? new Date(historyFrom) : null,
+          // datetime-local is minute-resolution and a trader picking 18:30 means
+          // "up to and including 18:30", so the exclusive end is a minute later.
+          to: historyTo ? new Date(new Date(historyTo).getTime() + 60000) : null,
+        }
+      default:
+        return { from: null, to: null }
+    }
+  }, [historyRange, historyFrom, historyTo])
+
+  const filteredHistory = useMemo(() => {
+    const { from, to } = historyWindow
+    if (!from && !to) return tradeHistory
+    return tradeHistory.filter((t) => {
+      const d = new Date(t.closedAt || t.updatedAt || t.createdAt)
+      if (Number.isNaN(d.getTime())) return false
+      if (from && d < from) return false
+      if (to && d >= to) return false
+      return true
+    })
+  }, [tradeHistory, historyWindow])
 
   const fetchTradeHistory = async () => {
 
@@ -3589,7 +3652,7 @@ const TradingPage = () => {
 
                   { name: 'Pending', count: pendingOrders.length },
 
-                  { name: 'History', count: tradeHistory.length },
+                  { name: 'History', count: filteredHistory.length },
 
                   { name: 'Cancelled', count: 0 }
 
@@ -3614,6 +3677,25 @@ const TradingPage = () => {
               </div>
 
               <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+
+                {activePositionTab === 'History' && (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <select
+                      value={historyRange}
+                      onChange={(e) => setHistoryRange(e.target.value)}
+                      title="Filter closed trades by when they closed"
+                      className={`h-7 text-xs rounded border px-2 focus:outline-none focus:border-blue-500 ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-gray-200' : 'bg-white border-gray-300 text-gray-700'}`}
+                    >
+                      <option value="today">Today</option>
+                      <option value="week">This Week</option>
+                      <option value="lastWeek">Last Week</option>
+                      <option value="lastMonth">Last Month</option>
+                      <option value="all">All history</option>
+                      <option value="custom">Customise Date Time</option>
+                    </select>
+
+                  </div>
+                )}
 
                 {!isMobile && (
 
@@ -3694,6 +3776,51 @@ const TradingPage = () => {
             </div>
 
             
+
+            {activePositionTab === 'History' && historyRange === 'custom' && (
+              <div className={`flex items-center gap-2 px-2 sm:px-4 py-1.5 border-b overflow-x-auto ${isDarkMode ? 'border-gray-800 bg-[#0d0d0d]' : 'border-gray-200 bg-white'}`}>
+
+                <span className="text-xs text-gray-500 shrink-0">From</span>
+
+                <input
+                  type="datetime-local"
+                  value={historyFrom}
+                  onChange={(e) => setHistoryFrom(e.target.value)}
+                  className={`h-7 text-xs rounded border px-2 shrink-0 focus:outline-none focus:border-blue-500 ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-gray-200' : 'bg-white border-gray-300 text-gray-700'}`}
+                />
+
+                <span className="text-xs text-gray-500 shrink-0">To</span>
+
+                <input
+                  type="datetime-local"
+                  value={historyTo}
+                  onChange={(e) => setHistoryTo(e.target.value)}
+                  className={`h-7 text-xs rounded border px-2 shrink-0 focus:outline-none focus:border-blue-500 ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-gray-200' : 'bg-white border-gray-300 text-gray-700'}`}
+                />
+
+                {(historyFrom || historyTo) && (
+                  <button
+                    onClick={() => { setHistoryFrom(''); setHistoryTo('') }}
+                    className="text-xs text-blue-500 hover:underline shrink-0"
+                  >
+                    Clear
+                  </button>
+                )}
+
+                {/* An empty end means "up to now", an empty start means "from the
+                    beginning" - say so, rather than leaving a blank box looking broken. */}
+                <span className="text-xs text-gray-500 shrink-0 hidden sm:inline">
+                  {!historyFrom && !historyTo
+                    ? 'Pick a start, an end, or both'
+                    : !historyTo
+                      ? 'up to now'
+                      : !historyFrom
+                        ? 'from the beginning'
+                        : ''}
+                </span>
+
+              </div>
+            )}
 
             <div className="flex-1 overflow-auto">
 
@@ -3909,17 +4036,21 @@ const TradingPage = () => {
 
                 <tbody>
 
-                  {tradeHistory.length === 0 ? (
+                  {filteredHistory.length === 0 ? (
 
                     <tr>
 
-                      <td colSpan="9" className="text-center py-8 text-gray-500">No trade history</td>
+                      <td colSpan="9" className="text-center py-8 text-gray-500">
+
+                        {tradeHistory.length === 0 ? 'No trade history' : 'No trades closed in this period'}
+
+                      </td>
 
                     </tr>
 
                   ) : (
 
-                    tradeHistory.map(trade => {
+                    filteredHistory.map(trade => {
 
                       const formatPrice = (price) => (price ? sharedFormatPrice(price, trade.symbol) : '-')
 
