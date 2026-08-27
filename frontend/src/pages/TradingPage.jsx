@@ -2161,6 +2161,28 @@ const TradingPage = () => {
 
   // Cancel pending order
 
+  // Move a resting order's trigger price. Called by the chart when the trader
+  // drags the order's line; it throws on refusal so the chart can put the line
+  // back where the server still has it.
+  const modifyPendingOrder = async (tradeId, price) => {
+    const res = await fetch(`${API_URL}/trade/pending/${tradeId}`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify({ price }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || data?.success === false) {
+      const msg = data?.message || 'Could not move the order'
+      setTradeError(msg)
+      setTimeout(() => setTradeError(''), 4000)
+      throw new Error(msg)
+    }
+    setTradeSuccess('Order updated')
+    setTimeout(() => setTradeSuccess(''), 2500)
+    await fetchPendingOrders()
+    return data
+  }
+
   const cancelPendingOrder = async (tradeId) => {
 
     try {
@@ -3529,7 +3551,13 @@ const TradingPage = () => {
 
               positions={openTrades}
 
+              orders={pendingOrders}
+
               onRefresh={fetchOpenTrades}
+
+              onModifyOrder={modifyPendingOrder}
+
+              onCancelOrder={cancelPendingOrder}
 
             />
 

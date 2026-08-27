@@ -8,7 +8,8 @@
 //   via PUT /api/trade/modify. A plain click opens a type-a-price dialog. [✕] closes
 //   the position at market (POST /api/trade/close).
 //
-// Props: symbol, interval, theme ('dark'|'light'), positions (open trades), onRefresh.
+// Props: symbol, interval, theme ('dark'|'light'), positions (open trades),
+// orders (resting pending orders), onRefresh, onModifyOrder, onCancelOrder.
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { API_URL } from "../config/api";
@@ -188,7 +189,10 @@ export default function ChartingLibraryChart({
   interval = "5",
   theme = "dark",
   positions = [],
+  orders = [],
   onRefresh,
+  onModifyOrder,
+  onCancelOrder,
 }) {
   const containerRef = useRef(null);
   const overlayRef = useRef(null);
@@ -198,7 +202,22 @@ export default function ChartingLibraryChart({
   // Latest normalized positions, kept fresh for the button sync loop (SL/TP can
   // change without recreating the buttons, so the loop reads live values here).
   const positionsRef = useRef([]);
+  // Same idea for pending orders: the pills are rebuilt only when the SET of
+  // orders changes, but a price the trader just dragged has to be readable by
+  // the loop on the very next frame.
+  const ordersRef = useRef([]);
   positionsRef.current = (positions || []).map(normalizePosition);
+  ordersRef.current = (orders || [])
+    .filter((o) => String(o.symbol || "").toUpperCase() === String(symbol || "").toUpperCase())
+    .map((o) => ({
+      id: String(o._id || o.id),
+      symbol: String(o.symbol || "").toUpperCase(),
+      side: String(o.side || "").toUpperCase() === "SELL" ? "SELL" : "BUY",
+      type: String(o.orderType || o.type || "").toUpperCase().includes("STOP") ? "STOP" : "LIMIT",
+      lots: Number(o.quantity ?? o.lots ?? 0),
+      price: Number(o.pendingPrice ?? o.openPrice ?? o.price ?? 0),
+    }))
+    .filter((o) => o.price > 0);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
   const [dialog, setDialog] = useState(null);
@@ -522,7 +541,26 @@ export default function ChartingLibraryChart({
         });
     }
 
-    const shapeOpts = (text, lineColor, textColor, dashed) => ({
+    // Pending orders, drawn dotted.
+    //
+    // A resting order lived only in the blotter: the chart showed open
+    // positions and nothing else, so the level a trader was waiting on was
+    // invisible on the one surface where price is. Dotted rather than dashed
+    // because a chart can carry a position AND an order on the same
+    // instrument, and the line style is what separates them at a glance.
+    for (const o of ordersRef.current) {
+      desired.push({
+        key: `order-${o.id}`,
+        price: o.price,
+        color: o.side === "BUY" ? CHART_BUY_COLOR : CHART_SELL_COLOR,
+        textColor: o.side === "BUY" ? CHART_BUY_COLOR : CHART_SELL_COLOR,
+        text: "",                       // the pill carries type, price and size
+        dashed: true,
+        dotted: true,
+      });
+    }
+
+    const shapeOpts = (text, lineColor, textColor, dashed, dotted) => ({
       shape: "horizontal_line",
       text,
       lock: true,
@@ -531,7 +569,7 @@ export default function ChartingLibraryChart({
       disableUndo: true,
       overrides: {
         linecolor: lineColor,
-        linestyle: dashed ? 2 : 0,
+        linestyle: dotted ? 1 : dashed ? 2 : 0,
         linewidth: dashed ? 1 : 2,
         // No on-line text label for SL/TP (dashed) — the SL/TP price is shown on
         // the ride-along button + the right-axis price tag (client request).
@@ -562,7 +600,7 @@ export default function ChartingLibraryChart({
         chart
           .createShape(
             { time: t, price: d.price },
-            shapeOpts(d.text, d.color, d.textColor, d.dashed),
+            shapeOpts(d.text, d.color, d.textColor, d.dashed, d.dotted),
           )
           .then((id) => {
             if (linesRef.current.get(d.key) === entry) {
@@ -625,7 +663,7 @@ export default function ChartingLibraryChart({
         linesRef.current.delete(key);
       }
     }
-  }, [positions, symU, ready]);
+  }, [positions, orders, symU, ready]);
 
   // Stable key of open positions on this symbol — the drag-button overlay rebuilds
   // only when the position SET changes, not every tick.
@@ -633,6 +671,12 @@ export default function ChartingLibraryChart({
     .map(normalizePosition)
     .filter((p) => p.symbol === symU)
     .map((p) => `${p.id}:${p.side}:${p.quantity}`)
+    .join("|");
+
+  // Same idea for orders: rebuild the order pills when the SET changes, not
+  // when a price moves - a dragged price is read live from ordersRef.
+  const ordersKey = ordersRef.current
+    .map((o) => `${o.id}:${o.side}:${o.type}:${o.lots}`)
     .join("|");
 
   // On-chart drag-to-set SL/TP + close (✕) buttons pinned to each entry line.
@@ -1047,7 +1091,96 @@ export default function ChartingLibraryChart({
 
       rows.push({ id: p.id, entryPrice: p.openPrice, entryPill, slPill, tpPill, slStrip, tpStrip });
     }
-    if (rows.length === 0) {
+
+    // ---- pending orders -----------------------------------------------------
+    //
+    // The same pill and strip the brackets use, so an order behaves the way
+    // everything else on this chart already does: drag the line to move the
+    // trigger, press the cross to cancel. No P&L segment - an order that has
+    // not filled has no entry to measure from, so there is nothing honest to
+    // put there.
+    const orderRows = [];
+    const dragOrder = (el, o) => {
+      const color = o.side === "BUY" ? GREEN : RED;
+      el.style.cursor = "ns-resize";
+      el.style.touchAction = "none";
+      el.onpointerdown = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        try { el.setPointerCapture(e.pointerId); } catch { /* noop */ }
+        const startY = e.clientY;
+        let moved = false;
+        const line = document.createElement("div");
+        line.style.cssText = `position:absolute;left:0;right:0;top:0;height:0;border-top:1px dotted ${color};pointer-events:none;z-index:7;`;
+        const lbl = document.createElement("div");
+        lbl.style.cssText = `position:absolute;left:50%;top:0;transform:translate(-50%,-50%);background:${color};color:#fff;font:700 11px system-ui;padding:2px 9px;border-radius:4px;pointer-events:none;z-index:8;white-space:nowrap;box-shadow:0 1px 5px rgba(0,0,0,.5);`;
+        overlay.appendChild(line);
+        overlay.appendChild(lbl);
+        const cleanup = () => {
+          for (const x of [line, lbl]) {
+            try { overlay.removeChild(x); } catch { /* noop */ }
+          }
+        };
+        el.onpointermove = (ev) => {
+          if (Math.abs(ev.clientY - startY) > 3) moved = true;
+          const r = containerRef.current.getBoundingClientRect();
+          const cy = ev.clientY - r.top;
+          const price = priceForY(cy);
+          line.style.top = `${cy}px`;
+          lbl.style.top = `${cy}px`;
+          lbl.textContent = `${o.side} ${o.type}  ${price ? price.toFixed(digitsFor(symU)) : "—"}`;
+        };
+        el.onpointerup = async (ev) => {
+          el.onpointermove = null;
+          el.onpointerup = null;
+          try { el.releasePointerCapture(ev.pointerId); } catch { /* noop */ }
+          cleanup();
+          if (!moved) return;                        // a click is not a move
+          const r = containerRef.current.getBoundingClientRect();
+          const price = priceForY(ev.clientY - r.top);
+          if (!price || !(price > 0)) return;
+          const level = Number(price.toFixed(digitsFor(symU)));
+          // Move the local copy first so the line does not snap back to the old
+          // level for the seconds until the refetch lands.
+          const localRow = ordersRef.current.find((x) => x.id === o.id);
+          if (localRow) localRow.price = level;
+          try {
+            await onModifyOrder?.(o.id, level);
+          } catch {
+            if (localRow) localRow.price = o.price;   // refused: put it back
+          }
+        };
+      };
+    };
+
+    for (const o of ordersRef.current) {
+      const color = o.side === "BUY" ? GREEN : RED;
+      const pill = mkSegPill();
+      pill.badge.textContent = `${o.side} ${o.type}`;
+      pill.badge.style.color = color;
+      pill.el.style.borderColor = color;
+      pill.el.style.borderStyle = "dotted";
+      pill.pnl.style.display = "none";
+      pill.badge.title = pill.price.title = "Pending order — drag to move the trigger price";
+      dragOrder(pill.badge, o);
+      dragOrder(pill.price, o);
+      const strip = mkDragStrip();
+      strip.title = "Pending order — drag anywhere on the line";
+      dragOrder(strip, o);
+      pill.x.title = "Cancel this order";
+      pill.x.onclick = (e) => {
+        e.stopPropagation();
+        openDialog({
+          title: "Cancel order",
+          body: `Cancel this ${o.side} ${o.type} on ${symU} — ${o.lots} lots at ${o.price}?`,
+          confirmLabel: "Cancel order",
+          danger: true,
+          onConfirm: () => onCancelOrder?.(o.id),
+        });
+      };
+      orderRows.push({ o, pill, strip });
+    }
+    if (rows.length === 0 && orderRows.length === 0) {
       try {
         crossSub?.unsubscribe?.(null, onCross);
       } catch {
@@ -1064,6 +1197,10 @@ export default function ChartingLibraryChart({
         for (const r of rows) {
           for (const pill of [r.entryPill, r.slPill, r.tpPill]) pill.el.style.display = "none";
           for (const strip of [r.slStrip, r.tpStrip]) strip.style.display = "none";
+        }
+        for (const r of orderRows) {
+          r.pill.el.style.display = "none";
+          r.strip.style.display = "none";
         }
         return;
       }
@@ -1131,6 +1268,24 @@ export default function ChartingLibraryChart({
         bracket(r.slPill, "sl", lp.sl, r.slStrip);
         bracket(r.tpPill, "tp", lp.tp, r.tpStrip);
       }
+
+      // Pending orders ride the same loop: the trigger price is fixed until the
+      // trader moves it, but the pane scrolls and zooms under it.
+      for (const r of orderRows) {
+        const live = ordersRef.current.find((x) => x.id === r.o.id) || r.o;
+        const visible = put(r.pill, live.price);
+        r.strip.style.display = visible ? "block" : "none";
+        if (visible) {
+          r.strip.style.top = r.pill.el.style.top;
+          r.pill.el.style.left = `${LEFT_PX}px`;
+          r.pill.el.style.right = "auto";
+          setText(r.pill.price, live.price.toFixed(digitsFor(symU)));
+          setText(r.pill.lots, Number(live.lots).toFixed(2));
+          r.pill.price.style.display = "flex";
+          r.pill.lots.style.display = "flex";
+          r.pill.x.style.display = "flex";
+        }
+      }
     };
     raf = requestAnimationFrame(sync);
 
@@ -1140,6 +1295,15 @@ export default function ChartingLibraryChart({
         crossSub?.unsubscribe?.(null, onCross);
       } catch {
         /* noop */
+      }
+      for (const r of orderRows) {
+        for (const el of [r.pill.el, r.strip]) {
+          try {
+            overlay.removeChild(el);
+          } catch {
+            /* noop */
+          }
+        }
       }
       for (const r of rows) {
         for (const pill of [r.entryPill, r.slPill, r.tpPill]) {
@@ -1158,7 +1322,7 @@ export default function ChartingLibraryChart({
         }
       }
     };
-  }, [ready, symU, positionsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ready, symU, positionsKey, ordersKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dark = theme !== "light";
   return (

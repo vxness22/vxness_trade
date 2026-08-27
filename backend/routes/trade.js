@@ -13,7 +13,7 @@ import infowayService from '../services/infowayService.js'
 import { resolveTradeSegment } from '../utils/tradeSegment.js'
 import { commissionDollarAmount } from '../utils/commissionMath.js'
 import { isMarketOpen } from '../utils/marketHours.js'
-import { validateBrackets } from '../utils/bracketGuard.js'
+import { validateBrackets, validatePendingBrackets } from '../utils/bracketGuard.js'
 import { pnlUsd } from '../utils/symbolMeta.js'
 import { webAuth, ownedAccount, ownedTrade, denyAccount, denyTrade } from '../utils/webAuth.js'
 
@@ -953,6 +953,118 @@ router.post('/check-stopout', async (req, res) => {
 })
 
 // POST /api/trade/cancel - Cancel a pending order
+// PUT /api/trade/pending/:id - amend a resting order.
+//
+// /modify above takes sl and tp and nothing else, because it was written for
+// OPEN trades. A pending order has three more things a trader needs to change -
+// the trigger price, the size, and its brackets - and the web had no way to
+// change any of them: the blotter row offered Cancel, and that was the whole
+// vocabulary. Cancelling and re-placing loses the queue position and is two
+// dialogs where one edit belongs.
+//
+// Same rules the terminal's /api/v1/orders/:id enforces, so an order edited
+// from the chart and one edited from the website end up in the same state.
+router.put('/pending/:id', webAuth, async (req, res) => {
+  try {
+    const order = await ownedTrade(req, req.params.id)
+    if (!order) return denyTrade(res)
+    if (order.status !== 'PENDING') {
+      return res.status(400).json({ success: false, message: 'Only pending orders can be amended' })
+    }
+    if (!(await assertKycApprovedForUserId(order.userId, res))) return
+
+    const b = req.body || {}
+    const has = (k) => Object.prototype.hasOwnProperty.call(b, k)
+    let touched = false
+
+    if (has('price')) {
+      const p = parseFloat(b.price)
+      if (!Number.isFinite(p) || p <= 0) {
+        return res.status(400).json({ success: false, message: 'Price must be greater than 0' })
+      }
+      // A limit must still sit on the far side of the market and a stop beyond
+      // it, or the order fills on the next tick and was really a market order.
+      const q = infowayService.getPrice(order.symbol)
+      if (q && q.bid > 0) {
+        const side = String(order.side).toLowerCase()
+        const isLimit = String(order.orderType || '').endsWith('_LIMIT')
+        const ref = side === 'buy' ? q.ask : q.bid
+        const wrong =
+          (side === 'buy' && isLimit && p >= ref) ||
+          (side === 'buy' && !isLimit && p <= ref) ||
+          (side === 'sell' && isLimit && p <= ref) ||
+          (side === 'sell' && !isLimit && p >= ref)
+        if (wrong) {
+          return res.status(400).json({
+            success: false,
+            message: `A ${side} ${isLimit ? 'limit' : 'stop'} must be ${
+              isLimit ? (side === 'buy' ? 'below' : 'above') : (side === 'buy' ? 'above' : 'below')
+            } the current price (${ref}).`,
+          })
+        }
+      }
+      order.openPrice = p
+      order.pendingPrice = p
+      touched = true
+    }
+
+    if (has('lots')) {
+      const l = parseFloat(b.lots)
+      if (!Number.isFinite(l) || l <= 0) {
+        return res.status(400).json({ success: false, message: 'Volume must be greater than 0' })
+      }
+      order.quantity = l
+      touched = true
+    }
+
+    // null / '' clears a bracket; leaving the key out leaves it alone.
+    if (has('sl')) {
+      const v = b.sl === null || b.sl === '' ? null : parseFloat(b.sl)
+      if (v !== null && (!Number.isFinite(v) || v < 0)) {
+        return res.status(400).json({ success: false, message: 'Invalid stop loss' })
+      }
+      order.sl = v || null
+      order.stopLoss = v || null
+      touched = true
+    }
+    if (has('tp')) {
+      const v = b.tp === null || b.tp === '' ? null : parseFloat(b.tp)
+      if (v !== null && (!Number.isFinite(v) || v < 0)) {
+        return res.status(400).json({ success: false, message: 'Invalid take profit' })
+      }
+      order.tp = v || null
+      order.takeProfit = v || null
+      touched = true
+    }
+
+    if (!touched) {
+      return res.status(400).json({ success: false, message: 'Nothing to update' })
+    }
+
+    // The brackets are judged against the TRIGGER price, not today's market:
+    // an order that has not filled has no entry yet, and a stop on the wrong
+    // side of the level it will open at is hit by the sweep minutes after the
+    // fill - the position appears and disappears in the same breath.
+    const bracketErr = validatePendingBrackets(
+      String(order.side).toLowerCase(), order.sl, order.tp, order.openPrice
+    )
+    if (bracketErr) return res.status(400).json({ success: false, message: bracketErr })
+
+    // Price or size moved, so the margin reserved for the fill is stale.
+    if (has('price') || has('lots')) {
+      order.marginUsed = tradeEngine.calculateMargin(
+        order.quantity, order.openPrice, `1:${order.leverage}`, order.contractSize, order.symbol
+      )
+    }
+
+    await order.save()
+    res.json({ success: true, message: 'Order updated', trade: order })
+  } catch (error) {
+    console.error('Error amending pending order:', error)
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
 router.post('/cancel', webAuth, async (req, res) => {
   try {
     const { tradeId } = req.body
