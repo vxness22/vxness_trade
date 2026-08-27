@@ -196,16 +196,21 @@ const TradingPage = () => {
   const [pendingOrders, setPendingOrders] = useState([])
 
   const [tradeHistory, setTradeHistory] = useState([])
-  // History date filter.
+  // Blotter date filter - one control, shared by Positions, Pending and
+  // History.
   //
-  // The blotter listed every close an account had ever had, newest first, and
-  // nothing else - so finding yesterday's trades on an account with a year of
-  // history meant scrolling. Filtered here rather than server-side because
-  // GET /trade/history returns the whole list unpaged (limit=0 by default), so
-  // the client already holds everything the filter needs.
-  const [historyRange, setHistoryRange] = useState('all')
-  const [historyFrom, setHistoryFrom] = useState('')
-  const [historyTo, setHistoryTo] = useState('')
+  // Each tab listed everything it had, newest first, with no way to narrow it,
+  // so finding yesterday's work on a busy account meant scrolling past all of
+  // it. Filtered in the client because every one of those lists already
+  // arrives whole (GET /trade/history is unpaged, limit=0 by default), so a
+  // range change costs no request.
+  //
+  // The three tabs measure DIFFERENT moments, which is the only honest reading
+  // of "Today" on each: a position by when it OPENED, an order by when it was
+  // PLACED, a closed trade by when it CLOSED.
+  const [blotterRange, setBlotterRange] = useState('all')
+  const [blotterFrom, setBlotterFrom] = useState('')
+  const [blotterTo, setBlotterTo] = useState('')
 
   // Positions view: false = one netted row per currency (with trade count badge),
   // true = flat list of every individual trade across all currencies.
@@ -1529,7 +1534,7 @@ const TradingPage = () => {
   // week would put a Monday morning trade in "last week" for the whole day.
   // "Last month" is the previous CALENDAR month, matching how This/Last Week
   // read - use the custom period for a rolling window.
-  const historyWindow = useMemo(() => {
+  const blotterWindow = useMemo(() => {
     const now = new Date()
     const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
     const mondayOf = (d) => {
@@ -1537,7 +1542,7 @@ const TradingPage = () => {
       x.setDate(x.getDate() - ((x.getDay() + 6) % 7))   // Mon=0 ... Sun=6
       return x
     }
-    switch (historyRange) {
+    switch (blotterRange) {
       case 'today':
         return { from: startOfDay(now), to: null }
       case 'week':
@@ -1555,27 +1560,44 @@ const TradingPage = () => {
         }
       case 'custom':
         return {
-          from: historyFrom ? new Date(historyFrom) : null,
+          from: blotterFrom ? new Date(blotterFrom) : null,
           // datetime-local is minute-resolution and a trader picking 18:30 means
           // "up to and including 18:30", so the exclusive end is a minute later.
-          to: historyTo ? new Date(new Date(historyTo).getTime() + 60000) : null,
+          to: blotterTo ? new Date(new Date(blotterTo).getTime() + 60000) : null,
         }
       default:
         return { from: null, to: null }
     }
-  }, [historyRange, historyFrom, historyTo])
+  }, [blotterRange, blotterFrom, blotterTo])
 
-  const filteredHistory = useMemo(() => {
-    const { from, to } = historyWindow
-    if (!from && !to) return tradeHistory
-    return tradeHistory.filter((t) => {
-      const d = new Date(t.closedAt || t.updatedAt || t.createdAt)
-      if (Number.isNaN(d.getTime())) return false
-      if (from && d < from) return false
-      if (to && d >= to) return false
-      return true
-    })
-  }, [tradeHistory, historyWindow])
+  // One predicate, three lists. A row with no usable timestamp is KEPT rather
+  // than dropped: a filter is for narrowing, and silently hiding a live
+  // position because its date failed to parse would be the worse bug.
+  const inBlotterWindow = useCallback((value) => {
+    const { from, to } = blotterWindow
+    if (!from && !to) return true
+    const d = new Date(value)
+    if (Number.isNaN(d.getTime())) return true
+    if (from && d < from) return false
+    if (to && d >= to) return false
+    return true
+  }, [blotterWindow])
+
+  // NOTE: these narrow the BLOTTER only. Equity, margin, the account summary
+  // and the chart's position lines all keep reading openTrades/pendingOrders,
+  // because hiding a row must never change what the account is actually worth.
+  const filteredHistory = useMemo(
+    () => tradeHistory.filter((t) => inBlotterWindow(t.closedAt || t.updatedAt || t.createdAt)),
+    [tradeHistory, inBlotterWindow]
+  )
+  const filteredPositions = useMemo(
+    () => openTrades.filter((t) => inBlotterWindow(t.openedAt || t.createdAt)),
+    [openTrades, inBlotterWindow]
+  )
+  const filteredPending = useMemo(
+    () => pendingOrders.filter((o) => inBlotterWindow(o.createdAt)),
+    [pendingOrders, inBlotterWindow]
+  )
 
   const fetchTradeHistory = async () => {
 
@@ -3648,9 +3670,9 @@ const TradingPage = () => {
 
                 {[
 
-                  { name: 'Positions', count: openTrades.length },
+                  { name: 'Positions', count: filteredPositions.length },
 
-                  { name: 'Pending', count: pendingOrders.length },
+                  { name: 'Pending', count: filteredPending.length },
 
                   { name: 'History', count: filteredHistory.length },
 
@@ -3678,12 +3700,18 @@ const TradingPage = () => {
 
               <div className="flex items-center gap-2 sm:gap-3 shrink-0">
 
-                {activePositionTab === 'History' && (
+                {['Positions', 'Pending', 'History'].includes(activePositionTab) && (
                   <div className="flex items-center gap-1.5 shrink-0">
                     <select
-                      value={historyRange}
-                      onChange={(e) => setHistoryRange(e.target.value)}
-                      title="Filter closed trades by when they closed"
+                      value={blotterRange}
+                      onChange={(e) => setBlotterRange(e.target.value)}
+                      title={
+                        activePositionTab === 'Positions'
+                          ? 'Filter positions by when they opened'
+                          : activePositionTab === 'Pending'
+                            ? 'Filter orders by when they were placed'
+                            : 'Filter closed trades by when they closed'
+                      }
                       className={`h-7 text-xs rounded border px-2 focus:outline-none focus:border-blue-500 ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-gray-200' : 'bg-white border-gray-300 text-gray-700'}`}
                     >
                       <option value="today">Today</option>
@@ -3777,15 +3805,15 @@ const TradingPage = () => {
 
             
 
-            {activePositionTab === 'History' && historyRange === 'custom' && (
+            {['Positions', 'Pending', 'History'].includes(activePositionTab) && blotterRange === 'custom' && (
               <div className={`flex items-center gap-2 px-2 sm:px-4 py-1.5 border-b overflow-x-auto ${isDarkMode ? 'border-gray-800 bg-[#0d0d0d]' : 'border-gray-200 bg-white'}`}>
 
                 <span className="text-xs text-gray-500 shrink-0">From</span>
 
                 <input
                   type="datetime-local"
-                  value={historyFrom}
-                  onChange={(e) => setHistoryFrom(e.target.value)}
+                  value={blotterFrom}
+                  onChange={(e) => setBlotterFrom(e.target.value)}
                   className={`h-7 text-xs rounded border px-2 shrink-0 focus:outline-none focus:border-blue-500 ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-gray-200' : 'bg-white border-gray-300 text-gray-700'}`}
                 />
 
@@ -3793,14 +3821,14 @@ const TradingPage = () => {
 
                 <input
                   type="datetime-local"
-                  value={historyTo}
-                  onChange={(e) => setHistoryTo(e.target.value)}
+                  value={blotterTo}
+                  onChange={(e) => setBlotterTo(e.target.value)}
                   className={`h-7 text-xs rounded border px-2 shrink-0 focus:outline-none focus:border-blue-500 ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-gray-200' : 'bg-white border-gray-300 text-gray-700'}`}
                 />
 
-                {(historyFrom || historyTo) && (
+                {(blotterFrom || blotterTo) && (
                   <button
-                    onClick={() => { setHistoryFrom(''); setHistoryTo('') }}
+                    onClick={() => { setBlotterFrom(''); setBlotterTo('') }}
                     className="text-xs text-blue-500 hover:underline shrink-0"
                   >
                     Clear
@@ -3810,11 +3838,11 @@ const TradingPage = () => {
                 {/* An empty end means "up to now", an empty start means "from the
                     beginning" - say so, rather than leaving a blank box looking broken. */}
                 <span className="text-xs text-gray-500 shrink-0 hidden sm:inline">
-                  {!historyFrom && !historyTo
+                  {!blotterFrom && !blotterTo
                     ? 'Pick a start, an end, or both'
-                    : !historyTo
+                    : !blotterTo
                       ? 'up to now'
-                      : !historyFrom
+                      : !blotterFrom
                         ? 'from the beginning'
                         : ''}
                 </span>
@@ -3828,7 +3856,7 @@ const TradingPage = () => {
                 // Group all open trades by currency/symbol, computing live P/L the
                 // same way the Positions table does so the two views always agree.
                 const groupsMap = {}
-                openTrades.forEach(trade => {
+                filteredPositions.forEach(trade => {
                   const livePrice = livePrices[trade.symbol]
                   const inst = instruments.find(i => i.symbol === trade.symbol) || selectedInstrument
                   const currentPrice = livePrice
@@ -4128,17 +4156,21 @@ const TradingPage = () => {
 
                 <tbody>
 
-                  {pendingOrders.length === 0 ? (
+                  {filteredPending.length === 0 ? (
 
                     <tr>
 
-                      <td colSpan="8" className="text-center py-8 text-gray-500">No pending orders</td>
+                      <td colSpan="8" className="text-center py-8 text-gray-500">
+
+                        {pendingOrders.length === 0 ? 'No pending orders' : 'No orders placed in this period'}
+
+                      </td>
 
                     </tr>
 
                   ) : (
 
-                    pendingOrders.map(order => (
+                    filteredPending.map(order => (
 
                       <tr key={order._id} className={`border-t ${isDarkMode ? 'border-gray-800 hover:bg-[#1a1a1a]' : 'border-gray-200 hover:bg-gray-50'}`}>
 
