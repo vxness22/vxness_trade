@@ -389,13 +389,27 @@
     bridge.symbolChanged.connect((sym) => {
       if (!sym || !widget) return;
       try {
+        const ch = widget.activeChart();
         // An in-chart pick is reported to C++ and comes straight back here as
         // the property's change notification. Re-applying it would reload the
         // series the trader just chose — and the reload discards the chart's
         // scroll position, so it reads as the chart jumping on its own.
-        if (widget.activeChart().symbol() === sym) return;
-        widget.activeChart().setSymbol(sym);
-      } catch (e) { /* not ready yet */ }
+        const cur = ch.symbol();
+        if (cur === sym) return;
+        // The callback is NOT optional on this library build: setSymbol(sym)
+        // alone throws, and the throw was swallowed by a silent catch. Clicking
+        // a row in Market Watch therefore moved the one-click strip, the
+        // blotter and the price feed onto the new instrument and left the CHART
+        // on the old one — which also hid every position and pending order line
+        // belonging to the symbol the trader had just chosen.
+        ch.setSymbol(sym, function () {
+          console.info("chart symbol -> " + sym);
+        });
+      } catch (e) {
+        // Never silent again. A symbol switch that fails is the difference
+        // between a chart of the instrument you picked and a chart of another.
+        console.warn("setSymbol(" + sym + ") failed: " + (e && e.message ? e.message : e));
+      }
     });
     bridge.themeChanged.connect((theme) => createChart(bridge, theme));
     // Same rebuild path as a theme switch: the features that hide the drawing
