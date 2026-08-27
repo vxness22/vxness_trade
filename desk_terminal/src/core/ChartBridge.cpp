@@ -54,6 +54,40 @@ void ChartBridge::setPositions(const QVector<OpenPosition>& positions) {
     emit positionsChanged();
 }
 
+void ChartBridge::setOrders(const QVector<PendingOrder>& orders) {
+    QJsonArray arr;
+    for (const PendingOrder& o : orders) {
+        // Only what the chart can draw or act on. A filled or cancelled row can
+        // still arrive on a poll that raced the fill engine; drawing it would
+        // put a line on the chart for an order that no longer exists.
+        if (!o.status.isEmpty() && o.status.compare("pending", Qt::CaseInsensitive) != 0)
+            continue;
+        QJsonObject j;
+        j["id"]     = o.id;
+        j["symbol"] = o.symbol;
+        j["side"]   = o.side;          // "buy" | "sell"
+        j["type"]   = o.type;          // "limit" | "stop"
+        j["lots"]   = o.lots;
+        j["price"]  = o.price;
+        j["sl"]     = o.sl;
+        j["tp"]     = o.tp;
+        arr.append(j);
+    }
+    QString next = QString::fromUtf8(QJsonDocument(arr).toJson(QJsonDocument::Compact));
+    if (next == m_ordersJson) return;      // nothing changed; don't churn the chart
+    m_ordersJson = next;
+    emit ordersChanged();
+}
+
+void ChartBridge::modifyOrderPrice(const QString& orderId, double price) {
+    // -1 is this API's "leave alone" for the fields the chart does not touch.
+    m_api->modifyPendingOrder(orderId, price, -1.0, -1.0, -1.0);
+}
+
+void ChartBridge::cancelOrder(const QString& orderId) {
+    m_api->cancelOrder(orderId);
+}
+
 void ChartBridge::modifyBracket(const QString& positionId, const QString& kind, double level) {
     m_api->modifyBracket(positionId, kind, level);
 }

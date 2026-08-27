@@ -18,6 +18,11 @@
  *     remove that bracket. Both ask first.
  *   - a transparent strip on each SET bracket, spanning the pane at the line's
  *     own y, so the LINE is the drag handle and not only the pill.
+ *   - PENDING ORDERS, drawn the same way: a dotted line at the trigger price
+ *     with [BUY LIMIT][price][lots][X]. Drag it to move the trigger, press the
+ *     cross to cancel. Dotted rather than dashed because a chart can carry an
+ *     open position and a resting order on the same instrument, and the line
+ *     style is what tells them apart at a glance.
  *   - an UNSET bracket shows as a badge-only handle parked on the right at the
  *     entry line — drag it down/up to create the bracket.
  *   - press & drag a badge/price segment, or the line itself -> dashed preview
@@ -46,7 +51,8 @@
   var SL_COLOR  = "#f59e0b", TP_COLOR   = "#14b8a6";
   var SL_ZONE   = "rgba(239,68,68,0.10)", TP_ZONE = "rgba(20,184,166,0.10)";
   var PROFIT_POS = "#3b82f6", PROFIT_NEG = "#ef4444", BREAKEVEN = "#9ca3af";
-  var LINE_SOLID = 0, LINE_DASHED = 2;
+  var LINE_SOLID = 0, LINE_DASHED = 2, LINE_DOTTED = 1;
+  var ORDER_BUY = "#3b82f6", ORDER_SELL = "#ef4444";
   var BTN_RIGHT_PX = 268;         // clear of the price axis + its P&L label
   var LEFT_PX      = 54;          // clear of the left drawing toolbar
 
@@ -88,6 +94,10 @@
     this._drawn = {};      // "posId|kind" -> level currently on screen
     this._rows = [];       // [{ p, entry, sl, tp }] pill rows
     this._rowKey = "";     // rebuild pills only when the position set changes
+    this._orders = {};        // orderId -> server record
+    this._orderShapes = {};   // orderId -> line handle
+    this._orderRows = [];     // [{ o, pill, strip }]
+    this._orderKey = "";      // rebuild order pills only when the set changes
     this._quote = {};      // symbol -> { bid, ask } for live P&L between polls
     this._calibOffset = null;
 
@@ -135,12 +145,14 @@
         self._quote[sym] = { bid: bid, ask: ask };
       });
       bind(bridge.positionsChanged, function () { self._sync(); });
+      bind(bridge.ordersChanged, function () { self._syncOrders(); });
       bind(bridge.positionOp, function (id, op, ok, msg) { self._onOp(id, op, ok, msg); });
       // No themeChanged handler here on purpose: app.js rebuilds the widget and
       // this overlay on a theme switch, and the new instance picks up the new
       // colours in its constructor.
 
       self._sync();
+      self._syncOrders();
       self._startLoop();
     });
   }
@@ -852,6 +864,12 @@
     });
     this._binds = [];
     try { this._clearPills(); } catch (e) {}
+    try { this._clearOrderPills(); } catch (e) {}
+    try {
+      var self = this;
+      Object.keys(this._orderShapes).forEach(function (id) { self._removeShape(self._orderShapes[id]); });
+      this._orderShapes = {};
+    } catch (e) {}
     if (this._dlg) { try { this._dlg.remove(); } catch (e) {} this._dlg = null; }
     if (this._overlay && this._overlay.parentNode) {
       try { this._overlay.parentNode.removeChild(this._overlay); } catch (e) {}
@@ -875,6 +893,10 @@
           r.tpZone.style.visibility = "hidden";
           r.slStrip.style.display = "none";
           r.tpStrip.style.display = "none";
+        });
+        self._orderRows.forEach(function (r) {
+          r.pill.el.style.display = "none";
+          r.strip.style.display = "none";
         });
         return;
       }
@@ -985,8 +1007,218 @@
         drawZone(r.slZone, ey, p.sl);
         drawZone(r.tpZone, ey, p.tp);
       });
+
+      // Pending orders ride the same loop: their price is fixed until the
+      // trader moves it, but the pane scrolls and zooms under them.
+      self._orderRows.forEach(function (r) {
+        var o = self._orders[String(r.o.id)] || r.o;
+        var lvl = Number(o.price) || 0;
+        var visible = lvl > 0 && put(r.pill, lvl);
+        r.strip.style.display = visible ? "block" : "none";
+        if (visible) {
+          r.strip.style.top = r.pill.el.style.top;
+          r.pill.el.style.left = LEFT_PX + "px";
+          r.pill.el.style.right = "auto";
+          setText(r.pill.price, fmt(lvl, self._digits(o.symbol)));
+          setText(r.pill.lots, Number(o.lots).toFixed(2));
+        }
+      });
     };
     this._raf = requestAnimationFrame(step);
+  };
+
+  // ---- pending orders ------------------------------------------------------
+
+  var ORDER_LABEL = function (o) {
+    var side = String(o.side || "").toUpperCase();
+    var type = String(o.type || "").toUpperCase();
+    return (side === "SELL" ? "SELL" : "BUY") + " " + (type === "STOP" ? "STOP" : "LIMIT");
+  };
+
+  Overlay.prototype._clearOrderPills = function () {
+    var ov = this._overlay;
+    if (!ov) { this._orderRows = []; return; }
+    this._orderRows.forEach(function (r) {
+      [r.pill.el, r.strip].forEach(function (el) {
+        try { ov.removeChild(el); } catch (e) {}
+      });
+    });
+    this._orderRows = [];
+  };
+
+  Overlay.prototype._removeOrder = function (id) {
+    var h = this._orderShapes[id];
+    if (h) { this._removeShape(h); delete this._orderShapes[id]; }
+    delete this._orders[id];
+  };
+
+  // Reads bridge.ordersJson and reconciles it with what is drawn.
+  Overlay.prototype._syncOrders = function () {
+    if (!this._chart) return;
+    var arr = [];
+    try { arr = JSON.parse(this._bridge.ordersJson || "[]") || []; } catch (e) {}
+    var sym = this._symbol;
+    var mine = arr.filter(function (o) { return !sym || o.symbol === sym; });
+    var self = this, seen = {};
+
+    mine.forEach(function (o) {
+      var id = String(o.id);
+      seen[id] = true;
+      // An edit in flight keeps its optimistic price until the server answers,
+      // for the same reason a dragged bracket does: the poll that lands in
+      // between still carries the old level.
+      var pend = self._pendingOrder;
+      if (pend && pend.id === id) o.price = pend.price;
+      self._orders[id] = o;
+
+      var color = String(o.side).toLowerCase() === "sell" ? ORDER_SELL : ORDER_BUY;
+      var lvl = Number(o.price) || 0;
+      var h = self._orderShapes[id];
+      if (!h) {
+        if (lvl > 0) self._orderShapes[id] = self._makeLine(lvl, "", color, LINE_DOTTED, true);
+      } else if (self._drawn["order|" + id] !== lvl) {
+        self._moveLine(h, lvl);
+      }
+      self._drawn["order|" + id] = lvl;
+    });
+
+    Object.keys(this._orderShapes).forEach(function (id) {
+      if (!seen[id]) { self._removeOrder(id); delete self._drawn["order|" + id]; }
+    });
+
+    var key = mine.map(function (o) {
+      return o.id + ":" + o.side + ":" + o.type + ":" + o.lots;
+    }).join(",");
+    if (key !== this._orderKey) {
+      this._orderKey = key;
+      this._buildOrderPills(mine);
+    }
+  };
+
+  Overlay.prototype._buildOrderPills = function (orders) {
+    this._clearOrderPills();
+    var self = this, ov = this._overlay;
+    if (!ov) return;
+
+    orders.forEach(function (o) {
+      var color = String(o.side).toLowerCase() === "sell" ? ORDER_SELL : ORDER_BUY;
+      var pill = self._mkPill();
+      pill.badge.textContent = ORDER_LABEL(o);
+      pill.badge.style.color = color;
+      pill.el.style.borderColor = color;
+      pill.el.style.borderStyle = "dotted";
+      pill.badge.title = pill.price.title =
+        "Pending order \u2014 drag to move the trigger price";
+      pill.pnl.style.display = "none";          // an order has no P&L yet
+
+      self._attachOrderDrag(pill.badge, o);
+      self._attachOrderDrag(pill.price, o);
+
+      var strip = self._mkStrip();
+      strip.title = "Pending order \u2014 drag anywhere on the line";
+      self._attachOrderDrag(strip, o);
+
+      pill.x.title = "Cancel this order";
+      pill.x.onclick = function (e) {
+        e.stopPropagation();
+        var live = self._orders[String(o.id)] || o;
+        self._dialog({
+          title: "Cancel order",
+          body: "Cancel this " + ORDER_LABEL(live) + " on " + live.symbol + " \u2014 " +
+                Number(live.lots).toFixed(2) + " lots at " +
+                fmt(Number(live.price), self._digits(live.symbol)) + "?",
+          confirmLabel: "Cancel order",
+          danger: true,
+          onConfirm: function () { self._bridge.cancelOrder(String(live.id)); },
+        });
+      };
+
+      self._orderRows.push({ o: o, pill: pill, strip: strip });
+    });
+  };
+
+  // Press and drag a pending order to a new trigger price. Release sends it.
+  //
+  // No shaded zone and no P&L preview, unlike a bracket: an order that has not
+  // filled has no entry to measure from, so the only honest thing to show while
+  // dragging is the price itself.
+  Overlay.prototype._attachOrderDrag = function (el, o) {
+    var self = this;
+    var color = String(o.side).toLowerCase() === "sell" ? ORDER_SELL : ORDER_BUY;
+    el.style.cursor = "ns-resize";
+    el.style.touchAction = "none";
+
+    el.onpointerdown = function (e) {
+      e.preventDefault(); e.stopPropagation();
+      try { el.setPointerCapture(e.pointerId); } catch (err) {}
+      var startY = e.clientY, moved = false;
+      var id = String(o.id);
+      var d = self._digits(o.symbol);
+      var key = "order|" + id;
+
+      var line = document.createElement("div");
+      line.style.cssText = "position:absolute;left:0;right:0;top:0;height:0;border-top:1px dotted " +
+        color + ";pointer-events:none;z-index:7;";
+      var lbl = document.createElement("div");
+      lbl.style.cssText = "position:absolute;left:50%;top:0;transform:translate(-50%,-50%);background:" +
+        color + ";color:#fff;font:700 11px Inter,'Segoe UI',sans-serif;padding:2px 9px;" +
+        "border-radius:4px;pointer-events:none;z-index:8;white-space:nowrap;" +
+        "box-shadow:0 1px 5px rgba(0,0,0,.5);";
+      self._overlay.appendChild(line);
+      self._overlay.appendChild(lbl);
+
+      var lineRaf = 0, lineWant = 0;
+      var trackLine = function (price) {
+        lineWant = price;
+        if (lineRaf) return;
+        lineRaf = requestAnimationFrame(function () {
+          lineRaf = 0;
+          var h = self._orderShapes[id];
+          if (h && lineWant > 0) { self._moveLine(h, lineWant); self._drawn[key] = lineWant; }
+        });
+      };
+      var cleanup = function () {
+        if (lineRaf) { cancelAnimationFrame(lineRaf); lineRaf = 0; }
+        [line, lbl].forEach(function (x) {
+          try { self._overlay.removeChild(x); } catch (err) {}
+        });
+      };
+
+      el.onpointermove = function (ev) {
+        if (Math.abs(ev.clientY - startY) > 3) moved = true;
+        var r = self._host.getBoundingClientRect();
+        var cy = ev.clientY - r.top;
+        var price = self._priceForY(cy);
+        line.style.top = cy + "px";
+        lbl.style.top = cy + "px";
+        lbl.textContent = ORDER_LABEL(o) + "  " + (price ? fmt(price, d) : "\u2014");
+        if (price > 0) trackLine(Number(price));
+      };
+
+      el.onpointerup = function (ev) {
+        el.onpointermove = null; el.onpointerup = null;
+        try { el.releasePointerCapture(ev.pointerId); } catch (err) {}
+        cleanup();
+        if (!moved) { self._syncOrders(); return; }   // a click is not a move
+
+        var r = self._host.getBoundingClientRect();
+        var price = self._priceForY(ev.clientY - r.top);
+        if (!price || !(price > 0)) { self._toast("Could not read price"); return; }
+        var level = Number(price.toFixed(d));
+
+        // Hold the dragged level until the server answers, and move the record
+        // now so the pill does not snap back for the seconds until it does.
+        self._pendingOrder = { id: id, price: level };
+        var live = self._orders[id];
+        if (live) live.price = level;
+        self._drawn[key] = level;
+        self._bridge.modifyOrderPrice(id, level);
+        self._okToast(ORDER_LABEL(o) + " moved to " + fmt(level, d));
+        // The server's own answer arrives as a fresh ordersJson, which clears
+        // this. If the edit is refused, that same refresh puts the line back.
+        setTimeout(function () { self._pendingOrder = null; }, 4000);
+      };
+    };
   };
 
   // ---- dialog + toasts -----------------------------------------------------

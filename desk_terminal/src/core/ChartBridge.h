@@ -15,6 +15,10 @@ class ChartBridge : public QObject {
     Q_PROPERTY(QString symbolsJson    READ symbolsJson    NOTIFY symbolsChanged)
     Q_PROPERTY(QString currentSymbol  READ currentSymbol  NOTIFY symbolChanged)
     Q_PROPERTY(QString positionsJson  READ positionsJson  NOTIFY positionsChanged)
+    // Pending orders for the charted symbol. Separate from positions: they are
+    // not open trades, they carry no P&L, and the only thing that can be done
+    // to one on the chart is move its trigger price or cancel it.
+    Q_PROPERTY(QString ordersJson     READ ordersJson     NOTIFY ordersChanged)
     Q_PROPERTY(QString theme          READ theme          NOTIFY themeChanged)
     // True while this pane is one of several. The web layer drops the drawing
     // toolbar and the bottom date-range bar in that state — in a quarter-sized
@@ -26,6 +30,7 @@ public:
     QString symbolsJson()   const { return m_symbolsJson; }
     QString currentSymbol() const { return m_currentSymbol; }
     QString positionsJson() const { return m_positionsJson; }
+    QString ordersJson() const { return m_ordersJson; }
     QString theme()         const { return m_theme; }
     bool    compact()       const { return m_compact; }
 
@@ -36,7 +41,8 @@ public:
 
     void setSymbols(const QVector<SymbolSpec>& symbols);  // called by MainWindow
     void setCurrentSymbol(const QString& symbol);          // watchlist selection
-    void setPositions(const QVector<OpenPosition>& positions);  // account poll
+    void setPositions(const QVector<OpenPosition>& positions);
+    void setOrders(const QVector<PendingOrder>& orders);  // account poll
 
     // JS -> C++: ask for history. Answered asynchronously via barsReady().
     Q_INVOKABLE void requestBars(const QString& symbol, const QString& timeframe,
@@ -46,6 +52,12 @@ public:
     // position, or close it. level <= 0 asks to remove. Answered via positionOp().
     Q_INVOKABLE void modifyBracket(const QString& positionId, const QString& kind, double level);
     Q_INVOKABLE void closePosition(const QString& positionId);
+
+    // JS -> C++: the trader dragged a pending order to a new trigger price,
+    // or pressed its cross. Only the price travels - size and brackets are
+    // edited in the blotter dialog, where there is room to show them.
+    Q_INVOKABLE void modifyOrderPrice(const QString& orderId, double price);
+    Q_INVOKABLE void cancelOrder(const QString& orderId);
 
     // JS -> C++: a TradingView dialog (Indicators, settings, …) opened or
     // closed. Those render INSIDE the chart iframe, so the native one-click
@@ -66,6 +78,7 @@ signals:
     // would send the symbol straight back to the chart that just set it.
     void symbolPickedInChart(const QString& symbol);
     void positionsChanged();
+    void ordersChanged();
     void themeChanged(const QString& theme);
     void compactChanged(bool compact);
     void barsReady(const QString& reqId, const QString& barsJson);
@@ -84,6 +97,7 @@ private:
     PriceStream* m_stream;
     QString      m_symbolsJson = "[]";
     QString      m_positionsJson = "[]";
+    QString      m_ordersJson = "[]";
     QString      m_currentSymbol;
     bool         m_compact = false;
     QString      m_theme = "dark";

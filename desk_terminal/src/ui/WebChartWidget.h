@@ -17,7 +17,8 @@ public:
 
     void setSymbols(const QVector<SymbolSpec>& symbols);
     void showSymbol(const QString& symbol);
-    void setPositions(const QVector<OpenPosition>& positions);   // feeds broker adapter
+    void setPositions(const QVector<OpenPosition>& positions);
+    void setOrders(const QVector<PendingOrder>& orders);   // feeds broker adapter
     void setTheme(const QString& theme);   // "dark" | "light" -> TradingView + overlay
 
     // Floats a widget over the top-left of the chart canvas — MT5 parks its

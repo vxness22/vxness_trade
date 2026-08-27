@@ -212,6 +212,10 @@ void WebChartWidget::setPositions(const QVector<OpenPosition>& positions) {
     m_bridge->setPositions(positions);
 }
 
+void WebChartWidget::setOrders(const QVector<PendingOrder>& orders) {
+    m_bridge->setOrders(orders);
+}
+
 void WebChartWidget::setCompact(bool compact) {
     m_bridge->setCompact(compact);
 }

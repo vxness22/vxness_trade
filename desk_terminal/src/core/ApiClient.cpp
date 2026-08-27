@@ -311,6 +311,7 @@ static void handleOrderOp(ApiClient* self, QNetworkReply* reply, const QString& 
         emit self->orderOpResult(
             op, ok,
             ok ? (op == "cancel" ? QObject::tr("Order cancelled")
+                : op == "modify" ? QObject::tr("Pending order updated")
                                  : QObject::tr("Pending order placed"))
                : apiDetail(o, reply->errorString()));
     });

@@ -519,6 +519,10 @@ void MainWindow::connectServices() {
     });
     connect(m_api, &ApiClient::positionsReceived, m_positions, &PositionsPanel::setPositions);
     connect(m_api, &ApiClient::positionsReceived, m_charts,    &ChartArea::setPositions);
+    // Pending orders go to the chart too. Without this they existed only in
+    // the blotter, so a trader watching the chart could not see the level
+    // they were waiting on, let alone drag it.
+    connect(m_api, &ApiClient::ordersReceived,    m_charts,    &ChartArea::setOrders);
     connect(m_api, &ApiClient::ordersReceived,    m_positions, &PositionsPanel::setOrders);
     connect(m_api, &ApiClient::historyReceived,   m_positions, &PositionsPanel::setHistory);
     connect(m_api, &ApiClient::transactionsReceived, m_positions, &PositionsPanel::setTransactions);

@@ -64,6 +64,7 @@ public:
     // theme; only the active one follows the watchlist.
     void setSymbols(const QVector<SymbolSpec>& symbols);
     void setPositions(const QVector<OpenPosition>& positions);
+    void setOrders(const QVector<PendingOrder>& orders);
     void setTheme(const QString& theme);
     void showSymbol(const QString& symbol);
 
@@ -118,4 +119,5 @@ private:
     int m_active = 0;
     QVector<SymbolSpec> m_symbols;      // replayed into panes built later
     QVector<OpenPosition> m_positions;
+    QVector<PendingOrder> m_orders;
 };

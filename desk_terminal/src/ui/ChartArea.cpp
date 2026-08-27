@@ -104,6 +104,7 @@ ChartArea::Pane& ChartArea::ensurePane(int index) {
     // Panes built after startup have missed every fan-out so far; replay them.
     if (!m_symbols.isEmpty())   p.chart->setSymbols(m_symbols);
     if (!m_positions.isEmpty()) p.chart->setPositions(m_positions);
+    if (!m_orders.isEmpty()) p.chart->setOrders(m_orders);
     p.chart->setTheme(Theme::name());
     // A new pane opens on whatever the active one is showing, which is almost
     // always what a trader comparing timeframes wants as a starting point.
@@ -310,6 +311,13 @@ void ChartArea::setPositions(const QVector<OpenPosition>& positions) {
     // position on the symbol a background pane shows still has to be visible
     // and draggable there.
     for (Pane& p : m_panes) if (p.chart) p.chart->setPositions(positions);
+}
+
+void ChartArea::setOrders(const QVector<PendingOrder>& orders) {
+    m_orders = orders;
+    // Every pane, for the same reason positions go to every pane: a pending
+    // order on the instrument a background pane shows belongs on that chart.
+    for (Pane& p : m_panes) if (p.chart) p.chart->setOrders(orders);
 }
 
 void ChartArea::setTheme(const QString& theme) {
