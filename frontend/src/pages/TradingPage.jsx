@@ -1599,6 +1599,43 @@ const TradingPage = () => {
     [pendingOrders, inBlotterWindow]
   )
 
+  // What the filtered rows add up to.
+  //
+  // A trader narrowing to "this week" is asking a question the row list only
+  // half answers: how did the week GO. Reading it meant adding a column by
+  // eye. This is the sum of the P/L column exactly as displayed, so the total
+  // and the rows can never disagree.
+  //
+  // Positions and History are different numbers and are labelled as such:
+  // History is REALISED - money already in the balance - while Positions is
+  // FLOATING and moves with every tick. Pending has no P/L at all: an order
+  // that has not filled has no entry to measure from, so there is nothing
+  // honest to total, and the space stays empty rather than showing a zero
+  // that would read as "broke even".
+  const blotterTotal = useMemo(() => {
+    if (activePositionTab === 'History') {
+      return {
+        value: filteredHistory.reduce((sum, t) => sum + (Number(t.realizedPnl) || 0), 0),
+        title: 'Realised P/L of the closed trades shown',
+      }
+    }
+    if (activePositionTab === 'Positions') {
+      return {
+        value: filteredPositions.reduce((sum, trade) => {
+          const lp = livePrices[trade.symbol]
+          const inst = instruments.find((i) => i.symbol === trade.symbol) || selectedInstrument
+          const cur = lp
+            ? (trade.side === 'BUY' ? lp.bid : lp.ask)
+            : (trade.side === 'BUY' ? inst?.bid : inst?.ask)
+          return sum + pnlUsd(trade.symbol, trade.side, trade.openPrice, cur,
+            trade.quantity, trade.contractSize, (sym) => livePrices[sym] || null)
+        }, 0),
+        title: 'Floating P/L of the open positions shown',
+      }
+    }
+    return null
+  }, [activePositionTab, filteredHistory, filteredPositions, livePrices, instruments, selectedInstrument])
+
   const fetchTradeHistory = async () => {
 
     try {
@@ -3721,6 +3758,18 @@ const TradingPage = () => {
                       <option value="all">All history</option>
                       <option value="custom">Customise Date Time</option>
                     </select>
+
+                    {blotterTotal && (
+                      <span
+                        title={blotterTotal.title}
+                        className="text-xs whitespace-nowrap shrink-0"
+                      >
+                        <span className="text-gray-500">P/L </span>
+                        <span className={`font-semibold ${blotterTotal.value >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {blotterTotal.value >= 0 ? '+' : '-'}${Math.abs(blotterTotal.value).toFixed(2)}
+                        </span>
+                      </span>
+                    )}
 
                   </div>
                 )}
