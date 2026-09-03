@@ -20,16 +20,42 @@ export default function DepositManual() {
   const [proof, setProof] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // The website asks where the money is going and in what currency before it
+  // will take a deposit. This screen asked for neither.
+  const [methods, setMethods] = useState([]);
+  const [method, setMethod] = useState(null);
+  const [currencies, setCurrencies] = useState([]);
+  const [currency, setCurrency] = useState(null);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const res = await ApiService.getDepositBankDetails();
-        if (!cancelled) setBankDetails(res);
-      } catch (_) {}
+      const [bd, pm, cur] = await Promise.all([
+        ApiService.getDepositBankDetails().catch(() => null),
+        ApiService.getDepositMethods().catch(() => ({ items: [] })),
+        ApiService.getDepositCurrencies().catch(() => ({ items: [] })),
+      ]);
+      if (cancelled) return;
+      if (bd) setBankDetails(bd);
+      const ms = Array.isArray(pm?.items) ? pm.items : [];
+      setMethods(ms);
+      setMethod((c) => c || ms[0] || null);
+      const cs = Array.isArray(cur?.items) ? cur.items : [];
+      setCurrencies(cs);
+      setCurrency((c) => c || cs[0] || null);
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // Shown so the user can check the conversion, exactly as the website does.
+  // The SERVER converts again on submit from its own rate — this figure is a
+  // preview, never the price.
+  const usdPreview = (() => {
+    const n = Number(amount);
+    if (!(n > 0) || !currency || currency.currency === 'USD') return null;
+    const eff = Number(currency.rate_to_usd) * (1 + Number(currency.markup || 0) / 100);
+    return eff > 0 ? n / eff : null;
+  })();
 
   const banks = bankDetails?.banks || bankDetails?.bank_accounts || [];
   const upiIds = bankDetails?.upi_ids || bankDetails?.upi || [];
@@ -51,7 +77,10 @@ export default function DepositManual() {
     if (!proof || !(Number(amount) > 0) || !transactionId.trim()) return;
     setSubmitting(true);
     const fd = new FormData();
-    fd.append('amount', String(amount));
+    fd.append('local_amount', String(amount));
+    fd.append('amount', String(amount));   // older builds read this name
+    fd.append('currency', currency?.currency || 'USD');
+    if (method) fd.append('payment_method', method.type || 'Manual');
     fd.append('transaction_id', transactionId.trim());
     fd.append('file', {
       uri: proof.uri,
@@ -101,8 +130,46 @@ export default function DepositManual() {
           </Card>
         ) : null}
 
-        <Text style={styles.label}>Amount (USD)</Text>
+        {methods.length > 1 ? (
+          <>
+            <Text style={styles.label}>Pay to</Text>
+            <View style={styles.chips}>
+              {methods.map((m) => (
+                <Pressable key={m.id} onPress={() => setMethod(m)} style={[styles.chip, method?.id === m.id && styles.chipOn]}>
+                  <Text style={[styles.chipTxt, method?.id === m.id && styles.chipTxtOn]}>
+                    {m.bank_name || m.upi_id || m.type}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : null}
+
+        {currencies.length > 1 ? (
+          <>
+            <Text style={[styles.label, { marginTop: space.md }]}>Currency</Text>
+            <View style={styles.chips}>
+              {currencies.map((c) => (
+                <Pressable key={c.currency} onPress={() => setCurrency(c)} style={[styles.chip, currency?.currency === c.currency && styles.chipOn]}>
+                  <Text style={[styles.chipTxt, currency?.currency === c.currency && styles.chipTxtOn]}>
+                    {c.symbol ? `${c.symbol} ` : ''}{c.currency}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : null}
+
+        <Text style={[styles.label, { marginTop: space.md }]}>
+          Amount ({currency?.currency || 'USD'})
+        </Text>
         <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={vx.textMuted} style={styles.input} />
+        {usdPreview != null ? (
+          <Text style={styles.convert}>
+            ≈ ${usdPreview.toFixed(2)} will be credited (rate {Number(currency.rate_to_usd).toFixed(2)}
+            {Number(currency.markup) > 0 ? ` + ${currency.markup}% markup` : ''})
+          </Text>
+        ) : null}
 
         <Text style={[styles.label, { marginTop: space.md }]}>Your transaction reference</Text>
         <TextInput value={transactionId} onChangeText={setTransactionId} placeholder="UTR / UPI ref" placeholderTextColor={vx.textMuted} style={styles.input} autoCapitalize="none" />
@@ -143,6 +210,15 @@ function Detail({ label, value }) {
 }
 
 const styles = StyleSheet.create({
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  chip: {
+    paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.pill,
+    backgroundColor: vx.bgElevated, borderWidth: 1, borderColor: vx.border,
+  },
+  chipOn: { borderColor: vx.accent, backgroundColor: vx.accent + '18' },
+  chipTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
+  chipTxtOn: { color: vx.accent },
+  convert: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 6 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs },
   title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
   label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },

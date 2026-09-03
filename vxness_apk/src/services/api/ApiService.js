@@ -573,6 +573,28 @@ class ApiService {
       body: JSON.stringify({ challenge_id: challengeId }),
     });
   }
+
+  // ── Funding: the lists the deposit/withdraw screens need ───────────────────
+  // Same three the website's Wallet page loads before it will take either.
+  async getDepositMethods() {
+    return this.request('/wallet/payment-methods');
+  }
+
+  async getDepositCurrencies() {
+    return this.request('/wallet/currencies');
+  }
+
+  // Approved payout accounts only — a withdrawal may not name any other.
+  async getWithdrawAccounts() {
+    return this.request('/wallet/bank-accounts');
+  }
+
+  async addWithdrawAccount(data) {
+    return this.request('/wallet/bank-accounts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 export default new ApiService();
