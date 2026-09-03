@@ -236,17 +236,6 @@ class ApiService {
     });
   }
 
-  async getMAMMPAMM() {
-    return this.request('/social/mamm-pamm');
-  }
-
-  async investInMAMMPAMM(accountId, amount) {
-    return this.request(`/social/mamm-pamm/${accountId}/invest`, {
-      method: 'POST',
-      body: JSON.stringify({ amount }),
-    });
-  }
-
   async getMyProvider(masterType) {
     const q = masterType ? `?master_type=${encodeURIComponent(masterType)}` : '';
     return this.request(`/social/my-provider${q}`);
@@ -456,25 +445,6 @@ class ApiService {
     return data;
   }
 
-  // PAMM allocations (web format)
-  async getMyAllocations() {
-    return this.request('/social/my-allocations');
-  }
-
-  async withdrawAllocation(masterId) {
-    return this.request(`/social/mamm-pamm/${masterId}/withdraw`, {
-      method: 'DELETE',
-    });
-  }
-
-  async getMasterPerformance() {
-    return this.request('/social/master-performance');
-  }
-
-  async getMasterInvestors() {
-    return this.request('/social/master-investors');
-  }
-
   // Instruments APIs
   async getInstruments() {
     // Trailing slash to match the website's call exactly (the route is GET
@@ -578,6 +548,29 @@ class ApiService {
   async unfollowMaster(subscriptionId) {
     return this.request(`/social/unfollow/${subscriptionId}`, {
       method: 'DELETE',
+    });
+  }
+
+  // ── Prop challenges ────────────────────────────────────────────────────────
+  // Challenge mode is an admin switch, so getPropStatus() gates the whole
+  // section: when it reports disabled the app shows nothing at all, matching
+  // the web dashboard, which hides its Challenge tab the same way.
+  async getPropStatus() {
+    return this.request('/prop/status');
+  }
+
+  async getPropChallenges() {
+    return this.request('/prop/challenges');
+  }
+
+  async getPropAccounts() {
+    return this.request('/prop/accounts');
+  }
+
+  async buyChallenge(challengeId) {
+    return this.request('/prop/buy', {
+      method: 'POST',
+      body: JSON.stringify({ challenge_id: challengeId }),
     });
   }
 }

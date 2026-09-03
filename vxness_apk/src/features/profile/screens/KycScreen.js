@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import ApiService from '../../../services/api/ApiService';
+import useReadOnly from '../../../hooks/useReadOnly';
 import logger from '../../../utils/logger';
 import { vx } from '../../../theme/vxTheme';
 import ScreenGlow from '../../../components/vx/ScreenGlow';
@@ -35,16 +36,16 @@ const colors = {
   error: vx.down,
 };
 
+// These six are the values the KYC record accepts, and the same list the web
+// dashboard offers. The old list carried types the schema rejects (id_front,
+// selfie, other...), which the server could only answer with a validation error.
 const DOC_TYPES = [
+  { value: 'aadhaar', label: 'Aadhaar Card' },
+  { value: 'pan_card', label: 'PAN Card' },
   { value: 'passport', label: 'Passport' },
-  { value: 'national_id', label: 'National ID' },
   { value: 'driving_license', label: 'Driving License' },
-  { value: 'id_front', label: 'ID Card (Front)' },
-  { value: 'id_back', label: 'ID Card (Back)' },
-  { value: 'selfie', label: 'Selfie with ID' },
-  { value: 'proof_of_address', label: 'Proof of Address' },
-  { value: 'bank_statement', label: 'Bank Statement' },
-  { value: 'other', label: 'Other' },
+  { value: 'voter_id', label: 'Voter ID' },
+  { value: 'national_id', label: 'National ID' },
 ];
 
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -65,7 +66,9 @@ export default function KycScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [docType, setDocType] = useState('passport');
+  const readOnly = useReadOnly();
+  const [docType, setDocType] = useState('aadhaar');
+  const [docNumber, setDocNumber] = useState('');
   const [file, setFile] = useState(null);
   const [docType2, setDocType2] = useState('');
   const [file2, setFile2] = useState(null);
@@ -176,6 +179,10 @@ export default function KycScreen({ navigation }) {
       Alert.alert('Document type', 'Please select a document type.');
       return;
     }
+    if (!docNumber.trim()) {
+      Alert.alert('Document number', 'Please enter the document number.');
+      return;
+    }
     if (!file) {
       Alert.alert('Document file', 'Please attach the primary document.');
       return;
@@ -184,6 +191,7 @@ export default function KycScreen({ navigation }) {
     try {
       const fd = new FormData();
       fd.append('document_type', docType);
+      fd.append('document_number', docNumber.trim());
       fd.append('file', { uri: file.uri, name: file.name, type: file.type });
       if (docType2 && file2) {
         fd.append('document_type_2', docType2);
@@ -198,6 +206,7 @@ export default function KycScreen({ navigation }) {
       Alert.alert('Submitted', 'Your documents are under review.');
       setFile(null);
       setFile2(null);
+      setDocNumber('');
       setDocType2('');
       await fetchProfile();
     } catch (e) {
@@ -234,7 +243,10 @@ export default function KycScreen({ navigation }) {
   // often ask users to upload additional/replacement documents while a prior
   // submission is still pending. Only hide the form once verification is
   // approved.
-  const canSubmit = status !== 'approved';
+  // An investor is viewing somebody else's account — submitting identity
+  // documents on the owner's behalf is not theirs to do (and the server
+  // refuses the POST anyway).
+  const canSubmit = status !== 'approved' && !readOnly;
 
   return (
     <View style={[styles.root, { backgroundColor: colors.bgPrimary, paddingTop: insets.top }]}>
@@ -345,6 +357,16 @@ export default function KycScreen({ navigation }) {
               </Text>
               <Ionicons name="chevron-down" size={18} color={colors.textMuted} />
             </TouchableOpacity>
+
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Document number</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.bgSecondary, borderColor: colors.border, color: colors.textPrimary }]}
+              value={docNumber}
+              onChangeText={setDocNumber}
+              placeholder="As printed on the document"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="characters"
+            />
 
             <Text style={[styles.label, { color: colors.textSecondary }]}>Document file</Text>
             {file ? (

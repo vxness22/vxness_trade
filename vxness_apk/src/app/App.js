@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
-import React, { Component, useEffect, useState, useContext } from 'react';
+import React, { Component, useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -10,7 +10,7 @@ import * as Updates from 'expo-updates';
 import * as SecureStore from 'expo-secure-store';
 
 import { SKIP_BOOT_LOADER_KEY } from './bootstrap/themeRuntime';
-import { AuthProvider, AuthContext } from './providers/AuthContext';
+import { AuthProvider } from './providers/AuthContext';
 import { ThemeProvider } from './providers/ThemeContext';
 import { SettingsProvider } from './providers/SettingsContext';
 import { I18nProvider } from '../i18n';
@@ -18,8 +18,6 @@ import RootNavigator from './navigation/RootNavigator';
 import { ChartHostProvider } from '../features/markets/charts/ChartHost';
 import { ToastHost, AppAlertHost } from '../components/vx';
 import AppLoader from '../components/vx/AppLoader';
-import BiometricLockScreen from '../components/BiometricLockScreen';
-import { isBiometricEnabled, getBiometricSupport } from '../services/auth/biometricLock';
 import { vx } from '../theme/vxTheme';
 
 LogBox.ignoreLogs([
@@ -86,38 +84,6 @@ function AppShell() {
     return () => { mounted = false; if (timer) clearTimeout(timer); };
   }, []);
 
-  // ── App Lock (biometrics) ──────────────────────────────────────────────────
-  const { token, logout } = useContext(AuthContext) || {};
-  const [locked, setLocked] = useState(false);
-  const [bioLabel, setBioLabel] = useState('Biometrics');
-
-  // Arm the lock on cold start when App Lock is enabled AND a session exists.
-  // (We don't lock right after a fresh password login — only on relaunch and
-  // when returning from the background.)
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      const on = await isBiometricEnabled();
-      if (!on || !mounted) return;
-      const sup = await getBiometricSupport();
-      if (mounted && sup.label) setBioLabel(sup.label);
-      let hasToken = false;
-      try { hasToken = !!(await SecureStore.getItemAsync('token')); } catch (_) {}
-      if (mounted && hasToken) setLocked(true);
-    })();
-    return () => { mounted = false; };
-  }, []);
-
-  // Re-lock whenever the app leaves the foreground.
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (s) => {
-      if (s === 'background') {
-        isBiometricEnabled().then((on) => { if (on) setLocked(true); }).catch(() => {});
-      }
-    });
-    return () => sub.remove();
-  }, []);
-
   useEffect(() => {
     // OTA update check: on launch, then at most once per 15 minutes when the
     // app returns to the foreground — checking on EVERY foreground added a
@@ -152,13 +118,6 @@ function AppShell() {
       <RootNavigator />
       <ToastHost />
       <AppAlertHost />
-      {locked && token ? (
-        <BiometricLockScreen
-          label={bioLabel}
-          onUnlock={() => setLocked(false)}
-          onLogout={async () => { setLocked(false); await logout?.(); }}
-        />
-      ) : null}
     </>
   );
 }

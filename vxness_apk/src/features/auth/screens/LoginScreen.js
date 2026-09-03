@@ -105,15 +105,14 @@ function LoginBackground() {
 }
 
 export default function LoginScreen({ navigation }) {
-  const { login, demoLogin } = useContext(AuthContext);
+  const { login } = useContext(AuthContext);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
   const [focused, setFocused] = useState(null); // 'email' | 'password' | null
   const [submitting, setSubmitting] = useState(false);
-  const [demoBusy, setDemoBusy] = useState(false);
 
-  const canSubmit = !!email.trim() && !!password && !submitting && !demoBusy;
+  const canSubmit = !!email.trim() && !!password && !submitting;
 
   const onSubmit = async () => {
     if (!canSubmit) return;
@@ -130,14 +129,6 @@ export default function LoginScreen({ navigation }) {
     if (!res.success) showToast({ kind: 'error', message: res.message || 'Login failed' });
   };
 
-  // One-tap demo sign-in — no email/password needed (matches the web).
-  const onDemo = async () => {
-    if (submitting || demoBusy) return;
-    setDemoBusy(true);
-    const res = await demoLogin();
-    setDemoBusy(false);
-    if (!res.success) showToast({ kind: 'error', message: res.message || 'Demo login failed' });
-  };
 
   return (
     <Screen edges={['top', 'bottom']} glow={false}>
@@ -222,21 +213,22 @@ export default function LoginScreen({ navigation }) {
                 : <Text style={styles.loginText}>Log In</Text>}
             </Pressable>
 
-            {/* One-tap demo sign-in — try the platform with play money, no
-                registration. Mirrors the web "Try Demo" button. */}
+
+            {/* Read-only access for someone the account owner wants to let
+                watch — signs in with the account number and the investor
+                password an admin issued, not with an email. */}
             <Pressable
-              onPress={onDemo}
-              disabled={submitting || demoBusy}
+              onPress={() => navigation.navigate('InvestorLogin')}
+              disabled={submitting}
               accessibilityRole="button"
-              accessibilityLabel="Try demo account"
+              accessibilityLabel="Investor login"
               style={({ pressed }) => [
-                styles.demoBtn,
-                { opacity: (submitting || demoBusy) ? 0.55 : (pressed ? 0.85 : 1) },
+                styles.investorBtn,
+                { opacity: submitting ? 0.5 : (pressed ? 0.85 : 1) },
               ]}
             >
-              {demoBusy
-                ? <ActivityIndicator color={THEME} />
-                : <Text style={styles.demoText}>Try Demo</Text>}
+              <Ionicons name="eye-outline" size={17} color={THEME} />
+              <Text style={styles.investorText}>Investor Login</Text>
             </Pressable>
 
             <Pressable onPress={() => navigation.navigate('Signup')} hitSlop={8} style={styles.signupRow}>
@@ -278,18 +270,6 @@ const styles = StyleSheet.create({
   signupMuted: { fontFamily, fontSize: sizes.body },
   signupLink: { color: THEME, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
 
-  demoBtn: {
-    marginTop: space.md,
-    borderRadius: radius.pill,
-    minHeight: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: THEME,
-    backgroundColor: 'transparent',
-  },
-  demoText: { color: THEME, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
-
   loginBtn: {
     marginTop: space.xxl,
     borderRadius: radius.pill,
@@ -298,4 +278,17 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   loginText: { color: '#FFFFFF', fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
+
+  investorBtn: {
+    marginTop: space.md,
+    height: 52,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: THEME,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  investorText: { color: THEME, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
 });

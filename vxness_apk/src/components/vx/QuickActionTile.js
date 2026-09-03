@@ -11,10 +11,18 @@ export default function QuickActionTile({
   // 'accent' → orange-tinted tile (default, used across the app).
   // 'flat'   → dark, borderless square tile that fills its column (reference look).
   variant = 'accent',
+  // Greyed and inert — used for actions a view-only investor session cannot take.
+  disabled = false,
 }) {
   const flat = variant === 'flat';
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" style={styles.wrap}>
+    <Pressable
+      onPress={disabled ? undefined : onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      style={[styles.wrap, disabled && { opacity: 0.4 }]}
+    >
       <View
         style={[
           styles.icon,

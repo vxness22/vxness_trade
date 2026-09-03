@@ -9,7 +9,6 @@ import KycScreen from '../../features/profile/screens/KycScreen';
 import AccountsScreen from '../../features/profile/screens/AccountsScreen';
 import PortfolioScreen from '../../features/trading/screens/PortfolioScreen';
 import IBScreen from '../../features/profile/screens/IBScreen';
-import PammScreen from '../../features/trading/screens/PammScreen';
 import EconomicCalendarScreen from '../../features/markets/screens/EconomicCalendarScreen';
 import SupportScreen from '../../features/profile/screens/SupportScreen';
 import InstructionsScreen from '../../features/profile/screens/InstructionsScreen';
@@ -26,7 +25,6 @@ export default function HomeStack() {
       <Stack.Screen name="Accounts" component={AccountsScreen} />
       <Stack.Screen name="Portfolio" component={PortfolioScreen} />
       <Stack.Screen name="IB" component={IBScreen} />
-      <Stack.Screen name="Pamm" component={PammScreen} />
       <Stack.Screen name="EconomicCalendar" component={EconomicCalendarScreen} />
       <Stack.Screen name="Support" component={SupportScreen} />
       <Stack.Screen name="Instructions" component={InstructionsScreen} />

@@ -103,36 +103,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // One-tap demo sign-in (matches the web "Try Demo"). Hits /auth/demo-login
-  // which provisions/returns a demo account + token, no email/password needed.
-  const demoLogin = async () => {
-    try {
-      const response = await fetch(`${API_URL}/auth/demo-login`, {
-        method: 'POST',
-        headers: AUTH_HEADERS,
-        body: JSON.stringify({}),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (response.ok && data.access_token) {
-        const userInfo = {
-          id: data.user_id,
-          email: data.email || '',
-          role: data.role,
-          expires_at: data.expires_at,
-          is_demo: true,
-        };
-        await persistSession(data, userInfo);
-        setToken(data.access_token);
-        setUser(userInfo);
-        return { success: true };
-      }
-      return { success: false, message: toMessage(data?.detail ?? data?.message, 'Demo login failed') };
-    } catch (error) {
-      logger.error('Demo login error:', error);
-      return { success: false, message: 'Network error' };
-    }
-  };
-
   const signup = async (userData) => {
     try {
       // Normalise email the same way as login so the two always agree.
@@ -240,6 +210,43 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Read-only sign-in with an account number + the investor password an admin
+  // issued. The session it returns is marked read-only and the SERVER refuses
+  // every write on it — `readOnly` here only drives what the UI offers, it is
+  // not what protects the account.
+  const investorLogin = async (accountNumber, password) => {
+    try {
+      const response = await fetch(`${API_URL}/auth/investor-login`, {
+        method: 'POST',
+        headers: AUTH_HEADERS,
+        body: JSON.stringify({
+          account_number: String(accountNumber || '').trim(),
+          password,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (response.ok && data?.access_token) {
+        const userInfo = {
+          id: data.user?.id,
+          email: data.user?.email,
+          name: data.user?.name,
+          readOnly: true,
+          investorAccountId: data.account_id,
+          investorAccountNumber: data.account?.account_number,
+        };
+        await persistSession(data, userInfo);
+        setToken(data.access_token);
+        setUser(userInfo);
+        return { success: true };
+      }
+      return { success: false, message: toMessage(data?.detail ?? data?.message, 'Investor login failed') };
+    } catch (error) {
+      logger.error('investor login error:', error);
+      return { success: false, message: 'Network error' };
+    }
+  };
+
   const logout = async () => {
     try {
       await SecureStore.deleteItemAsync('token');
@@ -272,7 +279,10 @@ export const AuthProvider = ({ children }) => {
       token,
       loading,
       login,
-      demoLogin,
+      investorLogin,
+      // Read-only investor session — screens use this to hide actions the
+      // server would refuse anyway (deposit, withdraw, KYC, buy/sell).
+      isInvestor: !!user?.readOnly,
       signup,
       registerStart,
       registerVerify,

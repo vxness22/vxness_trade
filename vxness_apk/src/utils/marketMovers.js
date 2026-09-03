@@ -17,22 +17,27 @@ export function topFallers(pricesMap, n = 5) {
     .slice(0, n);
 }
 
-const SEGMENT_ALIASES = {
-  forex:     ['forex', 'fx', 'currency', 'currencies'],
-  crypto:    ['crypto', 'cryptocurrency', 'coin', 'coins'],
-  indices:   ['index', 'indices', 'cash index', 'idx'],
-  commodities:['commodity', 'commodities', 'metal', 'metals'],
-  metals:    ['metal', 'metals', 'commodity', 'commodities'],
-  shares:    ['stock', 'stocks', 'share', 'shares', 'equity', 'equities'],
-};
+// One instrument -> one segment key.
+//
+// The old alias table listed 'metal' under commodities AND 'commodity' under
+// metals, so each of those tabs showed the other's instruments. Matching a
+// single key per instrument makes the tabs disjoint, and returning null for
+// anything unrecognised keeps a category we don't handle out of every tab
+// rather than smearing it across two.
+export function segmentKeyOf(inst) {
+  const seg = String(inst?.segment || inst?.category || inst?.type || '').toLowerCase();
+  if (!seg) return null;
+  if (/metal/.test(seg)) return 'metals';            // before commodities: XAUUSD is both, and Metals is the narrower label
+  if (/commodit/.test(seg)) return 'commodities';
+  if (/crypto|coin/.test(seg)) return 'crypto';
+  if (/ind(ex|ices)|idx/.test(seg)) return 'indices';
+  if (/forex|fx|currenc/.test(seg)) return 'forex';
+  return null;
+}
 
 export function bySegment(instruments, segmentKey) {
   if (!segmentKey || segmentKey === 'overview') return instruments;
-  const aliases = SEGMENT_ALIASES[segmentKey] || [segmentKey];
-  return (instruments || []).filter((i) => {
-    const seg = String(i?.segment || i?.category || i?.type || '').toLowerCase();
-    return aliases.some((a) => seg.includes(a));
-  });
+  return (instruments || []).filter((i) => segmentKeyOf(i) === segmentKey);
 }
 
 export const MARQUEE_SPOTLIGHT = ['XAUUSD', 'NAS100', 'BTCUSD'];

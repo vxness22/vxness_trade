@@ -1,5 +1,5 @@
 import React, { useContext, useState, useCallback, useRef, useEffect } from 'react';
-import { ScrollView, View, Text, StyleSheet, Pressable, PanResponder, Image, Modal, Switch } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, Pressable, PanResponder, Image, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import LottieView from 'lottie-react-native';
 import * as Updates from 'expo-updates';
@@ -19,15 +19,8 @@ import { Screen, Card, MenuRow, PillButton, showToast } from '../../../component
 import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 import { fetchKycStatus, isKycApproved, kycStatusLabel } from '../../../utils/kycGate';
 import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
-import {
-  getBiometricSupport,
-  isBiometricEnabled,
-  setBiometricEnabledFlag,
-  authenticate,
-} from '../../../services/auth/biometricLock';
 import ApiService from '../../../services/api/ApiService';
 import { LOTTIE_AVATARS, ICON_AVATARS, parseAvatar, renderAvatar } from '../../../utils/avatarRender';
-import { requestTourReplay } from '../../../components/onboarding/tourStorage';
 
 export default function ProfileMenuScreen() {
   const nav = useNavigation();
@@ -50,46 +43,6 @@ export default function ProfileMenuScreen() {
   }, []));
 
   const kycApproved = isKycApproved(kycStatus);
-
-  // ── App Lock (biometrics) ──────────────────────────────────────────────────
-  const [bioEnabled, setBioEnabled] = useState(false);
-  const [bioSupport, setBioSupport] = useState({ available: false, hasHardware: false, label: 'Biometrics' });
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const sup = await getBiometricSupport();
-      const on = await isBiometricEnabled();
-      if (cancelled) return;
-      setBioSupport(sup);
-      setBioEnabled(on);
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  const toggleBiometric = useCallback(async (next) => {
-    if (next) {
-      if (!bioSupport.available) {
-        showToast({
-          kind: 'warn',
-          message: bioSupport.hasHardware
-            ? 'No fingerprint/face enrolled — set it up in device settings first.'
-            : 'This device has no biometric sensor.',
-        });
-        return;
-      }
-      const ok = await authenticate('Confirm to enable App Lock');
-      if (!ok) { showToast({ kind: 'error', message: 'Authentication failed' }); return; }
-      await setBiometricEnabledFlag(true);
-      setBioEnabled(true);
-      showToast({ kind: 'success', message: 'App Lock enabled with biometrics' });
-    } else {
-      const ok = await authenticate('Confirm to disable App Lock');
-      if (!ok) { showToast({ kind: 'error', message: 'Authentication failed' }); return; }
-      await setBiometricEnabledFlag(false);
-      setBioEnabled(false);
-      showToast({ kind: 'info', message: 'App Lock disabled' });
-    }
-  }, [bioSupport]);
 
   // Profile avatar — user can set a photo or pick a preset; defaults to the
   // existing animation.
@@ -249,10 +202,6 @@ export default function ProfileMenuScreen() {
           <MenuRow icon={<Ionicons name="shield-checkmark-outline" size={18} color={vx.up} />} label="KYC" value={kycStatusLabel(kycStatus)} onPress={() => nav.navigate('Kyc')} />
         </Section>
 
-        <Section title="PROGRAMS">
-          <MenuRow icon={<Ionicons name="bar-chart-outline" size={18} color={vx.textPrimary} />} label="PAMM Investments" onPress={() => nav.navigate('Pamm')} />
-        </Section>
-
         <Section title="TOOLS">
           <MenuRow icon={<Ionicons name="calendar-outline" size={18} color={vx.textPrimary} />} label="Economic Calendar" onPress={() => nav.navigate('EconomicCalendar')} />
           {/* One source of truth for orders/history: the Trade tab (live,
@@ -289,39 +238,9 @@ export default function ProfileMenuScreen() {
           </View>
         </Section>
 
-        <Section title="SECURITY">
-          <View style={styles.appearanceRow}>
-            <View style={styles.appearanceLabel}>
-              <Ionicons name={bioSupport.label === 'Face ID' ? 'scan-outline' : 'finger-print'} size={18} color={vx.accent} />
-              <View>
-                <Text style={styles.appearanceTxt}>App Lock</Text>
-                <Text style={styles.securitySub}>
-                  {bioSupport.available ? 'Unlock with biometrics' : 'Set up biometrics in device settings'}
-                </Text>
-              </View>
-            </View>
-            <Switch
-              value={bioEnabled}
-              onValueChange={toggleBiometric}
-              trackColor={{ false: vx.bgRaised, true: vx.accent }}
-              thumbColor="#fff"
-            />
-          </View>
-        </Section>
-
         <Section title="HELP">
           <MenuRow icon={<Ionicons name="chatbubble-outline" size={18} color={vx.textPrimary} />} label="Support" onPress={() => nav.navigate('Support')} />
           <MenuRow icon={<Ionicons name="book-outline" size={18} color={vx.textPrimary} />} label="How to use" onPress={() => nav.navigate('Instructions')} />
-          <MenuRow
-            icon={<Ionicons name="map-outline" size={18} color={vx.textPrimary} />}
-            label="App Tour"
-            onPress={() => {
-              // Pop back to the dashboard so the tour plays over the shell,
-              // then ask the tour host (MainTabs) to start immediately.
-              nav.navigate('Home');
-              requestTourReplay();
-            }}
-          />
         </Section>
 
         <Section title="ABOUT">
@@ -432,7 +351,6 @@ const styles = StyleSheet.create({
   },
   appearanceLabel: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   appearanceTxt: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.semibold },
-  securitySub: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, marginTop: 1 },
   segment: {
     flexDirection: 'row', backgroundColor: vx.bgRaised,
     borderRadius: radius.pill, padding: 3, gap: 2,

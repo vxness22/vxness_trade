@@ -12,19 +12,23 @@ import {
   InstrumentRow,
 } from '../../../components/vx';
 import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
-import { topRisers, topFallers, bySegment, MARQUEE_SPOTLIGHT } from '../../../utils/marketMovers';
+import { topRisers, topFallers, bySegment, segmentKeyOf, MARQUEE_SPOTLIGHT } from '../../../utils/marketMovers';
 
 // Stable fallback so memoized rows don't see a fresh [] identity every render.
 const EMPTY_SPARK = [];
 
-const SEGMENT_OPTIONS = [
-  { value: 'overview',    label: 'Overview' },
-  { value: 'indices',     label: 'Indices' },
-  { value: 'forex',       label: 'Forex' },
-  { value: 'crypto',      label: 'Crypto' },
-  { value: 'metals',      label: 'Metals' },
-  { value: 'shares',      label: 'Shares' },
-];
+// Tabs are built from the instruments the server actually returns, never from a
+// fixed list. The fixed list carried a 'Shares' tab that could only ever be
+// empty — Vxness trades no equities — while omitting Commodities, which it does
+// carry. A tab now exists only when something sits behind it.
+const SEGMENT_LABELS = {
+  indices: 'Indices',
+  forex: 'Forex',
+  crypto: 'Crypto',
+  metals: 'Metals',
+  commodities: 'Commodities',
+};
+const SEGMENT_ORDER = ['indices', 'forex', 'crypto', 'metals', 'commodities'];
 
 export default function MarketsExplore({
   segment,
@@ -59,6 +63,18 @@ export default function MarketsExplore({
     }));
   }, [pricesBySymbol, moversDirection]);
 
+  const segmentOptions = useMemo(() => {
+    const present = new Set();
+    (instruments || []).forEach((i) => {
+      const k = segmentKeyOf(i);
+      if (k) present.add(k);
+    });
+    return [
+      { value: 'overview', label: 'Overview' },
+      ...SEGMENT_ORDER.filter((k) => present.has(k)).map((k) => ({ value: k, label: SEGMENT_LABELS[k] })),
+    ];
+  }, [instruments]);
+
   const essentials = useMemo(() => {
     // Full instrument set for the segment (same set the website shows).
     return bySegment(instruments, segment);
@@ -77,7 +93,7 @@ export default function MarketsExplore({
       <CategoryTabs
         value={segment}
         onChange={onChangeSegment}
-        options={SEGMENT_OPTIONS}
+        options={segmentOptions}
       />
 
       <View style={styles.section}>

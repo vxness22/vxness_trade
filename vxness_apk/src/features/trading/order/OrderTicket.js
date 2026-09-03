@@ -7,11 +7,13 @@ import {
   DiscreteSlider,
   CheckboxRow,
   PillButton,
+  ReadOnlyBanner,
   showToast,
 } from '../../../components/vx';
 import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 import { handleTradeError } from '../../../utils/tradeErrors';
 import ApiService from '../../../services/api/ApiService';
+import useReadOnly from '../../../hooks/useReadOnly';
 
 const ORDER_TYPES = ['market', 'limit', 'stop'];
 const ORDER_LABEL = { market: 'Market', limit: 'Limit', stop: 'Stop' };
@@ -24,6 +26,7 @@ function fmt(v) {
 }
 
 export default function OrderTicket({ accountId, account, accountSummary, symbol, tick, onPlaced }) {
+  const readOnly = useReadOnly();
   const [side, setSide] = useState('sell');
   const [orderType, setOrderType] = useState('market');
   const [volume, setVolume] = useState(1);
@@ -207,15 +210,19 @@ export default function OrderTicket({ accountId, account, accountSummary, symbol
         <InfoRow label="Leverage" value={`1:${leverage}`} />
       </View>
 
-      <PillButton
-        label={submitting ? 'Placing…' : (side === 'buy' ? 'Buy' : 'Sell')}
-        variant={side === 'buy' ? 'buy' : 'sell'}
-        size="lg"
-        loading={submitting}
-        disabled={!canSubmit || submitting}
-        onPress={submit}
-        style={{ marginTop: space.md }}
-      />
+      {readOnly ? (
+        <ReadOnlyBanner text="View-only access — this account cannot place orders." />
+      ) : (
+        <PillButton
+          label={submitting ? 'Placing…' : (side === 'buy' ? 'Buy' : 'Sell')}
+          variant={side === 'buy' ? 'buy' : 'sell'}
+          size="lg"
+          loading={submitting}
+          disabled={!canSubmit || submitting}
+          onPress={submit}
+          style={{ marginTop: space.md }}
+        />
+      )}
     </View>
   );
 }

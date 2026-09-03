@@ -4,7 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 import { useAccount } from '../../../app/providers/AccountContext';
-import { Screen, BalanceBlock, QuickActionTile } from '../../../components/vx';
+import { Screen, BalanceBlock, QuickActionTile, ReadOnlyBanner } from '../../../components/vx';
+import useReadOnly from '../../../hooks/useReadOnly';
 import { vx, space, sizes, weights, fontFamily } from '../../../theme/vxTheme';
 import ApiService from '../../../services/api/ApiService';
 import { useHiddenBalance } from '../../../utils/hiddenBalance';
@@ -15,6 +16,7 @@ import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 const RECENT_MAX_ROWS = 8;
 
 export default function FundsScreen() {
+  const readOnly = useReadOnly();
   const nav = useNavigation();
   const { hidden, toggle } = useHiddenBalance();
   const { accounts } = useAccount();
@@ -79,6 +81,8 @@ export default function FundsScreen() {
           <Text style={styles.title}>Funds</Text>
         </View>
 
+        <ReadOnlyBanner text="View-only access — deposits, withdrawals and transfers are disabled." />
+
         {/* Banner div — fund_banner.png fills the card. */}
         <View style={styles.bannerCard}>
           <Image
@@ -102,9 +106,9 @@ export default function FundsScreen() {
         </View>
 
         <View style={styles.tilesRow}>
-          <QuickActionTile variant="flat" icon={<Ionicons name="arrow-up-outline" size={30} color="#B39166" />} label="Deposit" onPress={() => nav.navigate('Deposit')} />
-          <QuickActionTile variant="flat" icon={<Ionicons name="arrow-down-outline" size={30} color="#B39166" />} label="Withdraw" onPress={() => nav.navigate('Withdraw')} />
-          <QuickActionTile variant="flat" icon={<Ionicons name="swap-horizontal-outline" size={30} color="#B39166" />} label="Transfer" onPress={() => nav.navigate('Transfer')} />
+          <QuickActionTile variant="flat" disabled={readOnly} icon={<Ionicons name="arrow-up-outline" size={30} color="#B39166" />} label="Deposit" onPress={() => { if (!readOnly) nav.navigate('Deposit'); }} />
+          <QuickActionTile variant="flat" disabled={readOnly} icon={<Ionicons name="arrow-down-outline" size={30} color="#B39166" />} label="Withdraw" onPress={() => { if (!readOnly) nav.navigate('Withdraw'); }} />
+          <QuickActionTile variant="flat" disabled={readOnly} icon={<Ionicons name="swap-horizontal-outline" size={30} color="#B39166" />} label="Transfer" onPress={() => { if (!readOnly) nav.navigate('Transfer'); }} />
           <QuickActionTile variant="flat" icon={<Ionicons name="receipt-outline" size={30} color="#B39166" />} label="History" onPress={() => nav.navigate('TransactionHistory')} />
         </View>
       </View>

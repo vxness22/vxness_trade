@@ -4,6 +4,7 @@ import LoginScreen from '../../features/auth/screens/LoginScreen';
 import SignupScreen from '../../features/auth/screens/SignupScreen';
 import RegisterOtp from '../../features/auth/screens/RegisterOtp';
 import ForgotPasswordScreen from '../../features/auth/screens/ForgotPasswordScreen';
+import InvestorLoginScreen from '../../features/auth/screens/InvestorLoginScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -14,6 +15,7 @@ export default function AuthStack() {
       <Stack.Screen name="Signup" component={SignupScreen} />
       <Stack.Screen name="RegisterOtp" component={RegisterOtp} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <Stack.Screen name="InvestorLogin" component={InvestorLoginScreen} />
     </Stack.Navigator>
   );
 }

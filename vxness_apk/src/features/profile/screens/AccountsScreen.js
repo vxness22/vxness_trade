@@ -20,6 +20,8 @@ import { useAccount } from '../../../app/providers/AccountContext';
 import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 import ApiService from '../../../services/api/ApiService';
 import logger from '../../../utils/logger';
+import useReadOnly from '../../../hooks/useReadOnly';
+import { ReadOnlyBanner } from '../../../components/vx';
 
 function isDemoAccount(a) {
   return !!(a?.is_demo || a?.isDemo || a?.accountTypeId?.isDemo);
@@ -31,6 +33,7 @@ function isActiveStatus(a) {
 }
 
 const AccountsScreen = ({ navigation, route }) => {
+  const readOnly = useReadOnly();
   const { colors } = useTheme();
   const { selectAccount } = useAccount();
   const [user, setUser] = useState(null);
@@ -114,6 +117,18 @@ const AccountsScreen = ({ navigation, route }) => {
   // Handle incoming route params for deposit/withdraw action
   const [pendingAction, setPendingAction] = useState(null);
 
+  // ── Prop challenges ───────────────────────────────────────────────────────
+  // `challengeEnabled` is the admin switch (PropSettings.challengeModeEnabled).
+  // While it is false the whole section is absent, exactly as the web dashboard
+  // hides its Challenge tab — we never show a Buy button for a purchase the
+  // backend would refuse.
+  const [challengeEnabled, setChallengeEnabled] = useState(false);
+  const [challengeAccounts, setChallengeAccounts] = useState([]);
+  const [challenges, setChallenges] = useState([]);
+  const [challengesLoading, setChallengesLoading] = useState(false);
+  const [showChallengeModal, setShowChallengeModal] = useState(false);
+  const [buyingChallengeId, setBuyingChallengeId] = useState(null);
+
   useEffect(() => {
     loadUser();
   }, []);
@@ -123,7 +138,7 @@ const AccountsScreen = ({ navigation, route }) => {
       // Fetch all data and then set loading false
       const loadData = async () => {
         try {
-          await Promise.all([fetchAccounts(), fetchWalletBalance()]);
+          await Promise.all([fetchAccounts(), fetchWalletBalance(), fetchChallengeAccounts()]);
         } catch (e) {
           logger.error('AccountsScreen: error loading accounts data', e);
         } finally {
@@ -229,9 +244,74 @@ const AccountsScreen = ({ navigation, route }) => {
     }
   };
 
+  const fetchChallengeAccounts = async () => {
+    try {
+      const status = await ApiService.getPropStatus();
+      const enabled = !!status?.enabled;
+      setChallengeEnabled(enabled);
+      if (!enabled) { setChallengeAccounts([]); return; }
+      const data = await ApiService.getPropAccounts();
+      setChallengeAccounts(data?.accounts || []);
+    } catch (e) {
+      // A backend without the prop routes (or challenge mode off) must not
+      // break the accounts list — just leave the section hidden.
+      logger.warn('AccountsScreen - challenge fetch failed:', e.message);
+      setChallengeEnabled(false);
+      setChallengeAccounts([]);
+    }
+  };
+
+  const openChallengeModal = async () => {
+    setShowChallengeModal(true);
+    setChallengesLoading(true);
+    try {
+      const data = await ApiService.getPropChallenges();
+      setChallenges(data?.items || []);
+    } catch (e) {
+      logger.warn('AccountsScreen - challenge list failed:', e.message);
+      setChallenges([]);
+    } finally {
+      setChallengesLoading(false);
+    }
+  };
+
+  const handleBuyChallenge = async (challenge) => {
+    const fee = Number(challenge.challenge_fee || 0);
+    if (walletBalance < fee) {
+      Alert.alert(
+        'Insufficient balance',
+        `This challenge costs $${fee.toFixed(2)} but your wallet has $${Number(walletBalance).toFixed(2)}. Deposit first.`,
+      );
+      return;
+    }
+    Alert.alert(
+      'Buy challenge',
+      `$${fee.toFixed(2)} will be deducted from your wallet for ${challenge.name}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Buy',
+          onPress: async () => {
+            setBuyingChallengeId(challenge.challenge_id);
+            try {
+              const res = await ApiService.buyChallenge(challenge.challenge_id);
+              setShowChallengeModal(false);
+              await Promise.all([fetchChallengeAccounts(), fetchWalletBalance()]);
+              Alert.alert('Challenge purchased', `Account ${res?.account?.account_number || ''} is ready to trade.`);
+            } catch (e) {
+              Alert.alert('Purchase failed', e.message || 'Could not buy this challenge.');
+            } finally {
+              setBuyingChallengeId(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchAccounts(), fetchWalletBalance()]);
+    await Promise.all([fetchAccounts(), fetchWalletBalance(), fetchChallengeAccounts()]);
     setRefreshing(false);
   };
 
@@ -580,7 +660,10 @@ const AccountsScreen = ({ navigation, route }) => {
         contentContainerStyle={{ paddingBottom: BOTTOM_NAV_PILL_HEIGHT + 40 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
       >
+        <ReadOnlyBanner text="View-only access — you can see this account but cannot change it." />
+
         {/* New Account button — full width dashed (matches web) */}
+        {readOnly ? null : (
         <TouchableOpacity
           onPress={openNewAccountModal}
           activeOpacity={0.85}
@@ -601,6 +684,7 @@ const AccountsScreen = ({ navigation, route }) => {
           <Ionicons name="add" size={20} color={colors.accent} />
           <Text style={{ color: colors.accent, fontSize: 15, fontWeight: '700' }}>New Account</Text>
         </TouchableOpacity>
+        )}
 
         {mainTradingAccounts.length === 0 ? (
           <View style={styles.emptyState}>
@@ -903,7 +987,183 @@ const AccountsScreen = ({ navigation, route }) => {
             );
           })
         )}
+        {/* ── Challenge accounts ────────────────────────────────────────────
+            Mirrors the Challenge tab on the web dashboard's Account page.
+            Hidden entirely unless the admin has challenge mode on. */}
+        {challengeEnabled && (
+          <View style={{ marginTop: 24 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}>Challenge Accounts</Text>
+              {readOnly ? null : (
+              <TouchableOpacity
+                onPress={openChallengeModal}
+                activeOpacity={0.85}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+              >
+                <Ionicons name="add-circle-outline" size={18} color={colors.accent} />
+                <Text style={{ color: colors.accent, fontSize: 13, fontWeight: '700' }}>Buy Challenge</Text>
+              </TouchableOpacity>
+              )}
+            </View>
+
+            {challengeAccounts.length === 0 ? (
+              <View style={[styles.challengeProgress, { backgroundColor: colors.bgSecondary, alignItems: 'center', paddingVertical: 24 }]}>
+                <Ionicons name="trophy-outline" size={40} color={colors.textMuted} />
+                <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 10, textAlign: 'center' }}>
+                  No challenge account yet. Tap "Buy Challenge" to start one.
+                </Text>
+              </View>
+            ) : (
+              challengeAccounts.map((c) => {
+                const statusColor =
+                  c.status === 'PASSED' || c.status === 'FUNDED' ? colors.success
+                  : c.status === 'FAILED' ? colors.error
+                  : colors.warning;
+                const profit = Number(c.profit_percent || 0);
+                const target = Number(c.profit_target_percent || 0);
+                // Guard the divide: a challenge with no configured target must
+                // not render a NaN-width progress bar.
+                const pct = target > 0 ? Math.max(0, Math.min(100, (profit / target) * 100)) : 0;
+                return (
+                  <View
+                    key={c.account_id}
+                    style={[styles.challengeProgress, { backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border }]}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700' }} numberOfLines={1}>
+                          {c.challenge_name || 'Challenge'}
+                        </Text>
+                        <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                          #{c.account_number} · Phase {c.phase}/{c.total_phases}
+                        </Text>
+                      </View>
+                      <View style={[styles.statusBadge, { backgroundColor: statusColor + '22' }]}>
+                        <Text style={[styles.statusText, { color: statusColor }]}>{c.status}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.progressRow}>
+                      <Text style={[styles.progressLabel, { color: colors.textMuted }]}>Equity</Text>
+                      <Text style={[styles.progressValue, { color: colors.textPrimary }]}>
+                        ${Number(c.equity || 0).toFixed(2)}
+                      </Text>
+                    </View>
+                    <View style={styles.progressRow}>
+                      <Text style={[styles.progressLabel, { color: colors.textMuted }]}>Profit</Text>
+                      <Text style={[styles.progressValue, { color: profit >= 0 ? colors.success : colors.error }]}>
+                        {profit >= 0 ? '+' : ''}{profit.toFixed(2)}%{target > 0 ? ` / ${target}%` : ''}
+                      </Text>
+                    </View>
+                    {target > 0 && (
+                      <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.bgSecondary, overflow: 'hidden', marginVertical: 6 }}>
+                        <View style={{ width: `${pct}%`, height: '100%', backgroundColor: colors.success }} />
+                      </View>
+                    )}
+                    <View style={styles.progressRow}>
+                      <Text style={[styles.progressLabel, { color: colors.textMuted }]}>Daily drawdown</Text>
+                      <Text style={[styles.progressValue, { color: colors.textPrimary }]}>
+                        {Number(c.daily_drawdown_percent || 0).toFixed(2)}%
+                        {c.max_daily_drawdown_percent ? ` / ${c.max_daily_drawdown_percent}%` : ''}
+                      </Text>
+                    </View>
+                    <View style={styles.progressRow}>
+                      <Text style={[styles.progressLabel, { color: colors.textMuted }]}>Overall drawdown</Text>
+                      <Text style={[styles.progressValue, { color: colors.textPrimary }]}>
+                        {Number(c.overall_drawdown_percent || 0).toFixed(2)}%
+                        {c.max_overall_drawdown_percent ? ` / ${c.max_overall_drawdown_percent}%` : ''}
+                      </Text>
+                    </View>
+                    {c.status === 'FAILED' && !!c.fail_reason && (
+                      <Text style={{ color: colors.error, fontSize: 12, marginTop: 8 }}>{c.fail_reason}</Text>
+                    )}
+                  </View>
+                );
+              })
+            )}
+          </View>
+        )}
+
       </ScrollView>
+
+      {/* Buy Challenge Modal */}
+      <Modal visible={showChallengeModal} animationType="slide" transparent onRequestClose={() => setShowChallengeModal(false)}>
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalBackdrop} onPress={() => setShowChallengeModal(false)} />
+          <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Buy a Challenge</Text>
+              <TouchableOpacity onPress={() => setShowChallengeModal(false)}>
+                <Ionicons name="close" size={24} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.walletBalanceRow, { backgroundColor: colors.bgSecondary }]}>
+              <Text style={[styles.walletBalanceLabel, { color: colors.textMuted }]}>Wallet balance</Text>
+              <Text style={[styles.walletBalanceValue, { color: colors.success }]}>
+                ${Number(walletBalance || 0).toFixed(2)}
+              </Text>
+            </View>
+
+            {challengesLoading ? (
+              <View style={styles.loadingTypes}>
+                <ActivityIndicator color={colors.accent} />
+                <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading challenges…</Text>
+              </View>
+            ) : challenges.length === 0 ? (
+              <View style={styles.loadingTypes}>
+                <Ionicons name="trophy-outline" size={40} color={colors.textMuted} />
+                <Text style={[styles.loadingText, { color: colors.textMuted }]}>No challenges available right now.</Text>
+              </View>
+            ) : (
+              <ScrollView contentContainerStyle={styles.challengesList}>
+                {challenges.map((ch) => {
+                  const fee = Number(ch.challenge_fee || 0);
+                  const affordable = Number(walletBalance || 0) >= fee;
+                  const busy = buyingChallengeId === ch.challenge_id;
+                  return (
+                    <TouchableOpacity
+                      key={ch.challenge_id}
+                      activeOpacity={0.85}
+                      disabled={busy}
+                      onPress={() => handleBuyChallenge(ch)}
+                      style={[styles.challengeItem, { backgroundColor: colors.bgSecondary, borderColor: colors.border, opacity: busy ? 0.6 : 1 }]}
+                    >
+                      <View style={[styles.challengeIcon, { backgroundColor: colors.accent + '20' }]}>
+                        <Ionicons name="trophy-outline" size={22} color={colors.accent} />
+                      </View>
+                      <View style={styles.challengeInfo}>
+                        <Text style={[styles.challengeName, { color: colors.textPrimary }]}>{ch.name}</Text>
+                        <Text style={[styles.challengeDesc, { color: colors.textMuted }]} numberOfLines={2}>
+                          ${Number(ch.fund_size || 0).toLocaleString()} fund
+                          {ch.steps_count ? ` · ${ch.steps_count}-step` : ''}
+                          {ch.profit_target_phase1_percent ? ` · target ${ch.profit_target_phase1_percent}%` : ''}
+                          {ch.max_overall_drawdown_percent ? ` · max DD ${ch.max_overall_drawdown_percent}%` : ''}
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        {busy ? (
+                          <ActivityIndicator size="small" color={colors.accent} />
+                        ) : (
+                          <>
+                            <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700' }}>${fee.toFixed(0)}</Text>
+                            {/* Shown up front so the fee is not a surprise at
+                                the confirm step; the buy is still attempted and
+                                the backend remains the authority on balance. */}
+                            {!affordable && (
+                              <Text style={{ color: colors.error, fontSize: 10, marginTop: 2 }}>Low balance</Text>
+                            )}
+                          </>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Deposit Modal - Transfer from Wallet to Account */}
       <Modal visible={showTransferModal} animationType="slide" transparent onRequestClose={() => setShowTransferModal(false)}>

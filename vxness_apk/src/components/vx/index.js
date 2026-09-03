@@ -28,3 +28,4 @@ export { default as DiscreteSlider } from './DiscreteSlider';
 export { default as EmptyState } from './EmptyState';
 export { default as GradientActionButton } from './GradientActionButton';
 export { default as DateRangeSheet, formatRangeLabel } from './DateRangeSheet';
+export { default as ReadOnlyBanner } from './ReadOnlyBanner';
