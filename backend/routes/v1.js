@@ -153,8 +153,12 @@ router.get('/accounts', jwtAuth, async (req, res) => {
     const accounts = await TradingAccount.find(scope)
       .populate('accountTypeId', 'name isDemo leverage').sort({ createdAt: -1 })
 
-    res.json({
-      accounts: accounts.map(a => ({
+    // Both keys, deliberately. Every mobile screen reads `items` — the account
+    // switcher, Transfer, the accounts list — while `accounts` is what this
+    // route has always answered with. Sending one and not the other silently
+    // empties the app's account list rather than failing loudly, which is
+    // exactly how it slipped through.
+    const items = accounts.map(a => ({
         account_id: String(a._id),
         account_number: a.accountId,
         is_demo: !!(a.isDemo || a.accountTypeId?.isDemo),
@@ -164,8 +168,9 @@ router.get('/accounts', jwtAuth, async (req, res) => {
         leverage: a.leverage,
         type: a.accountTypeId?.name || '',
         status: a.status,
-      })),
-    })
+    }))
+
+    res.json({ items, accounts: items })
   } catch (e) {
     fail(res, 500, e.message)
   }

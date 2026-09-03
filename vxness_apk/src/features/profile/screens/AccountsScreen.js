@@ -225,7 +225,14 @@ const AccountsScreen = ({ navigation, route }) => {
     try {
       logger.log('AccountsScreen - Fetching accounts with token auth');
       const data = await ApiService.getAccounts();
-      const items = data.items || data || [];
+      // `data.items || data` handed the whole response object to .map() the
+      // moment the payload came back under a different key, and the screen died
+      // with "undefined is not a function". Take the first thing that is
+      // actually an array, and never fall through to a non-array.
+      const items = Array.isArray(data) ? data
+        : Array.isArray(data?.items) ? data.items
+        : Array.isArray(data?.accounts) ? data.accounts
+        : [];
       // Map the platform account fields to expected format (show both demo and live, like web)
       const mappedAccounts = items.map((a) => ({
         ...a,
