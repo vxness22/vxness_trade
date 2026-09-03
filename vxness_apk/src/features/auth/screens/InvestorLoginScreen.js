@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import {
   View, Text, TextInput, StyleSheet, Pressable, KeyboardAvoidingView,
-  Platform, ScrollView, ActivityIndicator,
+  Platform, ScrollView, ActivityIndicator, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -60,9 +60,13 @@ export default function InvestorLoginScreen({ navigation }) {
           </Pressable>
 
           <View style={styles.header}>
-            <View style={styles.badge}>
-              <Ionicons name="eye-outline" size={26} color={THEME} />
-            </View>
+            <Image
+              source={require('../../../../assets/brand/vxness-icon.png')}
+              style={styles.logo}
+              resizeMode="contain"
+              accessibilityRole="image"
+              accessibilityLabel="Vxness"
+            />
             <Text style={styles.title}>Investor Login</Text>
             <Text style={styles.subtitle}>
               View-only access to a trading account. You can see balances,
@@ -136,10 +140,8 @@ const styles = StyleSheet.create({
   back: { width: 40, height: 40, justifyContent: 'center' },
 
   header: { alignItems: 'center', marginTop: space.lg, marginBottom: space.xxl },
-  badge: {
-    width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: THEME + '1A', borderWidth: 1, borderColor: THEME + '55', marginBottom: space.md,
-  },
+  // Square, matching the 1024x1024 lockup — same mark as sign-in and sign-up.
+  logo: { width: 132, height: 132, marginBottom: space.sm },
   title: { color: C.textPrimary, fontFamily, fontSize: 26, fontWeight: weights.heavy, textAlign: 'center' },
   subtitle: {
     color: C.textSecondary, fontFamily, fontSize: sizes.body,
