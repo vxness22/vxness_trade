@@ -8,7 +8,9 @@ import ApiService from '../../services/api/ApiService';
 const AccountContext = createContext(null);
 const KEY = 'selectedAccountId';
 
-const idOf = (a) => (a ? String(a.id || a._id || '') : '');
+// account_id is what /api/v1/accounts calls it; without it the switcher had no
+// identity to match a saved selection against.
+const idOf = (a) => (a ? String(a.id || a._id || a.account_id || '') : '');
 
 export function AccountProvider({ children }) {
   const [accounts, setAccounts] = useState([]);

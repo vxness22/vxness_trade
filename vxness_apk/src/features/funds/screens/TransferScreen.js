@@ -24,7 +24,7 @@ export default function TransferScreen() {
     (async () => {
       try {
         const res = await ApiService.getAccounts();
-        const list = Array.isArray(res) ? res : (Array.isArray(res?.items) ? res.items : []);
+        const list = Array.isArray(res) ? res : (Array.isArray(res?.items) ? res.items : (Array.isArray(res?.accounts) ? res.accounts : []));
         // Demo accounts are excluded from transfers — real money only.
         setAccounts(list.filter((a) => !a.is_demo));
       } catch (_) {}
@@ -42,13 +42,14 @@ export default function TransferScreen() {
     if (fromMain && toMain) {
       return showToast({ kind: 'warn', message: 'Choose a trading account too' });
     }
-    if (!fromMain && !toMain && (fromAccount.id || fromAccount._id) === (toAccount.id || toAccount._id)) {
+    const accId = (x) => x?.id || x?._id || x?.account_id;
+    if (!fromMain && !toMain && accId(fromAccount) === accId(toAccount)) {
       return showToast({ kind: 'warn', message: 'Choose different accounts' });
     }
     setSubmitting(true);
     try {
       const amt = Number(amount);
-      const aid = (x) => x.id || x._id;
+      const aid = (x) => x.id || x._id || x.account_id;
       if (fromMain) {
         await ApiService.transferMainToTrading(aid(toAccount), amt);     // wallet → account
       } else if (toMain) {
@@ -94,7 +95,7 @@ export default function TransferScreen() {
       <Sheet visible={picking != null} onClose={() => setPicking(null)} title={picking === 'from' ? 'From' : 'To'}>
         {[MAIN_WALLET, ...accounts].map((a) => (
           <MenuRow
-            key={a.id || a._id}
+            key={a.id || a._id || a.account_id}
             icon={<Ionicons name={a.isMain ? 'wallet-outline' : 'card-outline'} size={20} color={vx.textPrimary} />}
             label={labelOf(a)}
             value={a.isMain

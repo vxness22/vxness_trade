@@ -236,8 +236,11 @@ const AccountsScreen = ({ navigation, route }) => {
       // Map the platform account fields to expected format (show both demo and live, like web)
       const mappedAccounts = items.map((a) => ({
         ...a,
-        id: a.id || a._id,
-        _id: a.id || a._id,
+        // account_id included: the /api/v1 payload names it that, and without
+        // it every row's id was undefined — which is what made React see the
+        // same key twice and warn about duplicate children.
+        id: a.id || a._id || a.account_id,
+        _id: a.id || a._id || a.account_id,
         accountId: a.account_number || a.accountId || a.id,
         account_number: a.account_number,
         isDemo: a.is_demo || a.isDemo || false,
@@ -594,7 +597,7 @@ const AccountsScreen = ({ navigation, route }) => {
 
   // Delete a trading account
   const handleDeleteAccount = (account) => {
-    const aid = account.id || account._id;
+    const aid = account.id || account._id || account.account_id;
     const label = account.account_number || account.accountId || 'this account';
     Alert.alert(
       'Delete account',
@@ -622,7 +625,7 @@ const AccountsScreen = ({ navigation, route }) => {
   };
 
   const selectAccountForTrading = async (account) => {
-    const aid = account.id || account._id;
+    const aid = account.id || account._id || account.account_id;
     try {
       await SecureStore.setItemAsync('selectedAccountId', aid);
     } catch (e) {}
@@ -701,7 +704,9 @@ const AccountsScreen = ({ navigation, route }) => {
           </View>
         ) : (
           mainTradingAccounts.map((account) => {
-            const aid = account.id || account._id;
+            // Falling back to the account NUMBER, then the index, so the list
+            // key stays unique even if a row arrives without an id.
+            const aid = account.id || account._id || account.account_id || account.accountId;
             const isExpanded = expandedAccountId === aid;
             const isDemo = isDemoAccount(account);
             const dotColor = isDemo ? colors.warning : colors.accent;

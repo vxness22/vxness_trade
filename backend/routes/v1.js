@@ -159,6 +159,13 @@ router.get('/accounts', jwtAuth, async (req, res) => {
     // empties the app's account list rather than failing loudly, which is
     // exactly how it slipped through.
     const items = accounts.map(a => ({
+        // id/_id alongside account_id: every consumer in the app derives an
+        // account's identity as `a.id || a._id` — the account switcher, the
+        // Transfer picker, and the accounts list's React key. With only
+        // account_id present that came out undefined, so every row rendered
+        // with the same key and selection had nothing to match on.
+        id: String(a._id),
+        _id: String(a._id),
         account_id: String(a._id),
         account_number: a.accountId,
         is_demo: !!(a.isDemo || a.accountTypeId?.isDemo),
