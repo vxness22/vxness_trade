@@ -59,6 +59,31 @@ const transactionSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  // What the user actually paid, before conversion. The website collects these
+  // (currency, rate, markup) and then dropped them on the floor — only the USD
+  // figure was stored — so an admin reviewing a deposit could not see that
+  // "$100" was really "₹8,300 at 83.0". Optional, so every existing
+  // transaction stays valid.
+  localAmount: {
+    type: Number,
+    default: null
+  },
+  currency: {
+    type: String,
+    default: 'USD'
+  },
+  currencySymbol: {
+    type: String,
+    default: '$'
+  },
+  exchangeRate: {
+    type: Number,
+    default: 1
+  },
+  markup: {
+    type: Number,
+    default: 0
+  },
   transactionRef: {
     type: String,
     default: ''

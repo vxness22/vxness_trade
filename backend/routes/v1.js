@@ -38,6 +38,8 @@ import { fetchBars } from './charts.js'
 import OTP from '../models/OTP.js'
 import Admin from '../models/Admin.js'
 import PaymentMethod from '../models/PaymentMethod.js'
+import Currency from '../models/Currency.js'
+import UserBankAccount from '../models/UserBankAccount.js'
 import IBWallet from '../models/IBWallet.js'
 import IBCommissionNew from '../models/IBCommissionNew.js'
 import ibEngineNew from '../services/ibEngineNew.js'
@@ -1928,10 +1930,31 @@ router.post(
 // applies any first-deposit bonus, exactly as it does for a web deposit.
 router.post('/wallet/deposit/manual', jwtAuth, runUpload(proofUploadV1.single('file')), async (req, res) => {
   try {
-    const amount = Number(req.body?.amount)
+    const localAmount = Number(req.body?.local_amount ?? req.body?.amount)
     const transactionRef = String(req.body?.transaction_id || '').trim()
-    if (!(amount > 0)) return fail(res, 400, 'Enter an amount greater than zero')
+    if (!(localAmount > 0)) return fail(res, 400, 'Enter an amount greater than zero')
     if (!req.file) return fail(res, 400, 'Attach the payment screenshot')
+
+    // The amount is converted HERE, from the currency row, not from the rate
+    // the client sent. The website shows the working so the user can check it,
+    // but a rate that arrived with the screen is not one a deposit may be
+    // priced at — it is a number the client could have edited.
+    const code = String(req.body?.currency || 'USD').toUpperCase()
+    let amount = localAmount
+    let rate = 1, markup = 0, symbol = '$'
+    if (code !== 'USD') {
+      const cur = await Currency.findOne({ currency: code, isActive: true })
+      if (!cur) return fail(res, 400, `${code} is not accepted for deposits`)
+      rate = cur.rateToUSD || 1
+      markup = cur.markup || 0
+      symbol = cur.symbol || ''
+      const effective = rate * (1 + markup / 100)
+      if (!(effective > 0)) return fail(res, 400, `No exchange rate for ${code}`)
+      amount = Math.round((localAmount / effective) * 100) / 100
+    }
+    if (!(amount > 0)) return fail(res, 400, 'That amount converts to zero')
+
+    const method = String(req.body?.payment_method || 'Manual').trim() || 'Manual'
 
     let wallet = await Wallet.findOne({ userId: req.user._id })
     if (!wallet) wallet = await new Wallet({ userId: req.user._id, balance: 0 }).save()
@@ -1941,14 +1964,26 @@ router.post('/wallet/deposit/manual', jwtAuth, runUpload(proofUploadV1.single('f
       walletId: wallet._id,
       type: 'Deposit',
       amount,
-      paymentMethod: 'Manual',
+      localAmount,
+      currency: code,
+      currencySymbol: symbol,
+      exchangeRate: rate,
+      markup,
+      paymentMethod: method,
       transactionRef,
       screenshot: `/uploads/screenshots/${req.file.filename}`,
       status: 'Pending',
-      description: 'Manual deposit from mobile app',
+      description: 'Deposit from mobile app',
     })
 
-    res.json({ id: String(tx._id), status: tx.status, amount, message: 'Deposit submitted for approval' })
+    res.json({
+      id: String(tx._id),
+      status: tx.status,
+      amount,
+      local_amount: localAmount,
+      currency: code,
+      message: 'Deposit submitted for approval',
+    })
   } catch (e) {
     fail(res, 500, e.message)
   }
@@ -1966,7 +2001,20 @@ router.post('/wallet/withdraw/manual', jwtAuth, runUpload(proofUploadV1.single('
     if (!wallet) return fail(res, 404, 'Wallet not found')
     if (Number(wallet.balance || 0) < amount) return fail(res, 400, 'Insufficient wallet balance')
 
-    const upiId = String(req.body?.upi_id || '').trim()
+    // Payout goes to one of the user's APPROVED accounts, as on the website —
+    // never to an address typed into the withdrawal form. Free-text UPI here
+    // meant a payout destination that no admin had ever checked.
+    const bankAccountId = req.body?.bank_account_id
+    if (!bankAccountId) return fail(res, 400, 'Choose a withdrawal account')
+
+    const bank = await UserBankAccount.findOne({
+      _id: String(bankAccountId),
+      userId: req.user._id,
+      status: 'Approved',
+      isActive: true,
+    }).catch(() => null)
+    if (!bank) return fail(res, 400, 'That withdrawal account is not approved for your profile')
+
     const notes = String(req.body?.payout_notes || '').trim()
 
     wallet.balance -= amount
@@ -1977,8 +2025,16 @@ router.post('/wallet/withdraw/manual', jwtAuth, runUpload(proofUploadV1.single('
       walletId: wallet._id,
       type: 'Withdrawal',
       amount,
-      paymentMethod: upiId ? 'UPI' : 'Manual',
-      bankAccountDetails: upiId ? { type: 'UPI', upiId } : undefined,
+      paymentMethod: bank.type === 'UPI' ? 'UPI' : 'Bank Transfer',
+      bankAccountId: bank._id,
+      bankAccountDetails: bank.type === 'UPI'
+        ? { type: 'UPI', upiId: bank.upiId }
+        : {
+            type: 'Bank',
+            bankName: bank.bankName,
+            accountNumber: bank.accountNumber,
+            ifscCode: bank.ifscCode,
+          },
       screenshot: req.file ? `/uploads/screenshots/${req.file.filename}` : undefined,
       status: 'Pending',
       description: notes || 'Withdrawal request from mobile app',
@@ -2401,6 +2457,128 @@ router.post('/social/become-provider', jwtAuth, async (req, res) => {
     })
   } catch (e) {
     fail(res, e.status || 400, e.message)
+  }
+})
+
+/* ─────────────────  funding: the pieces the web deposit/withdraw uses  ───────────────── */
+
+// The website's Wallet page needs three lists before it can take a deposit or a
+// withdrawal: where to pay, in what currency, and which of the user's own
+// accounts a payout may go to. The app had none of them — it asked for an
+// amount and a screenshot and nothing else — so the two clients were not
+// running the same flow at all.
+
+// GET /api/v1/wallet/payment-methods — where a deposit should be sent.
+router.get('/wallet/payment-methods', jwtAuth, async (_req, res) => {
+  try {
+    const methods = await PaymentMethod.find({ isActive: true }).sort({ createdAt: -1 })
+    res.json({
+      items: methods.map(m => ({
+        id: String(m._id),
+        type: m.type || 'bank',
+        bank_name: m.bankName || '',
+        account_number: m.accountNumber || '',
+        account_holder_name: m.accountHolderName || '',
+        ifsc_code: m.ifscCode || '',
+        upi_id: m.upiId || '',
+        qr_code_url: m.qrCodeImage || '',
+        wallet_address: m.walletAddress || '',
+      })),
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// GET /api/v1/wallet/currencies — active deposit currencies and their rates.
+//
+// rate_to_usd and markup are sent rather than a finished conversion so the app
+// can show the working, exactly as the website does. The server converts again
+// on submit regardless — a rate that arrived with the page is not one the
+// deposit is allowed to be priced at.
+router.get('/wallet/currencies', jwtAuth, async (_req, res) => {
+  try {
+    const rows = await Currency.find({ isActive: true }).sort({ currency: 1 })
+    res.json({
+      items: rows.map(c => ({
+        currency: c.currency,
+        symbol: c.symbol || '',
+        rate_to_usd: c.rateToUSD,
+        markup: c.markup || 0,
+      })),
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// GET /api/v1/wallet/bank-accounts — the caller's APPROVED payout accounts.
+//
+// Approved only, matching /payment-methods/user-banks/:id/approved. A pending
+// account is not somewhere money may be sent yet.
+router.get('/wallet/bank-accounts', jwtAuth, async (req, res) => {
+  try {
+    const rows = await UserBankAccount.find({
+      userId: req.user._id,
+      status: 'Approved',
+      isActive: true,
+    }).sort({ createdAt: -1 })
+
+    res.json({
+      items: rows.map(b => ({
+        id: String(b._id),
+        type: b.type,
+        bank_name: b.bankName || '',
+        account_number: b.accountNumber || '',
+        account_holder_name: b.accountHolderName || '',
+        ifsc_code: b.ifscCode || '',
+        branch_name: b.branchName || '',
+        upi_id: b.upiId || '',
+        label: b.type === 'UPI'
+          ? (b.upiId || 'UPI')
+          : `${b.bankName || 'Bank'} ••••${String(b.accountNumber || '').slice(-4)}`,
+      })),
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// POST /api/v1/wallet/bank-accounts — submit a payout account for approval.
+// Without this the app can list accounts but never gain one, and a user with
+// none can never withdraw.
+router.post('/wallet/bank-accounts', jwtAuth, async (req, res) => {
+  try {
+    const b = req.body || {}
+    const type = String(b.type || '').toUpperCase() === 'UPI' ? 'UPI' : 'Bank'
+
+    if (type === 'UPI') {
+      if (!String(b.upi_id || '').trim()) return fail(res, 400, 'Enter your UPI ID')
+    } else {
+      if (!String(b.bank_name || '').trim()) return fail(res, 400, 'Enter the bank name')
+      if (!String(b.account_number || '').trim()) return fail(res, 400, 'Enter the account number')
+      if (!String(b.ifsc_code || '').trim()) return fail(res, 400, 'Enter the IFSC code')
+    }
+
+    const account = await UserBankAccount.create({
+      userId: req.user._id,
+      type,
+      bankName: String(b.bank_name || '').trim(),
+      accountNumber: String(b.account_number || '').trim(),
+      accountHolderName: String(b.account_holder_name || '').trim(),
+      ifscCode: String(b.ifsc_code || '').trim().toUpperCase(),
+      branchName: String(b.branch_name || '').trim(),
+      upiId: String(b.upi_id || '').trim(),
+      status: 'Pending',
+    })
+
+    res.json({
+      id: String(account._id),
+      status: account.status,
+      message: 'Account submitted — an admin will approve it before you can withdraw to it',
+    })
+  } catch (e) {
+    fail(res, 400, e.message)
   }
 })
 
