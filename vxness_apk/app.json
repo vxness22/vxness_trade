@@ -8,18 +8,6 @@
     "icon": "./assets/brand/vxness-icon.png",
     "backgroundColor": "#000000",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
-    "jsEngine": "hermes",
-    "splash": {
-      "image": "./assets/brand/vxness-logo.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#000000",
-      "dark": {
-        "image": "./assets/brand/vxness-logo.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#000000"
-      }
-    },
     "updates": {
       "enabled": true,
       "fallbackToCacheTimeout": 3000
@@ -47,24 +35,25 @@
         "foregroundImage": "./assets/brand/vxness-icon.png",
         "backgroundColor": "#000000"
       },
-      "edgeToEdgeEnabled": true,
       "backgroundColor": "#000000",
-      "package": "com.vxness.app",
-      "splash": {
-        "image": "./assets/brand/vxness-logo.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#000000",
-        "dark": {
-          "image": "./assets/brand/vxness-logo.png",
-          "resizeMode": "contain",
-          "backgroundColor": "#000000"
-        }
-      }
+      "package": "com.vxness.app"
     },
     "web": {
       "favicon": "./assets/brand/vxness-favicon.png"
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/brand/vxness-logo.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#000000",
+          "dark": {
+            "image": "./assets/brand/vxness-logo.png",
+            "backgroundColor": "#000000"
+          }
+        }
+      ],
       "expo-font",
       "expo-updates",
       "expo-secure-store",
