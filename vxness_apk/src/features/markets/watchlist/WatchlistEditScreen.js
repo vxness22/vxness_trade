@@ -8,16 +8,19 @@ import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 import { getInstruments } from '../../../utils/instrumentsCache';
 import { getWatchlist, setWatchlist } from './watchlistStorage';
-import { bySegment } from '../../../utils/marketMovers';
+import { bySegment, segmentKeyOf } from '../../../utils/marketMovers';
 
-const FILTER_OPTIONS = [
-  { value: 'all',     label: 'All' },
-  { value: 'forex',   label: 'Forex' },
-  { value: 'crypto',  label: 'Crypto' },
-  { value: 'indices', label: 'Indices' },
-  { value: 'metals',  label: 'Metals' },
-  { value: 'shares',  label: 'Shares' },
-];
+// Built from the instruments actually loaded, for the same reason the Markets
+// tabs are: the fixed list offered Shares, which the platform does not trade,
+// and left out Commodities, which it does.
+const SEGMENT_LABELS = {
+  forex: 'Forex',
+  crypto: 'Crypto',
+  indices: 'Indices',
+  metals: 'Metals',
+  commodities: 'Commodities',
+};
+const SEGMENT_ORDER = ['forex', 'crypto', 'indices', 'metals', 'commodities'];
 
 export default function WatchlistEditScreen() {
   const nav = useNavigation();
@@ -26,6 +29,18 @@ export default function WatchlistEditScreen() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [dirty, setDirty] = useState(false);
+
+  const filterOptions = useMemo(() => {
+    const present = new Set();
+    (instruments || []).forEach((i) => {
+      const k = segmentKeyOf(i);
+      if (k) present.add(k);
+    });
+    return [
+      { value: 'all', label: 'All' },
+      ...SEGMENT_ORDER.filter((k) => present.has(k)).map((k) => ({ value: k, label: SEGMENT_LABELS[k] })),
+    ];
+  }, [instruments]);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,7 +120,7 @@ export default function WatchlistEditScreen() {
         ) : null}
       </View>
 
-      <CategoryTabs value={filter} onChange={setFilter} options={FILTER_OPTIONS} />
+      <CategoryTabs value={filter} onChange={setFilter} options={filterOptions} />
 
       <FlatList
         data={visible}
