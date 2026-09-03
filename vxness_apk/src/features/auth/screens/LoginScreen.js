@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect, useRef } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Dimensions, Animated, Easing } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Dimensions, Animated, Easing, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, RadialGradient, Stop, Rect } from 'react-native-svg';
 
@@ -135,10 +135,16 @@ export default function LoginScreen({ navigation }) {
       <LoginBackground />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          {/* Header */}
+          {/* Header — the brand mark stands in for the old
+              "Welcome back / Sign in to continue your journey" copy. */}
           <View style={styles.header}>
-            <Text style={styles.title}>Welcome back</Text>
-            <Text style={styles.subtitle}>Sign in to continue your journey</Text>
+            <Image
+              source={require('../../../../assets/brand/vxness-logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+              accessibilityRole="image"
+              accessibilityLabel="Vxness"
+            />
           </View>
 
           {/* Form */}
@@ -247,8 +253,7 @@ const styles = StyleSheet.create({
   body: { flexGrow: 1, paddingHorizontal: space.xl, paddingTop: space.huge, paddingBottom: space.xl, justifyContent: 'flex-start' },
 
   header: { marginBottom: space.xxxl, alignItems: 'center' },
-  title: { color: C.textPrimary, fontFamily, fontSize: 32, fontWeight: weights.heavy, letterSpacing: -0.5, textAlign: 'center' },
-  subtitle: { color: C.textSecondary, fontFamily, fontSize: sizes.body, marginTop: space.sm, textAlign: 'center' },
+  logo: { width: 200, height: 64 },
 
   form: {},
   label: { color: C.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm, letterSpacing: 0.3 },

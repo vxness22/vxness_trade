@@ -430,6 +430,17 @@ router.post('/positions/:id/close', jwtAuth, async (req, res) => {
 
 /* ──────────────────────  pending orders  ────────────────────── */
 
+// Lot size off the request, in the spellings the clients use.
+function lotsFor(body) {
+  const n = Number(body?.lots ?? body?.volume ?? body?.quantity)
+  if (!Number.isFinite(n) || n <= 0) {
+    const e = new Error('lots must be greater than 0')
+    e.status = 400
+    throw e
+  }
+  return n
+}
+
 const ORDER_TYPE = {
   'buy:limit': 'BUY_LIMIT',
   'buy:stop': 'BUY_STOP',
@@ -488,8 +499,43 @@ router.post('/orders', jwtAuth, async (req, res) => {
 
     const side = String(body.side || '').toLowerCase()
     const type = String(body.order_type || '').toLowerCase()
+    if (side !== 'buy' && side !== 'sell') return fail(res, 400, 'side must be buy or sell')
+
+    // A market order fills now; the rest of this handler arms a PENDING one and
+    // needs a price to arm it at. The app's Buy/Sell buttons post here with
+    // order_type "market", so without this branch the one action a trader takes
+    // most often answered 400 and no position could be opened from the app at
+    // all. Same tradeEngine.openTrade the website's /api/trade/open uses, so
+    // spread, margin, commission and the market-hours rule are identical.
+    if (type === 'market') {
+      if (!isMarketOpen(symbol)) {
+        return fail(res, 400, marketClosedReason(symbol) || `${symbol} is closed for trading right now`)
+      }
+      const quote = liveQuote(symbol)
+      if (!quote || !(quote.bid > 0) || !(quote.ask > 0)) {
+        return fail(res, 400, `No live price for ${symbol} right now`)
+      }
+
+      const trade = await tradeEngine.openTrade(
+        req.user._id,
+        String(account._id),
+        symbol,
+        resolveTradeSegment(symbol),
+        side.toUpperCase(),
+        'MARKET',
+        lotsFor(body),
+        quote.bid,
+        quote.ask,
+        Number.isFinite(Number(body.stop_loss)) ? Number(body.stop_loss) : null,
+        Number.isFinite(Number(body.take_profit)) ? Number(body.take_profit) : null,
+        body.leverage || null,
+        null,
+      )
+      return res.json(positionJson(trade))
+    }
+
     const orderType = ORDER_TYPE[`${side}:${type}`]
-    if (!orderType) return fail(res, 400, 'side must be buy/sell and order_type limit/stop')
+    if (!orderType) return fail(res, 400, 'order_type must be market, limit or stop')
 
     const lots = Number(body.lots)
     if (!Number.isFinite(lots) || lots <= 0) return fail(res, 400, 'lots must be greater than 0')
