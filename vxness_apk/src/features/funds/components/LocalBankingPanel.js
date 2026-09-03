@@ -28,9 +28,6 @@ export default function LocalBankingPanel({ amount = '' }) {
   const [cFile, setCFile] = useState(null);
   const [cSubmitting, setCSubmitting] = useState(false);
 
-  // Razorpay (per-request) — amount entry for the "awaiting" state + busy flag.
-  const [rzpAmounts, setRzpAmounts] = useState({});
-  const [rzpBusyId, setRzpBusyId] = useState(null);
 
   const loadRequests = useCallback(async () => {
     try {
@@ -38,17 +35,6 @@ export default function LocalBankingPanel({ amount = '' }) {
       const list = Array.isArray(res) ? res : (Array.isArray(res?.items) ? res.items : []);
       const filtered = list.filter(isLbItem).slice(0, 8);
       setRequests(filtered);
-      // Prefill the Razorpay amount box with the request's amount (if any),
-      // without clobbering anything the user has already typed.
-      setRzpAmounts((prev) => {
-        const next = { ...prev };
-        filtered.forEach((d) => {
-          if (d.payment_link === 'razorpay:awaiting' && next[d.id] === undefined && Number(d.amount) > 0) {
-            next[d.id] = String(Number(d.amount));
-          }
-        });
-        return next;
-      });
     } catch (_) {}
   }, []);
 
@@ -140,11 +126,6 @@ export default function LocalBankingPanel({ amount = '' }) {
               cFile={cFile} pickProof={pickProof}
               cSubmitting={cSubmitting}
               onSubmitProof={() => submitProof(r.id)}
-              rzpAmount={rzpAmounts[r.id] || ''}
-              setRzpAmount={(v) => setRzpAmounts((p) => ({ ...p, [r.id]: v }))}
-              rzpBusy={rzpBusyId === r.id}
-              onPayAwaiting={() => payAwaiting(r)}
-              onPayOrder={() => payOrder(r)}
             />
           ))}
         </>
@@ -156,7 +137,6 @@ export default function LocalBankingPanel({ amount = '' }) {
 function RequestCard({
   req, confirming, onPay, onToggleConfirm,
   cAmount, setCAmount, cTxId, setCTxId, cFile, pickProof, cSubmitting, onSubmitProof,
-  rzpAmount, setRzpAmount, rzpBusy, onPayAwaiting, onPayOrder,
 }) {
   const status = String(req.status || 'pending').toLowerCase();
   const isApproved = status === 'approved' || status === 'auto_approved';
@@ -165,20 +145,18 @@ function RequestCard({
   const proofSubmitted = Number(req.amount || 0) > 0;
   const link = req.payment_link || '';
   const openable = /^https?:\/\//i.test(link);
-  const isRzpAwaiting = link === 'razorpay:awaiting';
-  const isRzpOrder = link.startsWith('razorpay:') && !isRzpAwaiting;
-
+  // A request whose link is a razorpay: marker was meant to open the in-app
+  // gateway. Those screens were removed (the web dashboard has no in-app
+  // gateway), and the handlers went with them while this JSX kept calling
+  // them — tapping "Pay with Razorpay" crashed with "payOrder is not defined".
+  // Such a request is now shown as awaiting the admin, which is what it is.
   const stage = isApproved ? 'Credited'
     : isRejected ? 'Rejected'
-    : (isRzpAwaiting || isRzpOrder) ? 'Approved — pay via Razorpay'
     : proofSubmitted ? 'Proof submitted — verifying'
     : hasLink ? 'Payment details ready'
     : 'Awaiting admin review';
   const stageColor = isApproved ? vx.up : isRejected ? vx.down : vx.textMuted;
-  // Razorpay paths are NOT gated by proofSubmitted — an LB request created
-  // with an amount still needs to be paid via Razorpay (mirrors the website).
-  const rzpActive = (isRzpAwaiting || isRzpOrder) && !isApproved && !isRejected;
-  const proofActions = hasLink && !isApproved && !isRejected && !proofSubmitted && !isRzpAwaiting && !isRzpOrder;
+  const proofActions = hasLink && !isApproved && !isRejected && !proofSubmitted;
 
   return (
     <Card style={{ marginTop: space.sm }}>
@@ -187,14 +165,9 @@ function RequestCard({
           <Text style={styles.reqAmt}>{proofSubmitted ? `$${Number(req.amount || 0).toLocaleString()}` : 'Deposit request'}</Text>
           <Text style={[styles.reqStage, { color: stageColor }]}>{stage}</Text>
         </View>
-        {(isRzpOrder && rzpActive) || proofActions ? (
+        {proofActions ? (
           <View style={styles.reqBtns}>
-            {isRzpOrder && rzpActive ? (
-              <Pressable onPress={onPayOrder} disabled={rzpBusy} style={[styles.smallBtn, styles.payBtn, rzpBusy && { opacity: 0.6 }]} accessibilityRole="button">
-                <Text style={styles.payTxt}>{rzpBusy ? 'Opening…' : 'Pay with Razorpay'}</Text>
-              </Pressable>
-            ) : null}
-            {proofActions && openable ? (
+            {openable ? (
               <Pressable onPress={() => onPay(link)} style={[styles.smallBtn, styles.payBtn]} accessibilityRole="button">
                 <Text style={styles.payTxt}>Pay now</Text>
               </Pressable>
@@ -208,25 +181,6 @@ function RequestCard({
         ) : null}
       </View>
 
-      {/* Razorpay "awaiting" — enter amount, then create order + open checkout. */}
-      {isRzpAwaiting && !isApproved && !isRejected ? (
-        <View style={styles.confirmBox}>
-          <Text style={styles.cLabel}>Amount to deposit (USD)</Text>
-          <View style={styles.rzpRow}>
-            <TextInput
-              value={rzpAmount}
-              onChangeText={setRzpAmount}
-              keyboardType="decimal-pad"
-              placeholder="e.g. 100"
-              placeholderTextColor={vx.textMuted}
-              style={[styles.cInput, { flex: 1 }]}
-            />
-            <Pressable onPress={onPayAwaiting} disabled={rzpBusy || !(Number(rzpAmount) > 0)} style={[styles.smallBtn, styles.payBtn, (rzpBusy || !(Number(rzpAmount) > 0)) && { opacity: 0.6 }]} accessibilityRole="button">
-              <Text style={styles.payTxt}>{rzpBusy ? 'Opening…' : 'Pay with Razorpay'}</Text>
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
 
       {/* Inline "I've Paid" proof form. */}
       {confirming ? (
@@ -269,7 +223,6 @@ const styles = StyleSheet.create({
   payTxt: { color: vx.textInverse, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
   paidBtn: { borderWidth: 1, borderColor: vx.textPrimary },
   paidTxt: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },
-  rzpRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   confirmBox: { marginTop: space.md, paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: vx.border },
   cLabel: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.xs },
   cInput: { backgroundColor: vx.bgRaised, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.sm, color: vx.textPrimary, fontFamily, fontSize: sizes.body },

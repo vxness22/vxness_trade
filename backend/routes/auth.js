@@ -421,7 +421,7 @@ router.get('/user/:userId', async (req, res) => {
 // POST /api/auth/forgot-password - Send OTP for password reset
 router.post('/forgot-password', async (req, res) => {
   try {
-    const { email } = req.body
+    const { email, newEmail } = req.body
 
     if (!email) {
       return res.status(400).json({ success: false, message: 'Email is required' })
@@ -492,10 +492,17 @@ router.post('/forgot-password', async (req, res) => {
         })
       }
 
-      // Create new request
+      // Create new request.
+      //
+      // newEmail was being dropped here even though the rest of the flow is
+      // built for it: the model has the field and the admin approval path
+      // (routes/admin.js) writes it onto the user. A trader who asked to change
+      // their address got a plain password reset and no address change.
+      const requestedEmail = String(newEmail || '').trim().toLowerCase()
       await PasswordResetRequest.create({
         userId: user._id,
         email: user.email,
+        newEmail: requestedEmail && requestedEmail !== user.email ? requestedEmail : null,
         status: 'Pending'
       })
 

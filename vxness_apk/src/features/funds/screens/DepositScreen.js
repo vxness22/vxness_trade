@@ -144,18 +144,15 @@ export default function DepositScreen() {
               </Card>
             ) : null}
 
-            <PillButton
-              label="Pay with crypto gateway →"
-              variant="primary"
-              size="lg"
-              onPress={openGateway}
-              style={{ marginTop: hasDestination ? space.md : 0 }}
-            />
-
+            {/* The "Pay with crypto gateway" button used to open DepositOxapay.
+                That screen — along with the Razorpay and on-chain ones — was
+                removed because the web dashboard has no payment gateway, and
+                the button was left behind calling an openGateway that no longer
+                existed. Pressing it crashed the screen with "Property
+                'openGateway' doesn't exist". Manual deposit is the whole flow
+                now, exactly as it is on the web. */}
             {hasDestination ? (
               <>
-                <Text style={styles.orNote}>Or pay manually to the address above and submit your transaction hash below.</Text>
-
                 <Text style={[styles.label, { marginTop: space.md }]}>Transaction reference / tx hash</Text>
                 <TextInput value={txId} onChangeText={setTxId} placeholder="On-chain tx hash, UTR, or reference" placeholderTextColor={vx.textMuted} style={styles.input} autoCapitalize="none" autoCorrect={false} />
 
@@ -227,7 +224,6 @@ const styles = StyleSheet.create({
   walletAddr: { color: vx.textPrimary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
   copyTxt: { color: vx.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.bold, marginTop: space.xs },
   hint: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, lineHeight: 15 },
-  orNote: { color: vx.textMuted, fontFamily, fontSize: sizes.label, textAlign: 'center', marginTop: space.lg },
   proofBtn: { backgroundColor: vx.bgElevated, borderRadius: radius.md, overflow: 'hidden', minHeight: 140, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: vx.border, borderStyle: 'dashed' },
   proofImg: { width: '100%', height: 200 },
   proofPlaceholder: { alignItems: 'center', padding: space.lg, gap: space.sm },

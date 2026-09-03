@@ -14,6 +14,10 @@ const ForgotPassword = () => {
   const [error, setError] = useState('')
   const [requiresOTP, setRequiresOTP] = useState(false)
   const [showEmailChange, setShowEmailChange] = useState(false)
+  // The "change email" input has always been bound to these, but they were
+  // never declared — opening that section crashed the page with
+  // "newEmail is not defined".
+  const [newEmail, setNewEmail] = useState('')
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
