@@ -17,6 +17,12 @@
 <body>
   <div id="tv_chart"></div>
   <div id="ov" style="position:absolute;inset:0;z-index:8;pointer-events:none;overflow:hidden;"></div>
+  <!-- Brand watermark. z-index sits BELOW the overlay (8) so SL/TP handles stay
+       on top, and above the chart canvas. Faint enough to read candles through. -->
+  <img id="vxmark" src="vxness-logo.png" alt=""
+       style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+              width:46%;max-width:260px;opacity:.07;z-index:2;pointer-events:none;
+              user-select:none;" />
   <div id="boot"><div class="spin"></div></div>
 
   <!-- TradingView Advanced Charting Library — bundled LOCALLY inside the APK
@@ -430,6 +436,22 @@
         overrides: {
           'paneProperties.background': dark ? '#0b0e11' : '#ffffff',
           'paneProperties.backgroundType': 'solid',
+
+          // Candles, stated explicitly. Left unset the series was rendering as
+          // a line — 1 is candles (0 bars, 2 line, 3 area, 9 hollow).
+          'mainSeriesProperties.style': 1,
+          'mainSeriesProperties.candleStyle.upColor': '#22C55E',
+          'mainSeriesProperties.candleStyle.downColor': '#EF4444',
+          'mainSeriesProperties.candleStyle.borderUpColor': '#22C55E',
+          'mainSeriesProperties.candleStyle.borderDownColor': '#EF4444',
+          'mainSeriesProperties.candleStyle.wickUpColor': '#22C55E',
+          'mainSeriesProperties.candleStyle.wickDownColor': '#EF4444',
+          'mainSeriesProperties.candleStyle.drawWick': true,
+          'mainSeriesProperties.candleStyle.drawBorder': true,
+
+          // The library's own symbol watermark is off; the brand mark below
+          // replaces it.
+          'symbolWatermarkProperties.transparency': 100,
         },
         loading_screen: { backgroundColor: dark ? '#0b0e11' : '#ffffff' },
       });
