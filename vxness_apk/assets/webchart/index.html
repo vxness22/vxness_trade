@@ -18,8 +18,12 @@
   <div id="tv_chart"></div>
   <div id="ov" style="position:absolute;inset:0;z-index:8;pointer-events:none;overflow:hidden;"></div>
   <!-- Brand watermark. z-index sits BELOW the overlay (8) so SL/TP handles stay
-       on top, and above the chart canvas. Faint enough to read candles through. -->
-  <img id="vxmark" src="vxness-logo.png" alt=""
+       on top, and above the chart canvas. Faint enough to read candles through.
+       Named vxness-mark, not vxness-logo: the old name is already cached by the
+       CDN for four hours, and a ?v= cache-buster cannot be used because the APK
+       loads this same page over file://, where a query string becomes part of
+       the filename and 404s. A new name is correct on both paths at once. -->
+  <img id="vxmark" src="vxness-mark.png" alt=""
        style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
               width:34%;max-width:190px;opacity:.08;z-index:2;pointer-events:none;
               user-select:none;" />
