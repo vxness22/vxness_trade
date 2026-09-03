@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { View, ActivityIndicator, StyleSheet, Platform } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as SecureStore from 'expo-secure-store';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+import { Ionicons } from '@expo/vector-icons';
 
 import { API_URL } from '../../../constants';
 import { vx } from '../../../theme/vxTheme';
@@ -24,6 +26,23 @@ const LOCAL_HTML =
   Platform.OS === 'android'
     ? 'file:///android_asset/webchart/index.html'
     : 'webchart/index.html'; // iOS: bundled resource (added later)
+
+// The chart ships INSIDE the binary: plugins/withWebChart.js copies
+// assets/webchart into android/app/src/main/assets at prebuild, which is what
+// makes file:///android_asset/webchart/… resolve.
+//
+// Expo Go cannot carry it. It is a fixed, pre-built app from the Play Store, so
+// config plugins never run for it and there is no android_asset of ours inside
+// it — the WebView answers ERR_FILE_NOT_FOUND every time, forever. That is not
+// a bug to fix in JS; the 25 MB / 1,930-file charting library cannot be shipped
+// over the Metro bundle either. It needs a real build:
+//
+//   npx expo run:android            (local, needs the Android SDK)
+//   eas build -p android --profile development
+//
+// So rather than let the WebView fail and log an error on every symbol change,
+// say plainly what is wrong and how to get a chart.
+const IN_EXPO_GO = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 const RES_SECONDS = { '1': 60, '5': 300, '15': 900, '30': 1800, '60': 3600, '240': 14400, '1D': 86400, D: 86400 };
 function resSeconds(r) { return RES_SECONDS[r] || 300; }
@@ -275,6 +294,20 @@ export default function NativeChart({ symbol = 'EURUSD', interval = '60', theme,
     + `&theme=${dark ? 'dark' : 'light'}`
     + `&digits=${resolveSymbolInfo(bootRef.current.symbol).digits}`;
 
+  if (IN_EXPO_GO) {
+    return (
+      <View style={[styles.wrap, styles.notice]}>
+        <Ionicons name="bar-chart-outline" size={34} color={vx.textMuted} />
+        <Text style={styles.noticeTitle}>Chart needs a native build</Text>
+        <Text style={styles.noticeText}>
+          The charting library ships inside the app binary, which Expo Go cannot
+          load. Run a development build or install the APK to see charts.
+        </Text>
+        <Text style={styles.noticeCmd}>npx expo run:android</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.wrap}>
       <WebView
@@ -313,4 +346,11 @@ const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: vx.bg },
   web: { flex: 1, backgroundColor: vx.bg },
   loader: { position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: vx.bg },
+  notice: { alignItems: 'center', justifyContent: 'center', padding: 24, gap: 8 },
+  noticeTitle: { color: vx.textPrimary, fontSize: 15, fontWeight: '700', marginTop: 4 },
+  noticeText: { color: vx.textMuted, fontSize: 12, lineHeight: 17, textAlign: 'center' },
+  noticeCmd: {
+    color: vx.accent, fontSize: 12, marginTop: 4,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
 });
