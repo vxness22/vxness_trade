@@ -45,11 +45,11 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/brand/vxness-logo.png",
+          "image": "./assets/brand/vxness-icon.png",
           "resizeMode": "contain",
           "backgroundColor": "#000000",
           "dark": {
-            "image": "./assets/brand/vxness-logo.png",
+            "image": "./assets/brand/vxness-icon.png",
             "backgroundColor": "#000000"
           }
         }
