@@ -701,6 +701,22 @@ app.use('/api/v1', v1Routes)
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 
+// The mobile app's own chart, served from the app's own API host.
+//
+// The APK carries these files inside itself (plugins/withWebChart.js copies
+// them into android/app/src/main/assets), so a real build never asks for this
+// route. Expo Go cannot carry them — it is a fixed Play Store app — so during
+// development it loads the same page over HTTPS instead.
+//
+// Served from vxness_apk/assets/webchart, which is the SAME directory the APK
+// bundles: one copy, no drift, and nothing here belongs to the web trader.
+// Deliberately NOT hosted on trade.vxness.in — the app's chart must not depend
+// on the web front end.
+app.use('/app-chart', express.static(
+  path.join(__dirname, '..', 'vxness_apk', 'assets', 'webchart'),
+  { maxAge: '1h' },
+))
+
 
 
 // Serve APK download

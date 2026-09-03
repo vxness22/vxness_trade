@@ -4,7 +4,7 @@ import { WebView } from 'react-native-webview';
 import * as SecureStore from 'expo-secure-store';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 
-import { API_URL } from '../../../constants';
+import { API_URL, API_BASE_URL } from '../../../constants';
 import { vx } from '../../../theme/vxTheme';
 import { getInstruments } from '../../../utils/instrumentsCache';
 import logger from '../../../utils/logger';
@@ -27,22 +27,18 @@ const LOCAL_HTML =
     : 'webchart/index.html'; // iOS: bundled resource (added later)
 
 // The chart ships INSIDE the binary: plugins/withWebChart.js copies
-// assets/webchart into android/app/src/main/assets at prebuild, which is what
-// makes file:///android_asset/webchart/… resolve. That is the path a real
-// build (APK / dev build) takes, and it needs no network at all.
+// assets/webchart into android/app/src/main/assets at prebuild, so a real build
+// loads it from disk and needs no network at all.
 //
-// Expo Go cannot carry it — it is a fixed app from the Play Store, so our
-// config plugins never run for it and it holds no android_asset of ours. The
-// 25 MB / 1,930-file library cannot ride the Metro bundle either.
+// Expo Go cannot carry it — it is a fixed app from the Play Store, our config
+// plugins never run for it, and the 25 MB / 1,930-file library cannot ride the
+// Metro bundle either. So in Expo Go only, the same page is fetched over HTTPS.
 //
-// So for Expo Go only, load the SAME page over the network. It is this app's
-// own chart (frontend/public/app-native-chart.html is a copy of the very file
-// bundled above), hosted beside the charting_library the web deploy already
-// serves so its relative script paths resolve. The RN bridge is unchanged —
-// injected JS and postMessage work the same on a remote page — so the chart
-// behaves identically; it just fetches its shell over HTTPS instead of from
-// disk. A real build never touches this.
-const REMOTE_HTML = 'https://trade.vxness.in/app-native-chart.html';
+// It comes from the API host, NOT from trade.vxness.in. The backend serves
+// vxness_apk/assets/webchart — the very directory the APK bundles — at
+// /app-chart, so this is the app's own chart on the app's own server. The web
+// trader's chart is a separate thing and the app never touches it.
+const REMOTE_HTML = `${API_BASE_URL.replace(/\/$/, '')}/app-chart/index.html`;
 
 const IN_EXPO_GO = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
