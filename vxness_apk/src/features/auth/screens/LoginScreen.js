@@ -139,7 +139,7 @@ export default function LoginScreen({ navigation }) {
               "Welcome back / Sign in to continue your journey" copy. */}
           <View style={styles.header}>
             <Image
-              source={require('../../../../assets/brand/vxness-logo.png')}
+              source={require('../../../../assets/brand/vxness-icon.png')}
               style={styles.logo}
               resizeMode="contain"
               accessibilityRole="image"
@@ -253,8 +253,10 @@ const styles = StyleSheet.create({
   body: { flexGrow: 1, paddingHorizontal: space.xl, paddingTop: space.huge, paddingBottom: space.xl, justifyContent: 'flex-start' },
 
   header: { marginBottom: space.xxxl, alignItems: 'center' },
-  // 4:1, matching the asset's own 1600x400 — any other ratio letterboxes it.
-  logo: { width: 224, height: 56 },
+  // The full lockup (mark above the wordmark) is square — 1024x1024 — so the
+  // box is square too. The old 4:1 box was sized for the wordmark-only asset
+  // and would letterbox this one down to a sliver.
+  logo: { width: 132, height: 132 },
 
   form: {},
   label: { color: C.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm, letterSpacing: 0.3 },

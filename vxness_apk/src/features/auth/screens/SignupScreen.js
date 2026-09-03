@@ -78,7 +78,7 @@ export default function SignupScreen({ navigation }) {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <View style={styles.brandWrap}>
-            <Image source={require('../../../../assets/brand/vxness-logo.png')} style={styles.logo} resizeMode="contain" />
+            <Image source={require('../../../../assets/brand/vxness-icon.png')} style={styles.logo} resizeMode="contain" />
             <Text style={styles.tagline}>Create your account</Text>
           </View>
 
@@ -164,8 +164,8 @@ export default function SignupScreen({ navigation }) {
 const styles = StyleSheet.create({
   body: { padding: space.xl, paddingTop: space.xxl, flexGrow: 1 },
   brandWrap: { alignItems: 'center', marginBottom: space.xl },
-  // Same 4:1 as the sign-in screen, so the mark is identical on both.
-  logo: { width: 224, height: 56, marginBottom: space.md },
+  // Square, matching the 1024x1024 lockup — same mark and size as sign-in.
+  logo: { width: 132, height: 132, marginBottom: space.sm },
   tagline: { color: vx.textMuted, fontFamily, fontSize: sizes.body },
   label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.xs },
   input: {
