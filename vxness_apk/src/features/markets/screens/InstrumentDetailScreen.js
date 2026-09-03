@@ -249,7 +249,7 @@ export default function InstrumentDetailScreen() {
     setSubmitting(true);
     try {
       await ApiService.placeOrder({
-        account_id: activeAccount.id || activeAccount._id,
+        account_id: activeAccount.id || activeAccount._id || activeAccount.account_id,
         symbol,
         side: s,
         order_type: 'market',
@@ -383,7 +383,7 @@ export default function InstrumentDetailScreen() {
                   mounted across tabs; unmounts only while fullscreen is open so
                   we never run two heavy WebViews at once. */}
               {!chartFull ? (
-                <NativeChart symbol={symbol} interval={interval} theme={vx.isDark ? 'dark' : 'light'} accountId={activeAccount?.id || activeAccount?._id} onDrag={setChartDragging} refreshTick={posRefresh} onClosePosition={(id) => setClosePrompt(id)} />
+                <NativeChart symbol={symbol} interval={interval} theme={vx.isDark ? 'dark' : 'light'} accountId={activeAccount?.id || activeAccount?._id || activeAccount?.account_id} onDrag={setChartDragging} refreshTick={posRefresh} onClosePosition={(id) => setClosePrompt(id)} />
               ) : null}
             </View>
 
@@ -397,7 +397,7 @@ export default function InstrumentDetailScreen() {
                 {/* Safe-area padding so the chart's top toolbar isn't hidden
                     behind the device status bar / notch. */}
                 <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom }}>
-                  <NativeChart symbol={symbol} interval={interval} theme={vx.isDark ? 'dark' : 'light'} accountId={activeAccount?.id || activeAccount?._id} onDrag={setChartDragging} refreshTick={posRefresh} onClosePosition={(id) => setClosePrompt(id)} />
+                  <NativeChart symbol={symbol} interval={interval} theme={vx.isDark ? 'dark' : 'light'} accountId={activeAccount?.id || activeAccount?._id || activeAccount?.account_id} onDrag={setChartDragging} refreshTick={posRefresh} onClosePosition={(id) => setClosePrompt(id)} />
                   {/* Trade bar in fullscreen too: Lots + advanced (limit/stop)
                       opener + the same one-tap Sell/Buy split. Lift it above
                       the keyboard when typing Lots (edge-to-edge breaks the
@@ -520,7 +520,7 @@ export default function InstrumentDetailScreen() {
         visible={acctSheet}
         onClose={() => setAcctSheet(false)}
         accounts={accounts}
-        selectedId={activeAccount?.id || activeAccount?._id}
+        selectedId={activeAccount?.id || activeAccount?._id || activeAccount?.account_id}
         onSelect={selectAccount}
       />
 
@@ -668,7 +668,7 @@ function AdvancedOrderSheet({ visible, onClose, account, symbol, tick, maxH }) {
         showsVerticalScrollIndicator={false}
       >
         <OrderTicket
-          accountId={account?.id || account?._id}
+          accountId={account?.id || account?._id || account?.account_id}
           account={account}
           accountSummary={account}
           symbol={symbol}

@@ -161,7 +161,7 @@ const AccountsScreen = ({ navigation, route }) => {
   useEffect(() => {
     if (route?.params?.action && route?.params?.accountId && accounts.length > 0) {
       const account = accounts.find(
-        (a) => String(a.id || a._id) === String(route.params.accountId)
+        (a) => String(a.id || a._id || a.account_id) === String(route.params.accountId)
       );
       if (account) {
         setSelectedAccount(account);
@@ -365,7 +365,7 @@ const AccountsScreen = ({ navigation, route }) => {
 
     setIsTransferring(true);
     try {
-      const accountId = selectedAccount.id || selectedAccount._id;
+      const accountId = selectedAccount.id || selectedAccount._id || selectedAccount.account_id;
       const amount = parseFloat(transferAmount);
 
       // Try the web endpoint first (matches frontend/trader)
@@ -413,7 +413,7 @@ const AccountsScreen = ({ navigation, route }) => {
 
     setIsTransferring(true);
     try {
-      const accountId = selectedAccount.id || selectedAccount._id;
+      const accountId = selectedAccount.id || selectedAccount._id || selectedAccount.account_id;
       const amount = parseFloat(transferAmount);
 
       // Try the web endpoint first
@@ -611,7 +611,7 @@ const AccountsScreen = ({ navigation, route }) => {
             setDeletingAccountId(aid);
             try {
               await ApiService.deleteAccount(aid);
-              setAccounts((prev) => prev.filter((a) => (a.id || a._id) !== aid));
+              setAccounts((prev) => prev.filter((a) => (a.id || a._id || a.account_id) !== aid));
               Alert.alert('Deleted', 'Account removed');
             } catch (e) {
               logger.error('AccountsScreen: delete account error', e);

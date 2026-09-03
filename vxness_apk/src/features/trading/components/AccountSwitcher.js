@@ -36,7 +36,7 @@ export default function AccountSwitcher({ visible, onClose, accounts = [], selec
       {accounts.length === 0 ? (
         <Text style={styles.empty}>No accounts. Open one in Funds.</Text>
       ) : accounts.map((a) => {
-        const id = a.id || a._id;
+        const id = a.id || a._id || a.account_id;
         const isSelected = id === selectedId;
         const tag = acctTag(a);
         const balance = a.balance != null

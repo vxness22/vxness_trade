@@ -62,7 +62,7 @@ export default function TransactionHistoryScreen() {
   const acctMap = useMemo(() => {
     const m = {};
     for (const a of accounts || []) {
-      const id = String(a.id || a._id || '');
+      const id = String(a.id || a._id || a.account_id || '');
       if (!id) continue;
       m[id] = `${a.is_demo ? 'Demo' : 'Live'} ${a.account_number || id.slice(0, 8)}`;
     }

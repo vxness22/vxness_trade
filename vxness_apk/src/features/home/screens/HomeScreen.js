@@ -74,7 +74,7 @@ export default function HomeScreen() {
 
   // Fetch live equity/PnL for the selected account.
   useEffect(() => {
-    const id = selectedAccount?.id || selectedAccount?._id;
+    const id = selectedAccount?.id || selectedAccount?._id || selectedAccount?.account_id;
     if (!id) { setAccountSummary(null); return; }
     let cancelled = false;
     ApiService.getAccountSummary(id)
@@ -237,7 +237,7 @@ export default function HomeScreen() {
         visible={accountSheet}
         onClose={() => setAccountSheet(false)}
         accounts={accounts}
-        selectedId={selectedAccount?.id || selectedAccount?._id}
+        selectedId={selectedAccount?.id || selectedAccount?._id || selectedAccount?.account_id}
         onSelect={selectAccount}
         onAddAccount={() => nav.navigate('Accounts', { action: 'open' })}
       />
