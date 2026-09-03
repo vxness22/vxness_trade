@@ -149,12 +149,103 @@ router.post('/buy', async (req, res) => {
   }
 })
 
+// Challenge accounts decorated with live equity, drawdown and profit.
+//
+// Shared by the web route below and by /api/v1/prop/accounts (the mobile app),
+// so both surfaces compute equity, daily DD, overall DD and profit percent the
+// same way. A divergence here would have the app and the web dashboard showing
+// different drawdown for the same account — and drawdown is what passes or
+// fails a challenge.
+export async function enrichChallengeAccounts(accounts) {
+  const Trade = (await import('../models/Trade.js')).default
+
+  // Fetch live prices from Binance for crypto and use cached prices
+  let livePrices = {}
+  try {
+    const binanceRes = await fetch('https://api.binance.com/api/v3/ticker/bookTicker')
+    const binanceData = await binanceRes.json()
+    binanceData.forEach(ticker => {
+      // Map Binance symbols to our format
+      const symbol = ticker.symbol.replace('USDT', 'USD')
+      livePrices[symbol] = {
+        bid: parseFloat(ticker.bidPrice),
+        ask: parseFloat(ticker.askPrice)
+      }
+    })
+  } catch (e) {
+    console.log('Could not fetch live prices for challenge accounts')
+  }
+
+  // Calculate real-time values for each account based on open trades
+  const accountsWithRealTimeData = await Promise.all(accounts.map(async (account) => {
+    const accountObj = account.toObject()
+    
+    // Get open trades for this account
+    const openTrades = await Trade.find({
+      tradingAccountId: account._id,
+      status: 'OPEN'
+    })
+    
+    // Calculate floating PnL using live prices
+    let floatingPnl = 0
+    openTrades.forEach(trade => {
+      const priceData = livePrices[trade.symbol]
+      if (priceData) {
+        const currentPrice = trade.side === 'BUY' ? priceData.bid : priceData.ask
+        const contractSize = trade.contractSize || 100000
+        floatingPnl += pnlUsd(
+          trade.symbol, trade.side, trade.openPrice, currentPrice,
+          trade.quantity, contractSize, (s) => infowayService.getPrice(s)
+        )
+        floatingPnl -= (trade.commission || 0) + (trade.swap || 0)
+      } else {
+        // Fallback to stored PnL if no live price
+        floatingPnl += trade.currentPnl || trade.floatingPnl || 0
+      }
+    })
+    
+    // Calculate real-time equity
+    const realTimeEquity = account.currentBalance + floatingPnl
+    
+    // Calculate real-time drawdown and profit percentages
+    const initialBalance = account.initialBalance || account.phaseStartBalance || 5000
+    const dayStartEquity = account.dayStartEquity || initialBalance
+    
+    // Daily DD = (dayStartEquity - currentEquity) / dayStartEquity * 100
+    const dailyLoss = dayStartEquity - realTimeEquity
+    const realTimeDailyDD = dailyLoss > 0 ? (dailyLoss / dayStartEquity) * 100 : 0
+    
+    // Overall DD — STATIC (from initial balance) or TRAILING (from equity peak)
+    const lowestEquity = Math.min(account.lowestEquityOverall || initialBalance, realTimeEquity)
+    const realTimeOverallDD = overallDrawdownPercent({
+      drawdownType: account.challengeId?.rules?.drawdownType || 'STATIC',
+      initialBalance,
+      highestEquity: Math.max(account.highestEquity || initialBalance, realTimeEquity),
+      lowestEquityOverall: lowestEquity,
+      currentEquity: realTimeEquity
+    })
+    
+    // Profit = (currentEquity - initialBalance) / initialBalance * 100
+    const realTimeProfit = ((realTimeEquity - initialBalance) / initialBalance) * 100
+    
+    return {
+      ...accountObj,
+      currentEquity: realTimeEquity,
+      currentDailyDrawdownPercent: Math.round(realTimeDailyDD * 100) / 100,
+      currentOverallDrawdownPercent: Math.round(realTimeOverallDD * 100) / 100,
+      currentProfitPercent: Math.round(realTimeProfit * 100) / 100,
+      floatingPnl: Math.round(floatingPnl * 100) / 100
+    }
+  }))
+
+  return accountsWithRealTimeData
+}
+
 // GET /api/prop/my-accounts/:userId - Get user's challenge accounts
 router.get('/my-accounts/:userId', async (req, res) => {
   try {
     const { userId } = req.params
     const { status } = req.query
-    const Trade = (await import('../models/Trade.js')).default
 
     let query = { userId }
     if (status) query.status = status
@@ -163,86 +254,7 @@ router.get('/my-accounts/:userId', async (req, res) => {
       .populate('challengeId')
       .sort({ createdAt: -1 })
 
-    // Fetch live prices from Binance for crypto and use cached prices
-    let livePrices = {}
-    try {
-      const binanceRes = await fetch('https://api.binance.com/api/v3/ticker/bookTicker')
-      const binanceData = await binanceRes.json()
-      binanceData.forEach(ticker => {
-        // Map Binance symbols to our format
-        const symbol = ticker.symbol.replace('USDT', 'USD')
-        livePrices[symbol] = {
-          bid: parseFloat(ticker.bidPrice),
-          ask: parseFloat(ticker.askPrice)
-        }
-      })
-    } catch (e) {
-      console.log('Could not fetch live prices for challenge accounts')
-    }
-
-    // Calculate real-time values for each account based on open trades
-    const accountsWithRealTimeData = await Promise.all(accounts.map(async (account) => {
-      const accountObj = account.toObject()
-      
-      // Get open trades for this account
-      const openTrades = await Trade.find({
-        tradingAccountId: account._id,
-        status: 'OPEN'
-      })
-      
-      // Calculate floating PnL using live prices
-      let floatingPnl = 0
-      openTrades.forEach(trade => {
-        const priceData = livePrices[trade.symbol]
-        if (priceData) {
-          const currentPrice = trade.side === 'BUY' ? priceData.bid : priceData.ask
-          const contractSize = trade.contractSize || 100000
-          floatingPnl += pnlUsd(
-            trade.symbol, trade.side, trade.openPrice, currentPrice,
-            trade.quantity, contractSize, (s) => infowayService.getPrice(s)
-          )
-          floatingPnl -= (trade.commission || 0) + (trade.swap || 0)
-        } else {
-          // Fallback to stored PnL if no live price
-          floatingPnl += trade.currentPnl || trade.floatingPnl || 0
-        }
-      })
-      
-      // Calculate real-time equity
-      const realTimeEquity = account.currentBalance + floatingPnl
-      
-      // Calculate real-time drawdown and profit percentages
-      const initialBalance = account.initialBalance || account.phaseStartBalance || 5000
-      const dayStartEquity = account.dayStartEquity || initialBalance
-      
-      // Daily DD = (dayStartEquity - currentEquity) / dayStartEquity * 100
-      const dailyLoss = dayStartEquity - realTimeEquity
-      const realTimeDailyDD = dailyLoss > 0 ? (dailyLoss / dayStartEquity) * 100 : 0
-      
-      // Overall DD — STATIC (from initial balance) or TRAILING (from equity peak)
-      const lowestEquity = Math.min(account.lowestEquityOverall || initialBalance, realTimeEquity)
-      const realTimeOverallDD = overallDrawdownPercent({
-        drawdownType: account.challengeId?.rules?.drawdownType || 'STATIC',
-        initialBalance,
-        highestEquity: Math.max(account.highestEquity || initialBalance, realTimeEquity),
-        lowestEquityOverall: lowestEquity,
-        currentEquity: realTimeEquity
-      })
-      
-      // Profit = (currentEquity - initialBalance) / initialBalance * 100
-      const realTimeProfit = ((realTimeEquity - initialBalance) / initialBalance) * 100
-      
-      return {
-        ...accountObj,
-        currentEquity: realTimeEquity,
-        currentDailyDrawdownPercent: Math.round(realTimeDailyDD * 100) / 100,
-        currentOverallDrawdownPercent: Math.round(realTimeOverallDD * 100) / 100,
-        currentProfitPercent: Math.round(realTimeProfit * 100) / 100,
-        floatingPnl: Math.round(floatingPnl * 100) / 100
-      }
-    }))
-
-    res.json({ success: true, accounts: accountsWithRealTimeData })
+    res.json({ success: true, accounts: await enrichChallengeAccounts(accounts) })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
   }

@@ -44,7 +44,23 @@ function isIndexSymbol(symbol) {
 // first time one of them was edited, and the app would price a trade off
 // different metadata than the website.
 export function instrumentCatalogue() {
-  return SUPPORTED_SYMBOLS.map(symbol => {
+  // Only what the LP actually feeds. SUPPORTED_SYMBOLS is the superset we are
+  // willing to carry; the feed decides what is real. Listing a symbol Infoway
+  // never sends meant showing a hard-coded FALLBACK_PRICES quote that never
+  // moves — and a client could open a position against that invented price.
+  //
+  // Self-correcting in both directions: a symbol the LP starts carrying appears
+  // on its first tick, one it drops falls off after the persisted cache is
+  // rebuilt. The cache is loaded at boot, so this is already populated before
+  // the first request rather than empty until the socket connects.
+  const live = SUPPORTED_SYMBOLS.filter(s => infowayService.hasLiveFeed(s))
+
+  // A cold machine with no persisted cache and no connection yet would
+  // otherwise serve an empty instrument list, which reads as "platform down".
+  // Better to show the full set for those few seconds than nothing at all.
+  const symbols = live.length ? live : SUPPORTED_SYMBOLS
+
+  return symbols.map(symbol => {
     const category = categorizeSymbol(symbol)
     return {
       symbol,

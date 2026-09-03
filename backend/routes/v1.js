@@ -29,6 +29,26 @@ import { resolveTradeSegment } from '../utils/tradeSegment.js'
 import { jwtAuth, ownedAccount, signAccessToken, fail } from '../utils/terminalAuth.js'
 import { validatePendingBrackets } from '../utils/bracketGuard.js'
 import { isMarketOpen, marketClosedReason } from '../utils/marketHours.js'
+import Challenge from '../models/Challenge.js'
+import ChallengeAccount from '../models/ChallengeAccount.js'
+import PropSettings from '../models/PropSettings.js'
+import propTradingEngine from '../services/propTradingEngine.js'
+import { enrichChallengeAccounts } from './propTrading.js'
+import { fetchBars } from './charts.js'
+import OTP from '../models/OTP.js'
+import Admin from '../models/Admin.js'
+import PaymentMethod from '../models/PaymentMethod.js'
+import IBWallet from '../models/IBWallet.js'
+import IBCommissionNew from '../models/IBCommissionNew.js'
+import ibEngineNew from '../services/ibEngineNew.js'
+import multer from 'multer'
+import pathV1 from 'path'
+import fsV1 from 'fs'
+import { fileURLToPath as fileURLToPathV1 } from 'url'
+import EmailSettings from '../models/EmailSettings.js'
+import { sendTemplateEmail, generateOTP, isOTPEnabled, getOTPExpiry } from '../services/emailService.js'
+
+const dirnameV1 = pathV1.dirname(fileURLToPathV1(import.meta.url))
 
 const router = express.Router()
 
@@ -125,10 +145,13 @@ router.post('/auth/refresh', async (req, res) => {
 // GET /api/v1/accounts — trading accounts belonging to the signed-in user.
 router.get('/accounts', jwtAuth, async (req, res) => {
   try {
-    const accounts = await TradingAccount.find({
-      userId: req.user._id,
-      status: { $ne: 'Archived' },
-    }).populate('accountTypeId', 'name isDemo leverage').sort({ createdAt: -1 })
+    // An investor session is pinned to the one account its password unlocked —
+    // it must not enumerate the owner's other accounts.
+    const scope = { userId: req.user._id, status: { $ne: 'Archived' } }
+    if (req.investorAccountId) scope._id = req.investorAccountId
+
+    const accounts = await TradingAccount.find(scope)
+      .populate('accountTypeId', 'name isDemo leverage').sort({ createdAt: -1 })
 
     res.json({
       accounts: accounts.map(a => ({
@@ -1276,6 +1299,1206 @@ router.get('/banners', jwtAuth, (_req, res) => res.json({ items: [] }))
 router.post('/banners/:id/click', jwtAuth, (_req, res) => res.json({ message: 'ok' }))
 
 /* ─────────────────────────  instruments  ───────────────────────── */
+
+// POST /api/v1/auth/investor-login — {account_number, password}
+//
+// The read-only sign-in an account owner hands to someone who should see the
+// account but not touch it. The credential is the account's investorPassword,
+// set by an admin — the same one the web's /trading-accounts/investor-login
+// checks, so one password works on both.
+//
+// The session it issues is the owner's, marked `ro`, and pinned to this one
+// account. Enforcement is in jwtAuth (utils/terminalAuth.js): every non-GET is
+// refused there, so the restriction holds even if the request never goes near
+// the app's UI.
+router.post('/auth/investor-login', async (req, res) => {
+  try {
+    const accountNumber = String(req.body?.account_number || req.body?.accountId || '').trim()
+    const password = String(req.body?.password || '')
+    if (!accountNumber || !password) return fail(res, 400, 'Account number and password are required')
+
+    const account = await TradingAccount.findOne({ accountId: accountNumber })
+      .populate('userId', 'firstName email isBlocked isBanned')
+      .populate('accountTypeId', 'name isDemo')
+
+    // One message for "no such account" and "wrong password" alike — telling
+    // them apart would turn this into an account-number oracle.
+    const INVALID = 'Invalid account number or password'
+    if (!account) return fail(res, 401, INVALID)
+    if (!account.investorPassword || account.investorPassword !== password) {
+      return fail(res, 401, INVALID)
+    }
+
+    const owner = account.userId
+    if (!owner) return fail(res, 401, INVALID)
+    if (owner.isBanned) return fail(res, 403, 'This account is banned')
+    if (owner.isBlocked) return fail(res, 403, 'This account is blocked')
+
+    // No refresh cookie: an investor session is deliberately short-lived and
+    // must not silently renew itself the way an owner's session does.
+    const accessToken = signAccessToken(owner._id, { ro: true, acct: String(account._id) })
+
+    res.json({
+      access_token: accessToken,
+      token: accessToken,
+      token_type: 'bearer',
+      read_only: true,
+      investor: true,
+      account_id: String(account._id),
+      name: owner.firstName,
+      user: {
+        id: String(owner._id),
+        name: owner.firstName,
+        full_name: owner.firstName,
+        email: owner.email,
+        kyc_approved: true,
+        read_only: true,
+      },
+      account: {
+        account_id: String(account._id),
+        account_number: account.accountId,
+        balance: account.balance,
+        credit: account.credit,
+        leverage: account.leverage,
+        status: account.status,
+        is_demo: !!(account.isDemo || account.accountTypeId?.isDemo),
+        type: account.accountTypeId?.name || '',
+      },
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+/* ─────────────────────  signup (OTP)  ───────────────────── */
+
+// The app collects the whole form first, emails a code, then verifies with only
+// {email, otp} — so the form has to be parked somewhere between the two calls.
+// It waits on the OTP document (models/OTP.js pendingSignup) and the account is
+// created only once the code checks out. Nothing is written to the users
+// collection before verification, so an abandoned signup leaves nothing behind.
+
+async function createSignupUser(payload) {
+  const email = String(payload.email || '').trim().toLowerCase()
+
+  let assignedAdmin = null, adminUrlSlug = null
+  if (payload.adminSlug) {
+    const admin = await Admin.findOne({ urlSlug: String(payload.adminSlug).toLowerCase(), status: 'ACTIVE' })
+    if (admin) { assignedAdmin = admin._id; adminUrlSlug = admin.urlSlug }
+  }
+
+  let parentIBId = null, referredBy = null
+  if (payload.referralCode) {
+    const ib = await User.findOne({ referralCode: payload.referralCode, isIB: true, ibStatus: 'ACTIVE' })
+    if (ib) { parentIBId = ib._id; referredBy = payload.referralCode }
+  }
+
+  const user = await User.create({
+    firstName: payload.firstName || payload.first_name || payload.name || '',
+    email,
+    phone: payload.phone || '',
+    countryCode: payload.countryCode || payload.country_code || '',
+    password: payload.password,
+    assignedAdmin,
+    adminUrlSlug,
+    parentIBId,
+    referredBy,
+    emailVerified: true,
+  })
+
+  if (assignedAdmin) await Admin.findByIdAndUpdate(assignedAdmin, { $inc: { 'stats.totalUsers': 1 } })
+
+  const settings = await EmailSettings.findOne()
+  sendTemplateEmail('welcome', email, {
+    firstName: user.firstName,
+    email: user.email,
+    platformName: settings?.fromName || 'Vxness',
+    loginUrl: 'https://vxness.in/user/login',
+    supportEmail: settings?.fromEmail || 'support@vxness.in',
+    year: new Date().getFullYear().toString(),
+  })
+
+  return user
+}
+
+async function issueSession(res, user) {
+  const accessToken = signAccessToken(user._id)
+  setRefreshCookie(res, await TerminalRefreshToken.issue(user._id))
+  return {
+    access_token: accessToken,
+    token: accessToken,
+    token_type: 'bearer',
+    user_id: String(user._id),
+    name: user.firstName,
+    user: {
+      id: String(user._id),
+      name: user.firstName,
+      full_name: user.firstName,
+      email: user.email,
+      kyc_approved: !!user.kycApproved,
+    },
+  }
+}
+
+// POST /api/v1/auth/register/start — the signup form; emails a code.
+router.post('/auth/register/start', async (req, res) => {
+  try {
+    const body = req.body || {}
+    const email = String(body.email || '').trim().toLowerCase()
+    const password = String(body.password || '')
+    if (!email || !password) return fail(res, 400, 'Email and password are required')
+
+    if (await User.findOne({ email })) return fail(res, 400, 'An account with this email already exists')
+
+    // OTP switched off platform-wide: create the account now and hand back a
+    // session, so the app's verify step has nothing left to do.
+    if (!(await isOTPEnabled())) {
+      const user = await createSignupUser({ ...body, email, password })
+      return res.json({ ...(await issueSession(res, user)), otp_required: false, message: 'Account created' })
+    }
+
+    const otp = generateOTP()
+    const expiryMinutes = await getOTPExpiry()
+    await OTP.deleteMany({ email, purpose: 'signup' })
+    await OTP.create({
+      email,
+      otp,
+      purpose: 'signup',
+      expiresAt: new Date(Date.now() + expiryMinutes * 60 * 1000),
+      pendingSignup: { ...body, email, password },
+    })
+
+    const settings = await EmailSettings.findOne()
+    await sendTemplateEmail('email_verification', email, {
+      otp,
+      firstName: body.firstName || body.first_name || 'User',
+      email,
+      expiryMinutes: String(expiryMinutes),
+      platformName: settings?.fromName || 'Vxness',
+      supportEmail: settings?.fromEmail || 'support@vxness.in',
+      year: new Date().getFullYear().toString(),
+    })
+
+    res.json({ otp_required: true, message: 'Verification code sent to your email' })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// POST /api/v1/auth/register/verify — {email, otp} → account + session.
+router.post('/auth/register/verify', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase()
+    const otp = String(req.body?.otp || '').trim()
+    if (!email || !otp) return fail(res, 400, 'Email and code are required')
+
+    const record = await OTP.findOne({ email, otp, purpose: 'signup' })
+    if (!record) return fail(res, 400, 'Invalid verification code')
+    if (record.expiresAt < new Date()) {
+      await OTP.deleteOne({ _id: record._id })
+      return fail(res, 400, 'This code has expired — request a new one')
+    }
+
+    // Re-checked here, not only at start: two devices could run the flow
+    // concurrently, and the unique index would otherwise surface as a 500.
+    if (await User.findOne({ email })) {
+      await OTP.deleteOne({ _id: record._id })
+      return fail(res, 400, 'An account with this email already exists')
+    }
+
+    const payload = record.pendingSignup
+    if (!payload) return fail(res, 400, 'Signup details expired — please start again')
+
+    const user = await createSignupUser(payload)
+    await OTP.deleteOne({ _id: record._id })
+
+    res.json(await issueSession(res, user))
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// POST /api/v1/auth/register/resend — {email}
+router.post('/auth/register/resend', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase()
+    if (!email) return fail(res, 400, 'Email is required')
+
+    const record = await OTP.findOne({ email, purpose: 'signup' })
+    if (!record) return fail(res, 400, 'No signup in progress for this email')
+
+    const otp = generateOTP()
+    const expiryMinutes = await getOTPExpiry()
+    record.otp = otp
+    record.expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000)
+    await record.save()
+
+    const settings = await EmailSettings.findOne()
+    await sendTemplateEmail('email_verification', email, {
+      otp,
+      firstName: record.pendingSignup?.firstName || 'User',
+      email,
+      expiryMinutes: String(expiryMinutes),
+      platformName: settings?.fromName || 'Vxness',
+      supportEmail: settings?.fromEmail || 'support@vxness.in',
+      year: new Date().getFullYear().toString(),
+    })
+
+    res.json({ message: 'A new code is on its way' })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// POST /api/v1/auth/register — one-shot signup, no OTP step.
+router.post('/auth/register', async (req, res) => {
+  try {
+    const body = req.body || {}
+    const email = String(body.email || '').trim().toLowerCase()
+    if (!email || !body.password) return fail(res, 400, 'Email and password are required')
+    if (await User.findOne({ email })) return fail(res, 400, 'An account with this email already exists')
+
+    const user = await createSignupUser({ ...body, email })
+    res.json(await issueSession(res, user))
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+/* ─────────────────  instrument price & bars  ───────────────── */
+
+// GET /api/v1/instruments/:symbol/price — one live quote.
+// Registered before the catalogue routes below would ever see it; Express
+// matches in order and none of those take a :symbol, so there is no shadowing.
+router.get('/instruments/:symbol/price', jwtAuth, (req, res) => {
+  try {
+    const symbol = String(req.params.symbol || '').toUpperCase()
+    const q = infowayService.getPrice(symbol)
+    if (!q || !q.bid) return fail(res, 404, `No price for ${symbol}`)
+
+    const meta = instrumentCatalogue().find(i => i.symbol === symbol)
+    res.json({
+      symbol,
+      name: meta?.name || symbol,
+      bid: q.bid,
+      ask: q.ask,
+      spread: q.ask != null && q.bid != null ? Number((q.ask - q.bid).toFixed(8)) : null,
+      change: q.change ?? null,
+      change_pct: q.changePercent ?? q.change_pct ?? null,
+      digits: meta?.digits ?? 5,
+      time: q.time || Date.now(),
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// GET /api/v1/instruments/:symbol/bars?resolution=&from=&to=&countback=&limit=
+//
+// The app's bundled chart is a separate build from the web's, but it must draw
+// the same candles, so both go through the one fetchBars() in routes/charts.js.
+// from/to/countback are passed straight through — they are what lets the chart
+// page backwards as the user scrolls; without them every scroll would re-fetch
+// the most recent bars and the chart would look like it had no history.
+router.get('/instruments/:symbol/bars', jwtAuth, async (req, res) => {
+  try {
+    const symbol = String(req.params.symbol || '').toUpperCase()
+    const bars = await fetchBars(symbol, String(req.query.resolution || '60'), {
+      from: req.query.from,
+      to: req.query.to,
+      countback: req.query.countback,
+      limit: parseInt(req.query.limit, 10) || undefined,
+    })
+    res.json({ s: 'ok', symbol, bars, noData: bars.length === 0 })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+/* ─────────────────────  account admin  ───────────────────── */
+
+// DELETE /api/v1/accounts/:id — archive, then delete once empty.
+//
+// The web requires the account to be archived first and refuses otherwise. The
+// app has no separate archive step, so this does both: it archives an active
+// account and then removes it, which is the behaviour the Close button implies.
+// A balance still on the account blocks the delete — losing funds to a stray tap
+// is not something to be tidy about.
+router.delete('/accounts/:id', jwtAuth, async (req, res) => {
+  try {
+    const account = await ownedAccount(req.user._id, req.params.id)
+
+    const openTrades = await Trade.countDocuments({ tradingAccountId: account._id, status: 'OPEN' })
+    if (openTrades > 0) return fail(res, 400, 'Close your open positions before closing this account')
+
+    if (Number(account.balance || 0) > 0.01) {
+      return fail(res, 400, 'Withdraw the remaining balance before closing this account')
+    }
+
+    await Trade.deleteMany({ tradingAccountId: account._id })
+    await TradingAccount.findByIdAndDelete(account._id)
+
+    res.json({ message: 'Account closed' })
+  } catch (e) {
+    fail(res, e.status || 500, e.message)
+  }
+})
+
+/* ─────────────────────  funding  ───────────────────── */
+
+// POST /api/v1/wallet/deposit/bank-details — where to send a manual deposit.
+// POST, not GET: that is what the app sends, and changing the client would put
+// old installs out of step with the server.
+router.post('/wallet/deposit/bank-details', jwtAuth, async (_req, res) => {
+  try {
+    const pm = await PaymentMethod.findOne({ isActive: true }).sort({ createdAt: -1 })
+    if (!pm) return res.json({})
+
+    res.json({
+      type: pm.type || 'bank',
+      bank_name: pm.bankName || '',
+      account_number: pm.accountNumber || '',
+      account_holder_name: pm.accountHolderName || '',
+      ifsc_code: pm.ifscCode || '',
+      upi_id: pm.upiId || '',
+      qr_code_url: pm.qrCodeImage || '',
+      wallet_address: pm.walletAddress || '',
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+function txPage(req) {
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1)
+  const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page, 10) || 20))
+  return { page, perPage, skip: (page - 1) * perPage }
+}
+
+function txJson(t) {
+  return {
+    id: String(t._id),
+    type: t.type,
+    method: t.paymentMethod || '',
+    amount: t.amount,
+    currency: 'USD',
+    status: t.status,
+    description: t.description || '',
+    reference: t.transactionRef || '',
+    created_at: t.createdAt,
+  }
+}
+
+// GET /api/v1/wallet/deposits
+router.get('/wallet/deposits', jwtAuth, async (req, res) => {
+  try {
+    const { page, perPage, skip } = txPage(req)
+    const query = { userId: req.user._id, type: { $in: ['Deposit', 'Challenge_Purchase'] } }
+    const [items, total] = await Promise.all([
+      Transaction.find(query).sort({ createdAt: -1 }).skip(skip).limit(perPage),
+      Transaction.countDocuments(query),
+    ])
+    res.json({ items: items.map(txJson), page, per_page: perPage, total })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// GET /api/v1/wallet/withdrawals
+router.get('/wallet/withdrawals', jwtAuth, async (req, res) => {
+  try {
+    const { page, perPage, skip } = txPage(req)
+    const query = { userId: req.user._id, type: { $in: ['Withdrawal', 'Payout'] } }
+    const [items, total] = await Promise.all([
+      Transaction.find(query).sort({ createdAt: -1 }).skip(skip).limit(perPage),
+      Transaction.countDocuments(query),
+    ])
+    res.json({ items: items.map(txJson), page, per_page: perPage, total })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// POST /api/v1/wallet/transfer-internal — {from_account_id, to_account_id, amount}
+// Account → account. Both accounts are resolved through ownedAccount(), so a
+// transfer can never reach an account the caller does not hold.
+router.post('/wallet/transfer-internal', jwtAuth, async (req, res) => {
+  try {
+    const fromId = req.body?.from_account_id
+    const toId = req.body?.to_account_id
+    const amount = Number(req.body?.amount)
+
+    if (!fromId || !toId) return fail(res, 400, 'Both accounts are required')
+    if (String(fromId) === String(toId)) return fail(res, 400, 'Choose two different accounts')
+    if (!(amount > 0)) return fail(res, 400, 'Enter an amount greater than zero')
+
+    const from = await ownedAccount(req.user._id, fromId)
+    const to = await ownedAccount(req.user._id, toId)
+
+    if (from.status !== 'Active') return fail(res, 400, 'The source account is not active')
+    if (to.status !== 'Active') return fail(res, 400, 'The destination account is not active')
+    if (Number(from.balance || 0) < amount) return fail(res, 400, 'Insufficient balance in the source account')
+
+    from.balance -= amount
+    to.balance += amount
+    await from.save()
+    await to.save()
+
+    const ref = `ACCTRF${Date.now()}`
+    await Transaction.create([
+      {
+        userId: req.user._id,
+        type: 'Account_Transfer_Out',
+        amount,
+        paymentMethod: 'Internal',
+        tradingAccountId: from._id,
+        tradingAccountName: from.accountId,
+        toTradingAccountId: to._id,
+        toTradingAccountName: to.accountId,
+        status: 'Completed',
+        transactionRef: ref,
+      },
+      {
+        userId: req.user._id,
+        type: 'Account_Transfer_In',
+        amount,
+        paymentMethod: 'Internal',
+        tradingAccountId: to._id,
+        tradingAccountName: to.accountId,
+        fromTradingAccountId: from._id,
+        fromTradingAccountName: from.accountId,
+        status: 'Completed',
+        transactionRef: ref,
+      },
+    ])
+
+    res.json({
+      message: `$${amount} moved from ${from.accountId} to ${to.accountId}`,
+      from_balance: from.balance,
+      to_balance: to.balance,
+    })
+  } catch (e) {
+    fail(res, e.status || 500, e.message)
+  }
+})
+
+/* ─────────────────  uploads: KYC & manual funding  ───────────────── */
+
+// Files land in the same folders the web writes to (backend/uploads/...), so
+// one admin screen reviews submissions from either client and the stored path
+// means the same thing on both.
+const v1UploadDir = (sub) => {
+  const dir = pathV1.join(dirnameV1, '..', 'uploads', sub)
+  if (!fsV1.existsSync(dir)) fsV1.mkdirSync(dir, { recursive: true })
+  return dir
+}
+
+const v1Upload = (sub, prefix) => multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, v1UploadDir(sub)),
+    filename: (_req, file, cb) => {
+      const ext = pathV1.extname(file.originalname) || '.jpg'
+      cb(null, `${prefix}-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`)
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ok = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']
+    cb(ok.includes(file.mimetype) ? null : new Error('Only images or PDF are accepted'), ok.includes(file.mimetype))
+  },
+})
+
+const kycUploadV1 = v1Upload('kyc', 'kyc')
+const proofUploadV1 = v1Upload('screenshots', 'proof')
+
+// multer rejects (bad type, too large) surface as thrown errors, which would
+// otherwise become a bare 500. Wrap so the app shows the real reason.
+const runUpload = (mw) => (req, res, next) => mw(req, res, (err) => {
+  if (err) return fail(res, 400, err.message || 'Upload failed')
+  next()
+})
+
+// POST /api/v1/profile/kyc/submit — multipart: document_type, document_number,
+// file (front), optional file_2 (back) and file_3 (selfie).
+router.post(
+  '/profile/kyc/submit',
+  jwtAuth,
+  runUpload(kycUploadV1.fields([{ name: 'file', maxCount: 1 }, { name: 'file_2', maxCount: 1 }, { name: 'file_3', maxCount: 1 }])),
+  async (req, res) => {
+    try {
+      const documentType = String(req.body?.document_type || '').trim()
+      const documentNumber = String(req.body?.document_number || '').trim()
+      const files = req.files || {}
+
+      if (!documentType) return fail(res, 400, 'Select a document type')
+      if (!documentNumber) return fail(res, 400, 'Enter the document number')
+      if (!files.file?.[0]) return fail(res, 400, 'Attach the front of the document')
+
+      const existing = await KYC.findOne({ userId: req.user._id, status: { $in: ['pending', 'approved'] } })
+      if (existing) {
+        return fail(res, 400, existing.status === 'approved'
+          ? 'Your KYC is already approved'
+          : 'You already have a submission awaiting review')
+      }
+
+      const url = (f) => (f ? `/uploads/kyc/${f.filename}` : null)
+      const kyc = await KYC.create({
+        userId: req.user._id,
+        documentType,
+        documentNumber,
+        frontImage: url(files.file[0]),
+        backImage: url(files.file_2?.[0]),
+        selfieImage: url(files.file_3?.[0]),
+        status: 'pending',
+        submittedAt: new Date(),
+      })
+
+      res.json({ id: String(kyc._id), status: kyc.status, message: 'Documents submitted for review' })
+    } catch (e) {
+      // An invalid document_type trips the schema enum — say which field.
+      if (e?.name === 'ValidationError') return fail(res, 400, 'That document type is not accepted')
+      fail(res, 500, e.message)
+    }
+  }
+)
+
+// POST /api/v1/wallet/deposit/manual — multipart: amount, transaction_id, file.
+// Saved as Pending; the admin's existing approval flow credits the wallet and
+// applies any first-deposit bonus, exactly as it does for a web deposit.
+router.post('/wallet/deposit/manual', jwtAuth, runUpload(proofUploadV1.single('file')), async (req, res) => {
+  try {
+    const amount = Number(req.body?.amount)
+    const transactionRef = String(req.body?.transaction_id || '').trim()
+    if (!(amount > 0)) return fail(res, 400, 'Enter an amount greater than zero')
+    if (!req.file) return fail(res, 400, 'Attach the payment screenshot')
+
+    let wallet = await Wallet.findOne({ userId: req.user._id })
+    if (!wallet) wallet = await new Wallet({ userId: req.user._id, balance: 0 }).save()
+
+    const tx = await Transaction.create({
+      userId: req.user._id,
+      walletId: wallet._id,
+      type: 'Deposit',
+      amount,
+      paymentMethod: 'Manual',
+      transactionRef,
+      screenshot: `/uploads/screenshots/${req.file.filename}`,
+      status: 'Pending',
+      description: 'Manual deposit from mobile app',
+    })
+
+    res.json({ id: String(tx._id), status: tx.status, amount, message: 'Deposit submitted for approval' })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// POST /api/v1/wallet/withdraw/manual — multipart: amount, upi_id, payout_notes,
+// optional file (QR). The balance is held now and settled on approval, so the
+// same funds cannot be requested twice while a request is pending.
+router.post('/wallet/withdraw/manual', jwtAuth, runUpload(proofUploadV1.single('file')), async (req, res) => {
+  try {
+    const amount = Number(req.body?.amount)
+    if (!(amount > 0)) return fail(res, 400, 'Enter an amount greater than zero')
+
+    const wallet = await Wallet.findOne({ userId: req.user._id })
+    if (!wallet) return fail(res, 404, 'Wallet not found')
+    if (Number(wallet.balance || 0) < amount) return fail(res, 400, 'Insufficient wallet balance')
+
+    const upiId = String(req.body?.upi_id || '').trim()
+    const notes = String(req.body?.payout_notes || '').trim()
+
+    wallet.balance -= amount
+    await wallet.save()
+
+    const tx = await Transaction.create({
+      userId: req.user._id,
+      walletId: wallet._id,
+      type: 'Withdrawal',
+      amount,
+      paymentMethod: upiId ? 'UPI' : 'Manual',
+      bankAccountDetails: upiId ? { type: 'UPI', upiId } : undefined,
+      screenshot: req.file ? `/uploads/screenshots/${req.file.filename}` : undefined,
+      status: 'Pending',
+      description: notes || 'Withdrawal request from mobile app',
+    })
+
+    res.json({
+      id: String(tx._id),
+      status: tx.status,
+      amount,
+      wallet_balance: wallet.balance,
+      message: 'Withdrawal requested',
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// POST /api/v1/wallet/deposit/local-banking — opens a pending deposit the user
+// then confirms with a payment proof (two-step local bank transfer).
+router.post('/wallet/deposit/local-banking', jwtAuth, runUpload(proofUploadV1.none()), async (req, res) => {
+  try {
+    const amount = Number(req.body?.amount)
+    if (!(amount > 0)) return fail(res, 400, 'Enter an amount greater than zero')
+
+    let wallet = await Wallet.findOne({ userId: req.user._id })
+    if (!wallet) wallet = await new Wallet({ userId: req.user._id, balance: 0 }).save()
+
+    const pm = await PaymentMethod.findOne({ isActive: true }).sort({ createdAt: -1 })
+
+    const tx = await Transaction.create({
+      userId: req.user._id,
+      walletId: wallet._id,
+      type: 'Deposit',
+      amount,
+      paymentMethod: 'Local Banking',
+      status: 'Pending',
+      description: 'Local banking deposit — awaiting payment proof',
+    })
+
+    res.json({
+      id: String(tx._id),
+      deposit_id: String(tx._id),
+      amount,
+      status: tx.status,
+      bank_details: pm ? {
+        bank_name: pm.bankName || '',
+        account_number: pm.accountNumber || '',
+        account_holder_name: pm.accountHolderName || '',
+        ifsc_code: pm.ifscCode || '',
+        upi_id: pm.upiId || '',
+        qr_code_url: pm.qrCodeImage || '',
+      } : null,
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// POST /api/v1/wallet/deposit/local-banking/:id/confirm-payment — attach proof.
+router.post(
+  '/wallet/deposit/local-banking/:id/confirm-payment',
+  jwtAuth,
+  runUpload(proofUploadV1.single('file')),
+  async (req, res) => {
+    try {
+      const tx = await Transaction.findOne({ _id: req.params.id, userId: req.user._id })
+      if (!tx) return fail(res, 404, 'Deposit not found')
+      if (tx.status !== 'Pending') return fail(res, 400, 'This deposit has already been processed')
+      if (!req.file) return fail(res, 400, 'Attach the payment proof')
+
+      const amount = Number(req.body?.amount)
+      if (amount > 0) tx.amount = amount
+      tx.transactionRef = String(req.body?.transaction_id || '').trim() || tx.transactionRef
+      tx.screenshot = `/uploads/screenshots/${req.file.filename}`
+      tx.description = 'Local banking deposit — proof submitted'
+      await tx.save()
+
+      res.json({ id: String(tx._id), status: tx.status, message: 'Payment proof submitted for approval' })
+    } catch (e) {
+      fail(res, 500, e.message)
+    }
+  }
+)
+
+/* ─────────────────────  IB programme  ───────────────────── */
+
+// The app calls these /business/* paths; the web calls /api/ib/*. Both read the
+// same records — only the response shape differs, and the IB here is always the
+// caller from the token rather than a :userId in the path.
+
+// GET /api/v1/business/status
+router.get('/business/status', jwtAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+    const status = String(user?.ibStatus || '').toUpperCase()
+
+    res.json({
+      is_ib: !!user?.isIB && status === 'ACTIVE',
+      application_status: status ? status.toLowerCase() : null,
+      referral_code: user?.referralCode || '',
+      rejection_reason: user?.ibRejectionReason || '',
+      id: String(user?._id || ''),
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// POST /api/v1/business/apply
+router.post('/business/apply', jwtAuth, async (req, res) => {
+  try {
+    const user = await ibEngineNew.applyForIB(req.user._id, req.body?.requested_level_id || null)
+    res.json({
+      message: 'Application submitted — an admin will review it shortly',
+      application_status: String(user.ibStatus || '').toLowerCase(),
+      referral_code: user.referralCode || '',
+    })
+  } catch (e) {
+    fail(res, 400, e.message)
+  }
+})
+
+// GET /api/v1/business/ib/dashboard
+router.get('/business/ib/dashboard', jwtAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).populate('ibLevelId')
+    if (!user?.isIB) return fail(res, 403, 'You are not an approved IB yet')
+
+    const wallet = await IBWallet.getOrCreateWallet(req.user._id)
+    const totalReferrals = await User.countDocuments({ parentIBId: req.user._id })
+
+    // CREDITED only — a REVERSED commission was clawed back and must not still
+    // be counted as something this IB earned.
+    const [earned] = await IBCommissionNew.aggregate([
+      { $match: { ibUserId: user._id, status: 'CREDITED' } },
+      { $group: { _id: null, total: { $sum: '$commissionAmount' } } },
+    ])
+    const totalEarned = Number(earned?.total || 0)
+
+    res.json({
+      total_earned: totalEarned,
+      total_commission: totalEarned,
+      pending_payout: Number(wallet?.balance || 0),
+      level: Number(user.ibLevelOrder || 1),
+      level_name: user.ibLevelId?.name || user.ibLevel || '',
+      total_referrals: totalReferrals,
+      is_active: String(user.ibStatus || '').toUpperCase() === 'ACTIVE',
+      referral_code: user.referralCode || '',
+      referral_link: user.referralCode ? `https://vxness.in/user/signup?ref=${user.referralCode}` : '',
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// GET /api/v1/business/ib/referrals
+router.get('/business/ib/referrals', jwtAuth, async (req, res) => {
+  try {
+    const referrals = await User.find({ parentIBId: req.user._id })
+      .select('firstName email createdAt')
+      .sort({ createdAt: -1 })
+
+    // Deposits and account counts in two aggregates rather than two queries per
+    // row — an IB with a few hundred referrals would otherwise hammer Mongo.
+    const ids = referrals.map(r => r._id)
+    const [deposits, accounts] = await Promise.all([
+      Transaction.aggregate([
+        { $match: { userId: { $in: ids }, type: 'Deposit', status: 'Approved' } },
+        { $group: { _id: '$userId', total: { $sum: '$amount' } } },
+      ]),
+      TradingAccount.aggregate([
+        { $match: { userId: { $in: ids } } },
+        { $group: { _id: '$userId', n: { $sum: 1 } } },
+      ]),
+    ])
+    const depMap = Object.fromEntries(deposits.map(d => [String(d._id), d.total]))
+    const accMap = Object.fromEntries(accounts.map(a => [String(a._id), a.n]))
+
+    res.json({
+      items: referrals.map(r => ({
+        id: String(r._id),
+        referred_user: {
+          name: r.firstName || '',
+          email: r.email,
+          joined_at: r.createdAt,
+        },
+        total_deposit: depMap[String(r._id)] || 0,
+        accounts_count: accMap[String(r._id)] || 0,
+        created_at: r.createdAt,
+      })),
+      total: referrals.length,
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// GET /api/v1/business/ib/commissions
+router.get('/business/ib/commissions', jwtAuth, async (req, res) => {
+  try {
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 50))
+    const commissions = await IBCommissionNew.find({ ibUserId: req.user._id })
+      .populate('traderUserId', 'firstName email')
+      .sort({ createdAt: -1 })
+      .limit(limit)
+
+    res.json({
+      items: commissions.map(c => ({
+        id: String(c._id),
+        source_user: {
+          name: c.traderUserId?.firstName || '',
+          email: c.traderUserId?.email || '',
+        },
+        commission_type: c.commissionType || '',
+        amount: c.commissionAmount,
+        mlm_level: c.level ?? 1,
+        status: String(c.status || 'credited').toLowerCase(),
+        symbol: c.symbol || '',
+        created_at: c.createdAt,
+      })),
+      total: commissions.length,
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// GET /api/v1/business/ib/tree
+router.get('/business/ib/tree', jwtAuth, async (req, res) => {
+  try {
+    const maxDepth = Math.min(10, Math.max(1, parseInt(req.query.max_depth, 10) || 5))
+    const chain = await ibEngineNew.getIBChain(req.user._id, maxDepth)
+    const tree = Array.isArray(chain) ? chain : (chain ? [chain] : [])
+
+    const countNodes = (nodes) => nodes.reduce(
+      (n, node) => n + 1 + countNodes(node?.children || node?.downline || []), 0)
+
+    res.json({ tree, total_nodes: countNodes(tree) })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+/* ─────────────────────  copy trading  ───────────────────── */
+
+// The Copy tab reads a flatter shape than /social/masters returns, and looks for
+// several spellings of each field. masterJson stays the single mapping; these
+// aliases sit on top so one record satisfies both readers.
+const providerJson = (m) => {
+  const base = masterJson(m)
+  return {
+    ...base,
+    provider_id: base.id,
+    name: base.manager_name,
+    provider_name: base.manager_name,
+    win_rate: base.win_rate_pct,
+    followers_count: base.total_investors,
+    follower_count: base.total_investors,
+  }
+}
+
+// GET /api/v1/social/leaderboard — the masters list, ranked.
+router.get('/social/leaderboard', jwtAuth, async (req, res) => {
+  try {
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 30))
+    const sort = String(req.query.sort || 'overall')
+
+    const sortBy = sort === 'win_rate' ? { 'stats.winRate': -1 }
+      : sort === 'followers' ? { 'stats.activeFollowers': -1 }
+      : { 'stats.totalProfitGenerated': -1 }
+
+    const masters = await MasterTrader.find({ status: 'ACTIVE' })
+      .populate('userId', 'firstName lastName')
+      .sort({ ...sortBy, createdAt: -1 })
+      .limit(limit)
+
+    res.json({ items: masters.map(providerJson), page: 1, per_page: limit })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// GET /api/v1/social/providers/:id
+router.get('/social/providers/:id', jwtAuth, async (req, res) => {
+  try {
+    const m = await MasterTrader.findById(req.params.id).populate('userId', 'firstName lastName')
+    if (!m) return fail(res, 404, 'Trader not found')
+    res.json(providerJson(m))
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// GET /api/v1/social/providers/:id/activity — recent closed trades.
+router.get('/social/providers/:id/activity', jwtAuth, async (req, res) => {
+  try {
+    const m = await MasterTrader.findById(req.params.id)
+    if (!m) return fail(res, 404, 'Trader not found')
+
+    const trades = await Trade.find({ tradingAccountId: m.tradingAccountId, status: 'CLOSED' })
+      .sort({ closedAt: -1, updatedAt: -1 })
+      .limit(30)
+
+    res.json({
+      items: trades.map(t => ({
+        id: String(t._id),
+        symbol: t.symbol,
+        side: t.side,
+        lots: t.quantity,
+        open_price: t.openPrice,
+        close_price: t.closePrice,
+        pnl: money(t.realizedPnl ?? t.pnl ?? 0),
+        closed_at: t.closedAt || t.updatedAt,
+      })),
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// POST /api/v1/social/copy — start copying a master with an allocation.
+router.post('/social/copy', jwtAuth, async (req, res) => {
+  try {
+    const src = { ...(req.query || {}), ...(req.body || {}) }
+    const masterId = src.provider_id || src.master_id
+    const amount = Number(src.amount)
+    const accountId = src.account_id
+
+    if (!masterId) return fail(res, 400, 'Choose a trader to copy')
+    if (!(amount > 0)) return fail(res, 400, 'Enter an amount greater than zero')
+    if (!accountId) return fail(res, 400, 'Choose which account to copy with')
+
+    const account = await ownedAccount(req.user._id, accountId)
+    const master = await MasterTrader.findById(masterId)
+    if (!master || master.status !== 'ACTIVE') return fail(res, 404, 'Trader not available')
+
+    // Copying yourself would have the engine mirroring a trade back onto the
+    // account that opened it.
+    if (String(master.userId) === String(req.user._id)) {
+      return fail(res, 400, 'You cannot copy your own strategy')
+    }
+    if (Number(account.balance || 0) < amount) return fail(res, 400, 'Insufficient balance on that account')
+
+    const existing = await CopyFollower.findOne({
+      followerId: req.user._id,
+      masterId: master._id,
+      status: { $in: ['ACTIVE', 'PAUSED'] },
+    })
+    if (existing) return fail(res, 400, 'You are already copying this trader')
+
+    const follower = await CopyFollower.create({
+      followerId: req.user._id,
+      masterId: master._id,
+      followerAccountId: account._id,
+      copyMode: 'BALANCE_BASED',
+      copyValue: amount,
+      status: 'ACTIVE',
+      startedAt: new Date(),
+    })
+
+    await MasterTrader.findByIdAndUpdate(master._id, {
+      $inc: { 'stats.totalFollowers': 1, 'stats.activeFollowers': 1 },
+    })
+
+    res.json({ id: String(follower._id), message: 'You are now copying this trader' })
+  } catch (e) {
+    fail(res, e.status || 400, e.message)
+  }
+})
+
+// DELETE /api/v1/social/copy/:id — stop copying.
+router.delete('/social/copy/:id', jwtAuth, async (req, res) => {
+  try {
+    const follower = await CopyFollower.findOne({ _id: req.params.id, followerId: req.user._id })
+    if (!follower) return fail(res, 404, 'Subscription not found')
+    if (follower.status === 'STOPPED') return fail(res, 400, 'This subscription is already stopped')
+
+    follower.status = 'STOPPED'
+    follower.stoppedAt = new Date()
+    await follower.save()
+
+    // Only the active count comes down — totalFollowers is a lifetime tally.
+    await MasterTrader.findByIdAndUpdate(follower.masterId, { $inc: { 'stats.activeFollowers': -1 } })
+
+    res.json({ message: 'Stopped copying' })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// POST /api/v1/social/become-provider — apply to become a master trader.
+router.post('/social/become-provider', jwtAuth, async (req, res) => {
+  try {
+    const src = { ...(req.query || {}), ...(req.body || {}) }
+    const accountId = src.account_id
+    if (!accountId) return fail(res, 400, 'Choose the account to publish')
+
+    const account = await ownedAccount(req.user._id, accountId)
+
+    const existing = await MasterTrader.findOne({ userId: req.user._id })
+    if (existing) {
+      return fail(res, 400, existing.status === 'ACTIVE'
+        ? 'You are already a master trader'
+        : 'Your application is already under review')
+    }
+
+    const master = await MasterTrader.create({
+      userId: req.user._id,
+      tradingAccountId: account._id,
+      displayName: String(src.display_name || src.name || '').trim() || undefined,
+      description: String(src.description || '').trim(),
+      requestedCommissionPercentage: Number(src.commission_pct ?? src.commission_rate ?? 0),
+      status: 'PENDING',
+    })
+
+    res.json({
+      id: String(master._id),
+      status: master.status,
+      message: 'Application submitted — an admin will review it shortly',
+    })
+  } catch (e) {
+    fail(res, e.status || 400, e.message)
+  }
+})
+
+/* ─────────────────────  prop challenges  ───────────────────── */
+
+// The prop-firm challenge surface, mirroring what the web dashboard shows on
+// its Account page. Challenge mode is an admin switch (PropSettings), so every
+// route here reports `enabled` and the buy refuses while it is off — the app
+// must hide the whole section rather than offer a purchase that cannot happen.
+//
+// Unlike /api/prop/* (the web routes), the user is taken from the verified
+// token and never from the payload, so one account holder cannot buy a
+// challenge against another's wallet.
+
+// GET /api/v1/prop/status — is challenge mode on?
+router.get('/prop/status', jwtAuth, async (_req, res) => {
+  try {
+    const settings = await PropSettings.getSettings()
+    res.json({
+      enabled: !!settings.challengeModeEnabled,
+      display_name: settings.displayName || 'Challenge',
+      description: settings.description || '',
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// GET /api/v1/prop/challenges — the challenges available to buy.
+router.get('/prop/challenges', jwtAuth, async (_req, res) => {
+  try {
+    const settings = await PropSettings.getSettings()
+    if (!settings.challengeModeEnabled) return res.json({ enabled: false, items: [] })
+
+    const challenges = await Challenge.find({ isActive: true }).sort({ sortOrder: 1, fundSize: 1 })
+    res.json({
+      enabled: true,
+      items: challenges.map(c => ({
+        challenge_id: String(c._id),
+        name: c.name,
+        fund_size: c.fundSize,
+        challenge_fee: c.challengeFee,
+        currency: c.currency || 'USD',
+        steps_count: c.stepsCount,
+        expiry_days: c.rules?.challengeExpiryDays ?? null,
+        profit_split_percent: c.fundedSettings?.profitSplitPercent ?? null,
+        profit_target_phase1_percent: c.rules?.profitTargetPhase1Percent ?? null,
+        profit_target_phase2_percent: c.rules?.profitTargetPhase2Percent ?? null,
+        max_daily_drawdown_percent: c.rules?.maxDailyDrawdownPercent ?? null,
+        max_overall_drawdown_percent: c.rules?.maxOverallDrawdownPercent ?? null,
+        drawdown_type: c.rules?.drawdownType || 'STATIC',
+        min_trading_days: c.rules?.tradingDaysRequired ?? null,
+        description: c.description || '',
+      })),
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// GET /api/v1/prop/accounts — the caller's challenge accounts, with live
+// equity/drawdown from the same helper the web route uses.
+router.get('/prop/accounts', jwtAuth, async (req, res) => {
+  try {
+    const query = { userId: req.user._id }
+    if (req.query?.status) query.status = String(req.query.status)
+
+    const accounts = await ChallengeAccount.find(query)
+      .populate('challengeId')
+      .sort({ createdAt: -1 })
+
+    const enriched = await enrichChallengeAccounts(accounts)
+    res.json({
+      accounts: enriched.map(a => ({
+        account_id: String(a._id),
+        account_number: a.accountId,
+        challenge_name: a.challengeId?.name || '',
+        fund_size: a.challengeId?.fundSize ?? a.initialBalance,
+        status: a.status,
+        phase: a.currentPhase,
+        currency: a.challengeId?.currency || 'USD',
+        total_phases: a.totalPhases,
+        balance: a.currentBalance,
+        equity: a.currentEquity,
+        initial_balance: a.initialBalance,
+        floating_pnl: a.floatingPnl,
+        profit_percent: a.currentProfitPercent,
+        daily_drawdown_percent: a.currentDailyDrawdownPercent,
+        overall_drawdown_percent: a.currentOverallDrawdownPercent,
+        // Phase 2 targets a smaller gain than phase 1 — send the one that
+        // applies to the phase this account is actually in.
+        profit_target_percent: (a.currentPhase === 2
+          ? a.challengeId?.rules?.profitTargetPhase2Percent
+          : a.challengeId?.rules?.profitTargetPhase1Percent) ?? null,
+        max_daily_drawdown_percent: a.challengeId?.rules?.maxDailyDrawdownPercent ?? null,
+        max_overall_drawdown_percent: a.challengeId?.rules?.maxOverallDrawdownPercent ?? null,
+        fail_reason: a.failReason || '',
+        expires_at: a.expiresAt,
+        created_at: a.createdAt,
+      })),
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// POST /api/v1/prop/buy — {challenge_id}. Pays the fee from the main wallet.
+router.post('/prop/buy', jwtAuth, async (req, res) => {
+  try {
+    const challengeId = req.body?.challenge_id || req.body?.challengeId
+    if (!challengeId) return fail(res, 400, 'challenge_id is required')
+
+    const settings = await PropSettings.getSettings()
+    if (!settings.challengeModeEnabled) return fail(res, 400, 'Challenge mode is currently disabled')
+
+    const challenge = await Challenge.findById(challengeId)
+    if (!challenge || !challenge.isActive) return fail(res, 404, 'Challenge not found or inactive')
+
+    const fee = challenge.challengeFee || 0
+
+    let wallet = await Wallet.findOne({ userId: req.user._id })
+    if (!wallet) wallet = await new Wallet({ userId: req.user._id, balance: 0 }).save()
+
+    if (wallet.balance < fee) {
+      return fail(res, 400, `Insufficient balance. Required: $${fee}, available: $${wallet.balance}`)
+    }
+
+    wallet.balance -= fee
+    await wallet.save()
+
+    const transaction = await new Transaction({
+      userId: req.user._id,
+      walletId: wallet._id,
+      type: 'Challenge_Purchase',
+      amount: fee,
+      status: 'Approved',
+      paymentMethod: 'Wallet',
+      description: `Challenge Purchase: ${challenge.name} ($${challenge.fundSize.toLocaleString()} Fund)`,
+      processedAt: new Date(),
+    }).save()
+
+    const account = await propTradingEngine.createChallengeAccount(req.user._id, challengeId, transaction._id)
+    transaction.challengeAccountId = account._id
+    await transaction.save()
+
+    res.json({
+      account: {
+        account_id: String(account._id),
+        account_number: account.accountId,
+        status: account.status,
+        initial_balance: account.initialBalance,
+        expires_at: account.expiresAt,
+      },
+      wallet_balance: wallet.balance,
+    })
+  } catch (e) {
+    fail(res, 400, e.message)
+  }
+})
 
 // GET /api/v1/instruments/ - the catalogue, without prices. Same source as the
 // website's /api/prices/instruments, so the two can never disagree.

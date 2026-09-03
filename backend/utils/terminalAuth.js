@@ -18,10 +18,22 @@ export function fail(res, status, detail) {
   return res.status(status).json({ detail })
 }
 
-export function signAccessToken(userId) {
+export function signAccessToken(userId, claims = {}) {
   // ~45 minutes, matching what the terminal's renewal timer expects.
-  return jwt.sign({ id: String(userId), typ: 'terminal' }, JWT_SECRET, { expiresIn: '45m' })
+  // `claims` carries the investor-session markers (ro / acct); a normal sign-in
+  // passes nothing and the token looks exactly as it always did.
+  return jwt.sign({ id: String(userId), typ: 'terminal', ...claims }, JWT_SECRET, { expiresIn: '45m' })
 }
+
+// Requests an investor session is never allowed to make, whatever the UI shows.
+//
+// An investor signs in with the account's investor password to WATCH it. The
+// app hides deposit, withdraw, KYC and the order ticket, but hiding a button is
+// not a control — anyone can replay the token against the API directly. So the
+// refusal lives here, at the only door every route goes through, and it is a
+// deny-list of methods rather than a list of routes: a mutating endpoint added
+// later is covered the day it is written, without anyone remembering to.
+const READ_ONLY_SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS']
 
 function bearer(req) {
   const h = req.headers.authorization || ''
@@ -47,6 +59,26 @@ export async function jwtAuth(req, res, next) {
     if (user.isBlocked) return fail(res, 403, 'Account blocked')
 
     req.user = user
+    req.readOnly = decoded.ro === true
+    // The one account the investor password was issued for. Routes narrow to it
+    // so an investor cannot enumerate the owner's other accounts.
+    req.investorAccountId = req.readOnly ? (decoded.acct || null) : null
+
+    if (req.readOnly && !READ_ONLY_SAFE_METHODS.includes(req.method)) {
+      return fail(res, 403, 'This is a read-only investor session')
+    }
+
+    // Blocking writes is not enough on its own: the routes take account_id as a
+    // parameter and check it against the OWNER, who may hold several accounts.
+    // Without this an investor given one account's password could read the
+    // positions and ledger of every other account that owner has.
+    if (req.investorAccountId) {
+      const asked = req.query?.account_id || req.body?.account_id || req.params?.id
+      if (asked && String(asked) !== String(req.investorAccountId)) {
+        return fail(res, 403, 'This investor session is limited to one account')
+      }
+    }
+
     next()
   } catch (e) {
     return fail(res, 500, e.message)

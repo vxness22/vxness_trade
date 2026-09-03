@@ -722,6 +722,18 @@ class InfowayService {
     return this.prices.get(symbol) || FALLBACK_PRICES[symbol] || null
   }
 
+  // Does the LP actually feed this symbol?
+  //
+  // getPrice() above falls back to a hard-coded FALLBACK_PRICES entry when the
+  // feed carries nothing, which is right for a momentary outage but wrong as a
+  // reason to LIST an instrument: 37 of the 125 in SUPPORTED_SYMBOLS have never
+  // arrived from Infoway at all, so they showed a frozen invented price that a
+  // trade could be opened against. `prices` holds only what the feed delivered
+  // (seeded at boot from the persisted cache), so this is the honest answer.
+  hasLiveFeed(symbol) {
+    return this.prices.has(symbol)
+  }
+
   getAllPrices() {
     const prices = {}
     this.prices.forEach((price, symbol) => { prices[symbol] = price })

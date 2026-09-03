@@ -21,6 +21,14 @@ const otpSchema = new mongoose.Schema({
   verified: {
     type: Boolean,
     default: false
+  },
+  // The signup payload held between /api/v1/auth/register/start and
+  // .../verify. The mobile app collects the form first and sends only
+  // {email, otp} to verify, so the details have to wait here in the meantime.
+  // Unused by the web flow, which posts the whole form to /api/auth/signup.
+  pendingSignup: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
   }
 }, { timestamps: true })
 

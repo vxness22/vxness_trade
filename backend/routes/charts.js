@@ -36,6 +36,46 @@ function priceScale(symbol) {
   return Math.round(1 / ps)
 }
 
+// Historical candles, shared by GET /api/charts/bars (the web chart's datafeed)
+// and GET /api/v1/instruments/:symbol/bars (the mobile app's bundled chart).
+//
+// Both charts therefore paginate identically: Infoway walks BACKWARD from
+// `to`, so the number of candles requested has to cover the whole window the
+// chart asked for, and anything older than `from` is dropped afterwards. When
+// the app scrolls back it sends a new, earlier window — with a per-request
+// count instead of a fixed one, that scroll would return the same recent bars
+// over and over and the chart would appear to have no history.
+export async function fetchBars(symbol, resolution, { from, to, countback, limit } = {}) {
+  const sym = String(symbol || '').toUpperCase()
+  const res = String(resolution)
+  const timeframe = RES_TO_TIMEFRAME[res]
+  if (!timeframe || !SUPPORTED_SYMBOLS.includes(sym)) return []
+
+  const fromTs = Number.isFinite(Number(from)) ? Number(from) : NaN
+  const endTs = Number.isFinite(Number(to)) ? Number(to) : Math.floor(Date.now() / 1000)
+  const secondsPerBar = RES_TO_SECONDS[res] || 300
+
+  const windowBars = Number.isFinite(fromTs)
+    ? Math.ceil((endTs - fromTs) / secondsPerBar) + 5
+    : (limit || 500)
+  const count = Math.min(1000, Math.max(50, Number(countback) || windowBars))
+
+  const candles = await infowayService.getCandles(sym, timeframe, new Date(endTs * 1000), count)
+  if (!candles.length) return []
+
+  return candles
+    .map(c => ({
+      time: Math.floor(new Date(c.time).getTime() / 1000),
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      volume: c.tickVolume ?? c.volume ?? 0,
+    }))
+    .filter(b => Number.isFinite(b.time) && (Number.isFinite(fromTs) ? b.time >= fromTs : true))
+    .sort((a, b) => a.time - b.time)
+}
+
 // 1. Datafeed configuration — read on chart init
 router.get('/config', (req, res) => {
   res.json({
@@ -193,46 +233,12 @@ router.get('/bars', async (req, res) => {
   try {
     const raw = String(req.query.symbol || '').toUpperCase()
     const symbol = raw.includes(':') ? raw.split(':')[1] : raw
-    const resolution = String(req.query.resolution || '5')
-    const from = parseInt(req.query.from, 10) // seconds
-    const to = parseInt(req.query.to, 10)     // seconds
-
-    if (!SUPPORTED_SYMBOLS.includes(symbol)) {
-      return res.json({ s: 'ok', bars: [], noData: true })
-    }
-    const timeframe = RES_TO_TIMEFRAME[resolution]
-    if (!timeframe) {
-      return res.json({ s: 'ok', bars: [], noData: true })
-    }
-
-    const endTs = Number.isFinite(to) ? to : Math.floor(Date.now() / 1000)
-    const secondsPerBar = RES_TO_SECONDS[resolution] || 300
-    const windowBars = Number.isFinite(from)
-      ? Math.ceil((endTs - from) / secondsPerBar) + 5
-      : 500
-    const limit = Math.min(1000, Math.max(50, windowBars))
-
-    const candles = await infowayService.getCandles(symbol, timeframe, new Date(endTs * 1000), limit)
-    if (!candles.length) {
-      return res.json({ s: 'ok', bars: [], noData: true })
-    }
-
-    const bars = candles
-      .map(c => ({
-        time: Math.floor(new Date(c.time).getTime() / 1000),
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-        volume: c.tickVolume ?? c.volume ?? 0,
-      }))
-      .filter(b => Number.isFinite(b.time) && (Number.isFinite(from) ? b.time >= from : true))
-      .sort((a, b) => a.time - b.time)
-
-    if (!bars.length) {
-      return res.json({ s: 'ok', bars: [], noData: true })
-    }
-    res.json({ s: 'ok', bars, noData: false })
+    const bars = await fetchBars(symbol, String(req.query.resolution || '5'), {
+      from: req.query.from,
+      to: req.query.to,
+      countback: req.query.countback,
+    })
+    res.json({ s: 'ok', bars, noData: bars.length === 0 })
   } catch (err) {
     console.error('[charts] /bars error:', err.message)
     res.json({ s: 'ok', bars: [], noData: true })
