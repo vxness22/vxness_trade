@@ -93,7 +93,11 @@ export default function MarketsScreen() {
   useFocusEffect(useCallback(() => {
     // REST poll is the WebSocket FALLBACK, not the price driver — 2s keeps
     // the full-universe fetch cheap instead of hammering it at 500ms.
-    const id = setInterval(refreshPrices, 2000);
+    // The websocket carries prices now (/ws/prices, 20fps). This poll stays as
+    // a safety net for a dropped socket, so it runs slowly instead of being the
+    // primary source — at 2s it was the reason a phone saw a new price twice a
+    // second no matter how fast the feed ran.
+    const id = setInterval(refreshPrices, 15000);
     return () => clearInterval(id);
   }, [refreshPrices]));
 

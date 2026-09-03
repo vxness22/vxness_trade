@@ -19,6 +19,7 @@ import barAggregator from './services/barAggregator.js'
 import { initBarHub } from './ws/barHub.js'
 
 import { initAlgoPriceHub } from './ws/algoPriceHub.js'
+import { initPriceHub } from './ws/priceHub.js'
 
 import authRoutes from './routes/auth.js'
 
@@ -116,10 +117,16 @@ initBarHub(httpServer)
 // stealing /socket.io/ handshakes.
 initAlgoPriceHub(httpServer)
 
+// Live quotes for the mobile app on /ws/prices. Until now this path was the one
+// the 404 handler below was written for — the app opened it, got nothing, and
+// fell back to a two-second poll.
+initPriceHub(httpServer)
+
 // A WebSocket upgrade to a path nobody serves must be ANSWERED, not dropped.
 //
-// This took the whole API down in ten-second bursts. The mobile app opens
-// /ws/prices, which is not a path this server has; every hub above returns
+// This took the whole API down in ten-second bursts. The mobile app opened
+// /ws/prices, which at the time was not a path this server had (it is now —
+// see initPriceHub above); every hub above returns
 // early for a path that is not its own, so the socket sat unhandled and was
 // eventually destroyed without a single response header ever being written.
 // nginx reads that as "upstream prematurely closed connection", counts it
@@ -130,7 +137,7 @@ initAlgoPriceHub(httpServer)
 //
 // Registered last, and it only speaks for paths none of the hubs claim, so the
 // ones that are served are already handled by the time it runs.
-const WS_PATHS = ['/ws/bars', '/ws/algo/prices']
+const WS_PATHS = ['/ws/bars', '/ws/algo/prices', '/ws/prices']
 httpServer.on('upgrade', (req, socket) => {
   let pathname = '/'
   try { pathname = new URL(req.url, 'http://localhost').pathname }
