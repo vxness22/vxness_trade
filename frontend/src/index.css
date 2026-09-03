@@ -188,3 +188,20 @@ body {
     scrollbar-width: none;
   }
 }
+
+/* Tick flash for AnimatedPrice.
+ *
+ * Only `from` is set, so the property animates back to whatever colour the
+ * element already inherits — the cell keeps its own styling and no explicit
+ * "back to" colour has to be hard-coded per site. Text only; no background box.
+ * `both` would pin the text on the tint after the run, so the fill mode is left
+ * at the default. */
+@keyframes vx-tick-up   { from { color: #22C55E; } }
+@keyframes vx-tick-down { from { color: #EF4444; } }
+
+.vx-tick-up   { animation: vx-tick-up   .45s ease-out; }
+.vx-tick-down { animation: vx-tick-down .45s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .vx-tick-up, .vx-tick-down { animation: none; }
+}

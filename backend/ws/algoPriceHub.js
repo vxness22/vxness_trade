@@ -26,7 +26,16 @@ const PING_INTERVAL_MS = 30_000
 const SPREAD_REFRESH_MS = 60_000
 // Infoway can push a symbol many times a second; 80ms per symbol is well past
 // the point a human eye or a forming candle can tell the difference.
-const TICK_THROTTLE_MS = 80
+// Coalescing window. Each flush sends the LATEST quote per symbol that changed
+// since the last one — never a backlog, never a per-symbol drop.
+//
+// The old behaviour throttled each symbol to one tick per 80ms and DISCARDED
+// anything arriving inside that window, then wrote one frame per symbol per
+// tick. With a fast feed that is a lot of small writes, and whichever symbol
+// ticked first inside a window won while the others waited their turn. Keeping
+// the newest per symbol and writing one frame per flush costs the same whatever
+// the feed does, and 50ms is under the threshold anyone can see.
+const FLUSH_MS = 50
 
 export function initAlgoPriceHub(httpServer) {
   // noServer + manual routing, for the same reason barHub.js uses it: passing
@@ -78,7 +87,6 @@ export function initAlgoPriceHub(httpServer) {
   wss.on('connection', (ws) => {
     ws.authed = false
     ws.spreadTable = null
-    ws.lastSentAt = new Map()
 
     const graceTimer = setTimeout(() => {
       if (!ws.authed) {
@@ -158,34 +166,44 @@ export function initAlgoPriceHub(httpServer) {
     ws.on('close', () => {
       clearTimeout(graceTimer)
       if (spreadTimer) clearInterval(spreadTimer)
-      ws.lastSentAt?.clear()
+
     })
     ws.on('error', () => { try { ws.close() } catch { /* ignore */ } })
   })
 
-  // One subscription to the feed, fanned out to every authenticated socket.
+  // One subscription to the feed, coalesced, then fanned out to every
+  // authenticated socket on a fixed frame.
+  const pending = new Map() // symbol -> newest raw quote since the last flush
+
   infowayService.subscribe((symbol, price) => {
     if (!(price?.bid > 0)) return
-    const now = Date.now()
+    pending.set(symbol, price)
+  })
+
+  setInterval(() => {
+    if (pending.size === 0) return
+
+    // Drain first: a quote arriving while this loop runs belongs to the NEXT
+    // frame, not to a half-sent one.
+    const batch = [...pending.entries()]
+    pending.clear()
 
     for (const ws of wss.clients) {
       if (ws.readyState !== ws.OPEN || !ws.authed) continue
-
-      const last = ws.lastSentAt.get(symbol) || 0
-      if (now - last < TICK_THROTTLE_MS) continue
-      ws.lastSentAt.set(symbol, now)
-
-      const q = applySpread(symbol, price.bid, price.ask, ws.spreadTable?.get(symbol))
-      send(ws, {
-        type: 'tick',
-        symbol,
-        bid: q.bid,
-        ask: q.ask,
-        spread: q.ask - q.bid,
-        timestamp: new Date(price.time || now).toISOString(),
-      })
+      for (const [symbol, price] of batch) {
+        // Spread is per-account, so it is applied per socket rather than once.
+        const q = applySpread(symbol, price.bid, price.ask, ws.spreadTable?.get(symbol))
+        send(ws, {
+          type: 'tick',
+          symbol,
+          bid: q.bid,
+          ask: q.ask,
+          spread: q.ask - q.bid,
+          timestamp: new Date(price.time || Date.now()).toISOString(),
+        })
+      }
     }
-  })
+  }, FLUSH_MS)
 
   // App-level keep-alive: the terminal answers {"type":"pong"}, and proxies see
   // traffic on an otherwise idle weekend socket.

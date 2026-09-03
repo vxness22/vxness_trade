@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Pressable, Text, StyleSheet } from 'react-native';
 import { vx, space, sizes, weights, fontFamily, radius } from '../../theme/vxTheme';
-import PriceTicker from './PriceTicker';
+import AnimatedPrice from './AnimatedPrice';
 
 export default function BuySellSplit({
   bid,
@@ -21,7 +21,9 @@ export default function BuySellSplit({
           accessibilityState={{ selected: side === 'sell' }}
         >
           <Text style={styles.lab}>Sell</Text>
-          <PriceTicker value={bid} format={formatPrice} fontSize={sizes.h3} fontWeight={weights.heavy} fontFamily={fontFamily} upColor="#FFFFFF" downColor="#FFFFFF" neutralColor="#FFFFFF" style={{ marginTop: 1 }} />
+          {/* Coloured action button: glide only. A green/red flash on a red Sell
+              or green Buy face reads as a glitch, not as movement. */}
+          <AnimatedPrice value={bid} digits={priceDigits(bid)} glide flash={false} color="#FFFFFF" style={styles.bigPrice} />
         </Pressable>
         <View style={styles.chip}>
           <Text style={styles.chipTxt}>{spreadPoints != null ? spreadPoints : '—'}</Text>
@@ -33,11 +35,15 @@ export default function BuySellSplit({
           accessibilityState={{ selected: side === 'buy' }}
         >
           <Text style={styles.lab}>Buy</Text>
-          <PriceTicker value={ask} format={formatPrice} fontSize={sizes.h3} fontWeight={weights.heavy} fontFamily={fontFamily} upColor="#FFFFFF" downColor="#FFFFFF" neutralColor="#FFFFFF" style={{ marginTop: 1 }} />
+          <AnimatedPrice value={ask} digits={priceDigits(ask)} glide flash={false} color="#FFFFFF" style={styles.bigPrice} />
         </Pressable>
       </View>
     </View>
   );
+}
+
+function priceDigits(p) {
+  return Number.isFinite(Number(p)) && Math.abs(Number(p)) >= 1 ? 2 : 5;
 }
 
 function formatPrice(p) {
@@ -47,6 +53,11 @@ function formatPrice(p) {
 }
 
 const styles = StyleSheet.create({
+  // Matches the weight the odometer used, so the button face is unchanged.
+  bigPrice: {
+    color: '#FFFFFF', fontFamily, fontSize: sizes.h3, fontWeight: weights.heavy,
+    marginTop: 1, textAlign: 'center', fontVariant: ['tabular-nums'],
+  },
   row: { flexDirection: 'row', alignItems: 'stretch', height: 58, position: 'relative' },
   half: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space.md },
   left:  { borderTopLeftRadius: radius.lg, borderBottomLeftRadius: radius.lg },

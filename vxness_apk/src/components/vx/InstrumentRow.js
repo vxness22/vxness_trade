@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import SymbolIcon from './SymbolIcon';
 import Sparkline from './Sparkline';
-import PriceTicker from './PriceTicker';
+import AnimatedPrice from './AnimatedPrice';
 import { vx, space, weights, fontFamily, radius } from '../../theme/vxTheme';
 
 function InstrumentRow({
@@ -71,15 +71,15 @@ function InstrumentRow({
           <Sparkline data={sparkData || []} color={sparkColor} width={64} height={28} />
         </View>
         <View style={styles.right}>
-          <PriceTicker
+          {/* A neutral cell, so it keeps the subtle text flash. AnimatedPrice
+              paints on the UI thread — the odometer re-rendered on every tick,
+              which at 20fps across a full watchlist was hundreds of renders a
+              second on the phones least able to afford them. */}
+          <AnimatedPrice
             value={price}
-            format={formatPrice}
-            fontSize={16}
-            fontWeight={weights.bold}
-            fontFamily={fontFamily}
-            upColor={upColor}
-            downColor={vx.down}
-            neutralColor={vx.textPrimary}
+            digits={priceDigits(price)}
+            style={styles.price}
+            color={vx.textPrimary}
           />
           <Text style={[styles.pct, { color: hasChange ? (positive ? upColor : vx.down) : vx.textMuted }]}>
             {hasChange ? `${positive ? '+' : ''}${effChange.toFixed(2)}%` : '—'}
@@ -89,6 +89,12 @@ function InstrumentRow({
       </Pressable>
     </Animated.View>
   );
+}
+
+// Mirrors formatPrice's thresholds so the digit count does not change as a
+// price crosses 1 — a changing width would make the column jump.
+function priceDigits(p) {
+  return Number.isFinite(Number(p)) && Math.abs(Number(p)) >= 1 ? 2 : 5;
 }
 
 function formatPrice(p) {
@@ -124,7 +130,7 @@ const styles = StyleSheet.create({
   sub: { color: vx.textMuted, fontFamily, fontSize: 12, marginTop: 2 },
   spark: { width: 64 },
   right: { alignItems: 'flex-end', minWidth: 90 },
-  price: { color: vx.textPrimary, fontFamily, fontSize: 16, fontWeight: weights.bold },
+  price: { color: vx.textPrimary, fontFamily, fontSize: 16, fontWeight: weights.bold, textAlign: 'right', fontVariant: ['tabular-nums'] },
   pct: { fontFamily, fontSize: 12, marginTop: 2 },
 });
 

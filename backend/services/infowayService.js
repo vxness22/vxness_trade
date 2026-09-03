@@ -4,6 +4,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { isForexWeekend } from '../utils/marketHours.js'
+import { BINANCE_SYMBOLS, BINANCE_FEED_ENABLED } from './binanceFeed.js'
 import {
   SESSION_START_HOUR_NY,
   barStartSeconds,
@@ -383,6 +384,9 @@ class InfowayService {
     this.cryptoWs = null
     this.prices = new Map()
     this.subscribers = new Set()
+    // symbol -> half the last observed depth spread, used to re-spread a trade
+    // print (which carries a price but no book).
+    this.halfSpreads = new Map()
     this.heartbeatInterval = null
     this.watchdogInterval = null
     this.forexLastMessageAt = 0
@@ -477,6 +481,10 @@ class InfowayService {
         try {
           const allForexSymbols = [...FOREX_SYMBOLS, ...METALS_SYMBOLS, ...COMMODITIES_SYMBOLS, ...INDICES_SYMBOLS]
           this.subscribeToDepth(ws, allForexSymbols)
+          // Depth alone prints about once a second. The trade stream carries
+          // every print — gold runs several a second — so the two together are
+          // what make the quote move at a broker's pace rather than a ticker's.
+          this.subscribeToTrades(ws, allForexSymbols)
         } catch (e) {
           console.error('[Infoway] Forex subscribe error:', e.message)
         }
@@ -530,7 +538,16 @@ class InfowayService {
         this.cryptoLastMessageAt = Date.now()
         console.log('[Infoway] Crypto WebSocket connected')
         try {
-          this.subscribeToDepth(ws, CRYPTO_SYMBOLS.map(toInfowaySymbol))
+          // Whatever Binance carries is left off this subscription entirely.
+          // Two live sources for one symbol means the published quote flips
+          // between them tick by tick, and a fill lands on whichever arrived
+          // last — so each symbol gets exactly one feed.
+          const ours = CRYPTO_SYMBOLS.filter(
+            (sym) => !(BINANCE_FEED_ENABLED && BINANCE_SYMBOLS[sym]))
+          this.subscribeToDepth(ws, ours.map(toInfowaySymbol))
+          if (BINANCE_FEED_ENABLED) {
+            console.log(`[Infoway] ${CRYPTO_SYMBOLS.length - ours.length} crypto symbols left to Binance`)
+          }
         } catch (e) {
           console.error('[Infoway] Crypto subscribe error:', e.message)
         }
@@ -599,9 +616,46 @@ class InfowayService {
     console.log(`[Infoway] Subscribed to ${symbols.length} symbols`)
   }
 
+  // Verified against the live socket: 10000 subscribes the trade stream and is
+  // acked with 10001; ticks then arrive as 10002 carrying {p, s, t}. (10003 /
+  // 10004 / 10005 are the depth equivalents.)
+  subscribeToTrades(ws, symbols) {
+    const msg = {
+      code: 10000,
+      trace: Date.now().toString(),
+      data: { codes: symbols.join(',') }
+    }
+    ws.send(JSON.stringify(msg))
+    console.log(`[Infoway] Subscribed to trades for ${symbols.length} symbols`)
+  }
+
   handleMessage(data) {
     try {
       const msg = JSON.parse(data.toString())
+      // Trade print. It carries a last price and no book, so the spread has to
+      // come from somewhere: the last depth tick for that symbol supplies it,
+      // and the price is re-spread around the mid exactly as a depth quote is.
+      // Before any depth has arrived there is no honest spread to apply, so the
+      // print is skipped rather than published with an invented one.
+      if (msg.code === 10002 && msg.data) {
+        const symbol = fromInfowaySymbol(msg.data.s)
+        const last = parseFloat(msg.data.p)
+        const half = this.halfSpreads.get(symbol)
+        if (last > 0 && half >= 0) {
+          const priceData = {
+            bid: last - half,
+            ask: last + half,
+            time: msg.data.t || Date.now(),
+          }
+          this.lastTickAt = Date.now()
+          this.prices.set(symbol, priceData)
+          this.subscribers.forEach(callback => {
+            try { callback(symbol, priceData) } catch (e) {}
+          })
+        }
+        return
+      }
+
       if (msg.code === 10005 && msg.data) {
         const infowaySymbol = msg.data.s
         const symbol = fromInfowaySymbol(infowaySymbol)
@@ -609,9 +663,15 @@ class InfowayService {
         const bidPrice = msg.data.b?.[0]?.[0]
 
         if (bidPrice && askPrice) {
+          const bid = parseFloat(bidPrice)
+          const ask = parseFloat(askPrice)
+          // Kept so a trade print can be re-spread the same way. A crossed book
+          // would otherwise store a negative half-spread and invert the quote.
+          if (ask >= bid) this.halfSpreads.set(symbol, (ask - bid) / 2)
+
           const priceData = {
-            bid: parseFloat(bidPrice),
-            ask: parseFloat(askPrice),
+            bid,
+            ask,
             time: msg.data.t || Date.now()
           }
           this.lastTickAt = Date.now()
@@ -738,6 +798,20 @@ class InfowayService {
     const prices = {}
     this.prices.forEach((price, symbol) => { prices[symbol] = price })
     return prices
+  }
+
+  // A quote from another feed (see binanceFeed.js), published through the same
+  // map and subscriber list as the primary one. Everything downstream — trade
+  // engine, bar aggregator, both websocket hubs — reads quotes from here, so a
+  // second feed stays invisible to all of it.
+  ingestExternalPrice(symbol, price) {
+    if (!symbol || !(price?.bid > 0) || !(price?.ask > 0)) return
+    if (price.ask >= price.bid) this.halfSpreads.set(symbol, (price.ask - price.bid) / 2)
+    this.lastTickAt = Date.now()
+    this.prices.set(symbol, price)
+    this.subscribers.forEach(callback => {
+      try { callback(symbol, price) } catch (e) {}
+    })
   }
 
   subscribe(callback) {

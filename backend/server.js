@@ -85,6 +85,7 @@ import tradeEngine from './services/tradeEngine.js'
 import propTradingEngine from './services/propTradingEngine.js'
 
 import infowayService from './services/infowayService.js'
+import binanceFeed from './services/binanceFeed.js'
 import { SUPPORTED_SYMBOLS, CRYPTO_SYMBOLS } from './services/infowayService.js'
 import ChallengeAccount from './models/ChallengeAccount.js'
 
@@ -190,13 +191,14 @@ const priceCache = new Map()
 // bar.
 //
 // So: collect what moved, and flush the changes — only the changes — on a frame.
-// 100ms is far finer than the feed itself, which delivers a given symbol about
-// 1.4 times a second (median gap 710ms), so nothing is lost by waiting; a symbol
-// that ticks twice inside one frame simply sends its newer quote, which is the
-// one the chart would have drawn anyway.
+// 50ms (20fps) is below what anyone perceives as delay, and the cost is bounded
+// by the number of symbols that moved rather than by the feed's rate: a symbol
+// ticking ten times inside a frame still sends one quote, the newest, which is
+// the one the chart would have drawn anyway. That bound is what lets the feed
+// get faster — trade stream, Binance — without the clients paying for it.
 const pendingPriceUpdates = new Map()
 let priceFlushTimer = null
-const PRICE_FLUSH_MS = 100
+const PRICE_FLUSH_MS = 50
 
 function queuePriceUpdate(symbol, price) {
   pendingPriceUpdates.set(symbol, price)
@@ -225,6 +227,15 @@ let infowayConnected = false
 
 
 async function initInfowayConnection() {
+
+  // Crypto majors come from Binance's public bookTicker; they were dropped from
+  // the primary subscription, so this is their only source.
+  //
+  // Started OUTSIDE the primary feed's success path on purpose: crypto trades
+  // around the clock and has nothing to do with the forex vendor being
+  // reachable. Nesting it under that connection would take BTC down whenever
+  // the FX feed had a bad night.
+  binanceFeed.start((symbol, price) => infowayService.ingestExternalPrice(symbol, price))
 
   try {
 

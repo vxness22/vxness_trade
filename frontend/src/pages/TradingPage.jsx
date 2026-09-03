@@ -24,7 +24,8 @@ import { isMarketOpen, marketClosedReason } from '../utils/marketHours'
 import ChartingLibraryChart from '../components/ChartingLibraryChart'
 
 import KycTradeRequiredModal from '../components/KycTradeRequiredModal'
-import { formatPrice as sharedFormatPrice } from '../utils/formatPrice'
+import { formatPrice as sharedFormatPrice, digitsFor } from '../utils/formatPrice'
+import AnimatedPrice from '../components/AnimatedPrice'
 
 
 
@@ -3994,7 +3995,7 @@ const TradingPage = () => {
                               <td className={`py-2 px-3 text-xs font-medium ${trade.side === 'BUY' ? 'text-blue-400' : 'text-red-400'}`}>{trade.side}</td>
                               <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{trade.quantity}</td>
                               <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{formatPrice(trade.symbol, trade.openPrice)}</td>
-                              <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{formatPrice(trade.symbol, trade.currentPrice)}</td>
+                              <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}><AnimatedPrice value={trade.currentPrice} digits={digitsFor(trade.symbol)} /></td>
                               <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{trade.stopLoss ? formatPrice(trade.symbol, trade.stopLoss) : '-'}</td>
                               <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{trade.takeProfit ? formatPrice(trade.symbol, trade.takeProfit) : '-'}</td>
                               <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>${trade.commission?.toFixed(2) || '0.00'}</td>
@@ -4038,7 +4039,7 @@ const TradingPage = () => {
                                   <td className={`py-2 px-3 text-xs font-bold ${netSide === 'BUY' ? 'text-blue-400' : netSide === 'SELL' ? 'text-red-400' : 'text-gray-400'}`}>{netSide}</td>
                                   <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{Math.abs(netLots).toFixed(2)}</td>
                                   <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{formatPrice(group.symbol, avgEntry)}</td>
-                                  <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{formatPrice(group.symbol, curPrice)}</td>
+                                  <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}><AnimatedPrice value={curPrice} digits={digitsFor(group.symbol)} /></td>
                                   <td className={`py-2 px-3 text-xs ${groupSl ? (isDarkMode ? 'text-gray-300' : 'text-gray-700') : 'text-gray-500'}`}>{groupSl ? formatPrice(group.symbol, groupSl) : '—'}</td>
                                   <td className={`py-2 px-3 text-xs ${groupTp ? (isDarkMode ? 'text-gray-300' : 'text-gray-700') : 'text-gray-500'}`}>{groupTp ? formatPrice(group.symbol, groupTp) : '—'}</td>
                                   <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>${group.charges.toFixed(2)}</td>
@@ -4055,7 +4056,7 @@ const TradingPage = () => {
                                     <td className={`py-2 px-3 text-xs font-medium ${trade.side === 'BUY' ? 'text-blue-400' : 'text-red-400'}`}>{trade.side}</td>
                                     <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{trade.quantity}</td>
                                     <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{formatPrice(trade.symbol, trade.openPrice)}</td>
-                                    <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{formatPrice(trade.symbol, trade.currentPrice)}</td>
+                                    <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}><AnimatedPrice value={trade.currentPrice} digits={digitsFor(trade.symbol)} /></td>
                                     <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{trade.stopLoss ? formatPrice(trade.symbol, trade.stopLoss) : '-'}</td>
                                     <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{trade.takeProfit ? formatPrice(trade.symbol, trade.takeProfit) : '-'}</td>
                                     <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>${trade.commission?.toFixed(2) || '0.00'}</td>
@@ -4425,7 +4426,7 @@ const TradingPage = () => {
 
                       <div className="text-white font-mono text-lg font-bold">
 
-                        {formatTradePrice(selectedInstrument.symbol, q.bid)}
+                        <AnimatedPrice value={q.bid} digits={digitsFor(selectedInstrument.symbol)} glide flash={false} />
 
                       </div>
 
@@ -4447,7 +4448,7 @@ const TradingPage = () => {
 
                       <div className="text-white font-mono text-lg font-bold">
 
-                        {formatTradePrice(selectedInstrument.symbol, q.ask)}
+                        <AnimatedPrice value={q.ask} digits={digitsFor(selectedInstrument.symbol)} glide flash={false} />
 
                       </div>
 
