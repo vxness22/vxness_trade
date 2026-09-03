@@ -2601,10 +2601,16 @@ router.get('/accounts/available-groups', jwtAuth, async (_req, res) => {
   }
 })
 
-// POST /api/v1/accounts/open  {group_id|account_type_id, leverage?}
+// POST /api/v1/accounts/open  {account_group_id|group_id|account_type_id, leverage?}
 router.post('/accounts/open', jwtAuth, async (req, res) => {
   try {
-    const typeId = req.body?.group_id || req.body?.account_type_id || req.body?.accountTypeId
+    // account_group_id is what the app actually sends, and an installed APK
+    // cannot be changed retroactively — so the server accepts every spelling
+    // rather than the one that happened to be written here first.
+    const typeId = req.body?.account_group_id
+      || req.body?.group_id
+      || req.body?.account_type_id
+      || req.body?.accountTypeId
     const type = typeId ? await AccountType.findById(String(typeId)) : null
     if (!type || !type.isActive) return fail(res, 400, 'Choose an available account type')
 

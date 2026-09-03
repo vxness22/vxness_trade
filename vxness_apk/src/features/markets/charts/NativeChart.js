@@ -304,7 +304,14 @@ export default function NativeChart({ symbol = 'EURUSD', interval = '60', theme,
         // whitelisted, and file:// pages may read sibling file:// subresources
         // (the charting_library/ bundle next to index.html) but get NO
         // universal (network) access and no mixed-content allowance.
-        originWhitelist={IN_EXPO_GO ? ['https://*'] : ['file://*']}
+        // blob: has to be listed explicitly. WebViewShared derives the origin
+        // with /^[A-Za-z][A-Za-z0-9+.-]+:(\/\/)?[^/]*/, so a worker URL like
+        // blob:https://api.vxness.in/… yields the origin "blob:https:", which
+        // neither https://* nor file://* matches. Unmatched means the WebView
+        // hands the URL to Linking and REFUSES the navigation — the charting
+        // library's workers were being blocked, and "Can't open url: blob:…"
+        // was the visible half of that.
+        originWhitelist={IN_EXPO_GO ? ['https://*', 'blob:*'] : ['file://*', 'blob:*']}
         style={styles.web}
         javaScriptEnabled
         domStorageEnabled
