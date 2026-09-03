@@ -253,7 +253,8 @@ const styles = StyleSheet.create({
   body: { flexGrow: 1, paddingHorizontal: space.xl, paddingTop: space.huge, paddingBottom: space.xl, justifyContent: 'flex-start' },
 
   header: { marginBottom: space.xxxl, alignItems: 'center' },
-  logo: { width: 200, height: 64 },
+  // 4:1, matching the asset's own 1600x400 — any other ratio letterboxes it.
+  logo: { width: 224, height: 56 },
 
   form: {},
   label: { color: C.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm, letterSpacing: 0.3 },

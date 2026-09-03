@@ -82,12 +82,22 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (response.ok && data.access_token) {
-        // the platform API returns access_token, user_id, role, expires_at
+        // /auth/login answers {access_token, user:{id,...}} — there is no
+        // top-level user_id, so reading one stored `undefined` as the user id
+        // for every normal sign-in. user_id is kept as a fallback because
+        // /auth/register/verify does send it.
+        //
+        // readOnly is set explicitly rather than left absent: an investor
+        // session sets it true, and a value that is merely missing is easy to
+        // carry over by accident. Normal sign-in states plainly that it is not
+        // read-only.
         const userInfo = {
-          id: data.user_id,
-          email: email,
+          id: data.user?.id || data.user_id,
+          email: data.user?.email || email,
+          name: data.user?.name || data.name,
           role: data.role,
-          expires_at: data.expires_at
+          expires_at: data.expires_at,
+          readOnly: false,
         };
 
         await persistSession(data, userInfo);
@@ -235,6 +245,12 @@ export const AuthProvider = ({ children }) => {
           investorAccountId: data.account_id,
           investorAccountNumber: data.account?.account_number,
         };
+        // Drop any refresh token left by an earlier session on this device.
+        // refreshAccessToken() reads it on the first 401, and refreshing with a
+        // full account's token would hand this read-only session a full one —
+        // the whole point of investor access is that it cannot be widened.
+        try { await SecureStore.deleteItemAsync('refreshToken'); } catch (_) {}
+
         await persistSession(data, userInfo);
         setToken(data.access_token);
         setUser(userInfo);

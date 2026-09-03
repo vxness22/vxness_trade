@@ -1385,8 +1385,11 @@ router.post('/auth/investor-login', async (req, res) => {
     if (owner.isBanned) return fail(res, 403, 'This account is banned')
     if (owner.isBlocked) return fail(res, 403, 'This account is blocked')
 
-    // No refresh cookie: an investor session is deliberately short-lived and
-    // must not silently renew itself the way an owner's session does.
+    // No refresh cookie is issued, and any existing one is cleared. An investor
+    // session is deliberately short-lived; leaving a previous full session's
+    // cookie in the jar would let /auth/refresh trade this read-only token for
+    // an unrestricted one.
+    res.clearCookie(REFRESH_COOKIE, { path: '/' })
     const accessToken = signAccessToken(owner._id, { ro: true, acct: String(account._id) })
 
     res.json({
