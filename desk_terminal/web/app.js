@@ -83,6 +83,97 @@
 
   let widget = null;
   let datafeed = null;
+  let bridgeRef = null;
+
+  /*
+   * Save / load adapter for the charting library.
+   *
+   * This is what makes "Save chart", indicator templates and drawing templates
+   * real: without an adapter the library has nowhere to keep any of them, so
+   * the terminal disabled the header button rather than show one that could
+   * not work — and a trader's fibs and indicators died with the window.
+   *
+   * Storage is the C++ side (sc.*), which keeps one JSON file beside
+   * config.json. So a template saved on one pane is offered on all four, and
+   * everything survives a restart.
+   *
+   * Every method returns a Promise because the library awaits them, and every
+   * bridge call is wrapped in one because QWebChannel methods are ASYNCHRONOUS
+   * — a bridge call returns undefined and delivers its result to a callback.
+   * Returning `sc.listCharts()` directly would hand the library undefined and
+   * look exactly like an empty, broken store.
+   */
+  function call(fn, ...args) {
+    return new Promise((resolve) => {
+      try {
+        fn.call(bridgeRef, ...args, (result) => resolve(result));
+      } catch (e) {
+        console.warn("save/load bridge call failed", e);
+        resolve(undefined);
+      }
+    });
+  }
+
+  const parseJson = (text, fallback) => {
+    try { return text ? JSON.parse(text) : fallback; } catch (e) { return fallback; }
+  };
+
+  function makeSaveLoadAdapter(bridge) {
+    return {
+      getAllCharts: () =>
+        call(bridge.listCharts).then((t) => parseJson(t, [])),
+      removeChart: (id) => call(bridge.removeChart, String(id)),
+      saveChart: (chartData) =>
+        call(bridge.saveChart,
+             chartData.id === undefined || chartData.id === null ? "" : String(chartData.id),
+             chartData.name || "Untitled",
+             chartData.symbol || "",
+             String(chartData.resolution || ""),
+             chartData.content || ""),
+      getChartContent: (id) => call(bridge.chartContent, String(id)),
+
+      // Indicator templates — MT5 calls these chart templates, and they are
+      // what a trader means by "save my setup and put it on another chart".
+      getAllStudyTemplates: () =>
+        call(bridge.listStudyTemplates)
+          .then((t) => parseJson(t, []).map((name) => ({ name }))),
+      removeStudyTemplate: (info) => call(bridge.removeStudyTemplate, info.name),
+      // The instrument and timeframe are stripped on the C++ side, in the one
+      // place templates are written — see ChartBridge::saveStudyTemplate.
+      saveStudyTemplate: (data) =>
+        call(bridge.saveStudyTemplate, data.name, data.content),
+      getStudyTemplateContent: (info) =>
+        call(bridge.studyTemplateContent, info.name),
+
+      // Chart templates carry the STYLE (candle colours, scales, background).
+      // Stored as text and parsed back here, because the library hands this
+      // one over as an object rather than a string.
+      getAllChartTemplates: () =>
+        call(bridge.listChartTemplates).then((t) => parseJson(t, [])),
+      saveChartTemplate: (name, theme) =>
+        call(bridge.saveChartTemplate, name, JSON.stringify(theme)),
+      removeChartTemplate: (name) => call(bridge.removeChartTemplate, name),
+      getChartTemplateContent: (name) =>
+        call(bridge.chartTemplateContent, name).then((t) => parseJson(t, {})),
+
+      getDrawingTemplates: (tool) =>
+        call(bridge.listDrawingTemplates, tool).then((t) => parseJson(t, [])),
+      loadDrawingTemplate: (tool, name) =>
+        call(bridge.drawingTemplateContent, tool, name),
+      saveDrawingTemplate: (tool, name, content) =>
+        call(bridge.saveDrawingTemplate, tool, name, content),
+      removeDrawingTemplate: (tool, name) =>
+        call(bridge.removeDrawingTemplate, tool, name),
+
+      // Only reached with saveload_separate_drawings_storage enabled, which
+      // this build does not turn on: drawings travel inside the layout content
+      // above. Present because the adapter interface is all-or-nothing, and a
+      // missing method throws rather than degrading.
+      saveLineToolsAndGroups: () => Promise.resolve(),
+      loadLineToolsAndGroups: () => Promise.resolve(null),
+    };
+  }
+
 
   /*
    * Builds the chart in `theme`, replacing any existing one.
@@ -146,6 +237,12 @@
       // lines are drawn by our own overlay instead — see tx_positions.js.
       // (tx_broker.js stays ready for the day a Trading Platform build lands
       // in vendor/.)
+      // Saved layouts and templates go through our own adapter, into a file
+      // beside config.json. No TradingView account and no server is involved.
+      save_load_adapter: makeSaveLoadAdapter(bridge),
+      // The library needs a layout name to show in the header before the first
+      // save; it renames itself as soon as one is saved.
+      saved_data_meta_info: { uid: 1, name: "Vxness", description: "" },
       // Quick-access timeframe buttons in the header (1m 3m 5m … D W M),
       // matching the web terminal's toolbar.
       favorites: {
@@ -153,6 +250,12 @@
       },
       disabled_features: [
         "use_localstorage_for_settings",
+        // The Save / Load LAYOUT menu stays off. A saved layout carries the
+        // instrument and the interval with it, so loading one on a second
+        // chart dragged that chart onto the first chart's symbol — reported
+        // from the desk as "once save in template same symbol get in chart".
+        // Indicator templates are the thing a trader actually wants to reuse
+        // across instruments, and those are enabled below.
         "header_saveload",
         "header_compare",
         // Split view (2 or 4 panes): drop the drawing toolbar down the left and
@@ -167,7 +270,9 @@
         ...(compact ? ["left_toolbar", "timeframes_toolbar"] : []),
       ],
       // Left drawing toolbar stays open on a single full-size chart.
-      enabled_features: [],
+      // study_templates is what puts "Save Indicator Template" in the
+      // Indicators dialog; it is off unless asked for.
+      enabled_features: ["study_templates"],
       overrides: overridesFor(t, compact),
     });
 
@@ -180,14 +285,8 @@
     widget.onChartReady(() => {
       const l = document.getElementById("loading");
       if (l) l.style.display = "none";
-      // A fresh chart has no dialog open by definition, so clear any hidden
-      // state the previous one left behind BEFORE re-arming the watcher. The
-      // native strip is a sibling of the web view and survives the rebuild, so
-      // without this a stale "hidden" outlives the chart that caused it.
-      try { bridge.setOverlayHidden(false); } catch (e) {}
       // Re-attached per widget: a theme switch rebuilds the chart, and with it
       // the iframe the observer was watching.
-      hideChartBranding();
       watchDialogs(bridge);
 
       // Tell the native side when the symbol is changed from inside the chart
@@ -209,45 +308,6 @@
         console.warn("onSymbolChanged subscribe failed", e);
       }
     });
-  }
-
-  /*
-   * Hides the charting library's own logo, bottom-left inside the chart.
-   *
-   * The web terminal does this with public/tvchart.css, handed to the widget as
-   * custom_css_url. That option is resolved against library_path, which here is
-   * the vendored library folder — a per-developer drop that is not in the repo,
-   * so our stylesheet cannot live there. The same rules are injected straight
-   * into the chart's document instead. It is reachable for the same reason
-   * watchDialogs() can read it: both documents are file:// and same-origin.
-   *
-   * Re-run on every rebuild (theme or grid change), because the rebuild throws
-   * the old iframe away and the new one starts clean.
-   */
-  function hideChartBranding() {
-    const host = document.getElementById("tv_chart");
-    const frame = host && host.querySelector("iframe");
-    let doc = null;
-    try {
-      doc = frame && (frame.contentDocument || (frame.contentWindow || {}).document);
-    } catch (e) { /* cross-origin — reported below */ }
-    if (!doc || !doc.head) {
-      console.warn("branding: chart iframe document unavailable; the library logo stays");
-      return;
-    }
-    if (doc.getElementById("tx_no_branding")) return;
-    const st = doc.createElement("style");
-    st.id = "tx_no_branding";
-    // Kept in step with frontend/public/tvchart.css — the class names carry a
-    // build hash, hence the prefix matches, and the :has() rules take out the
-    // wrapper the icon sits in so no empty box is left behind.
-    st.textContent =
-      'a[href*="tradingview.com"],a[href*="tradingview"],' +
-      '[class*="chartLogo-"],[class*="brand-H"],#tv-attr-logo,#tv-logo' +
-      '{display:none !important;}' +
-      ':has(> [class*="chartLogo-"]),:has(> [class*="brand-H"])' +
-      '{display:none !important;}';
-    doc.head.appendChild(st);
   }
 
   /*
@@ -274,10 +334,6 @@
     } catch (e) { /* cross-origin — handled below */ }
     if (!doc || !doc.body) {
       console.warn("dialog watch: chart iframe document unavailable; strip will not auto-hide");
-      // Fail OPEN, never closed. Without this the strip keeps whatever state a
-      // previous chart left it in, and if that state was hidden the trader is
-      // left with no BUY/SELL control and no way to get it back.
-      try { bridge.setOverlayHidden(false); } catch (e) {}
       return;
     }
 
@@ -293,73 +349,25 @@
       '.tv-dropdown-behavior__body', '[class*="menuWrap"]', '[class*="popupMenu"]'
     ].join(',');
 
-    // Presence is not enough, and neither is a non-zero rect.
-    //
-    // THIS IS WHAT BROKE TRADING. Several of the selectors above match
-    // containers the charting library keeps in the DOM permanently — laid out,
-    // sized, but transparent or visibility:hidden until something opens inside
-    // them. The old test asked only for width/height > 1, so it answered "a
-    // dialog is open" on a chart with nothing open at all. setOverlayHidden(true)
-    // then fired on the first poll and never came back, which takes the one-click
-    // strip off screen for the whole session — and that strip IS the BUY/SELL
-    // control. The terminal looked fine, priced fine, drew positions fine, and
-    // simply had no way to place a trade.
-    //
-    // So: require the element to be genuinely rendered, and big enough to be a
-    // real dialog rather than a 2px sliver.
-    const win = frame.contentWindow;
-    function reallyVisible(el) {
-      const r = el.getBoundingClientRect();
-      if (!(r.width > 24 && r.height > 24)) return false;      // slivers are not dialogs
-      const vw = doc.documentElement.clientWidth || 0;
-      const vh = doc.documentElement.clientHeight || 0;
-      if (r.right <= 0 || r.bottom <= 0 || r.left >= vw || r.top >= vh) return false;  // parked off screen
-      if (el.getAttribute("aria-hidden") === "true") return false;
-      let cs = null;
-      try { cs = win.getComputedStyle(el); } catch (e) { return false; }
-      if (!cs) return false;
-      if (cs.display === "none" || cs.visibility === "hidden") return false;
-      if (parseFloat(cs.opacity || "1") < 0.05) return false;
-      return true;
-    }
-
+    // Presence is not enough: some of these containers exist permanently and
+    // are merely empty when closed, which would pin the strip hidden forever.
+    // Require something actually laid out on screen.
     function anythingOpen() {
       const nodes = doc.querySelectorAll(SEL);
       for (let i = 0; i < nodes.length; i++) {
-        if (reallyVisible(nodes[i])) return true;
+        const r = nodes[i].getBoundingClientRect();
+        if (r.width > 1 && r.height > 1) return true;
       }
       return false;
     }
 
-    // What matched, for the diagnostic log. Hiding the one-click strip removes
-    // the trader's BUY/SELL control, so when it happens the log has to say what
-    // caused it — chasing a permanently hidden strip without this meant guessing
-    // at ten selectors against a DOM that cannot be inspected from outside.
-    function firstOpen() {
-      const nodes = doc.querySelectorAll(SEL);
-      for (let i = 0; i < nodes.length; i++) {
-        if (reallyVisible(nodes[i])) {
-          const el = nodes[i];
-          return (el.tagName || "?").toLowerCase() +
-                 (el.getAttribute("data-dialog-name") ? "[" + el.getAttribute("data-dialog-name") + "]" : "") +
-                 (el.getAttribute("data-name") ? "[" + el.getAttribute("data-name") + "]" : "") +
-                 (el.className && el.className.baseVal === undefined
-                    ? "." + String(el.className).split(/\s+/).slice(0, 2).join(".")
-                    : "");
-        }
-      }
-      return null;
-    }
-
     let last = null;
     function update() {
-      const cause = firstOpen();
-      const open = cause !== null;
+      const open = anythingOpen();
       if (open === last) return;
       last = open;
       const wm = document.getElementById("tx_watermark");
       if (wm) wm.style.visibility = open ? "hidden" : "visible";
-      console.info("one-click strip " + (open ? "HIDDEN by " + cause : "SHOWN"));
       try { bridge.setOverlayHidden(open); } catch (e) { console.warn("setOverlayHidden", e); }
     }
 
@@ -381,6 +389,7 @@
 
   function boot(bridge) {
     window.sc = bridge;
+    bridgeRef = bridge;
     datafeed = window.makeDatafeed(bridge);
     createChart(bridge, bridge.theme);
 
@@ -389,27 +398,13 @@
     bridge.symbolChanged.connect((sym) => {
       if (!sym || !widget) return;
       try {
-        const ch = widget.activeChart();
         // An in-chart pick is reported to C++ and comes straight back here as
         // the property's change notification. Re-applying it would reload the
         // series the trader just chose — and the reload discards the chart's
         // scroll position, so it reads as the chart jumping on its own.
-        const cur = ch.symbol();
-        if (cur === sym) return;
-        // The callback is NOT optional on this library build: setSymbol(sym)
-        // alone throws, and the throw was swallowed by a silent catch. Clicking
-        // a row in Market Watch therefore moved the one-click strip, the
-        // blotter and the price feed onto the new instrument and left the CHART
-        // on the old one — which also hid every position and pending order line
-        // belonging to the symbol the trader had just chosen.
-        ch.setSymbol(sym, function () {
-          console.info("chart symbol -> " + sym);
-        });
-      } catch (e) {
-        // Never silent again. A symbol switch that fails is the difference
-        // between a chart of the instrument you picked and a chart of another.
-        console.warn("setSymbol(" + sym + ") failed: " + (e && e.message ? e.message : e));
-      }
+        if (widget.activeChart().symbol() === sym) return;
+        widget.activeChart().setSymbol(sym);
+      } catch (e) { /* not ready yet */ }
     });
     bridge.themeChanged.connect((theme) => createChart(bridge, theme));
     // Same rebuild path as a theme switch: the features that hide the drawing

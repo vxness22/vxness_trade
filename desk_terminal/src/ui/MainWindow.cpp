@@ -11,6 +11,8 @@
 #include "ui/EditOrderDialog.h"
 #include "ui/LoginDialog.h"
 #include "ui/WalletDialog.h"
+#include "ui/SymbolSpecDialog.h"
+#include "ui/ShareTradeDialog.h"
 #include "core/ApiClient.h"
 #include "core/PriceStream.h"
 
@@ -27,15 +29,13 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QFrame>
+#include <QCloseEvent>
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QFile>
-#include <QScreen>
-#include <QGuiApplication>
-#include <QCloseEvent>
-#include <QResizeEvent>
 #include "ui/Theme.h"
+#include "ui/Toast.h"
 
 static const char* MASK = "••••••";
 
@@ -43,33 +43,7 @@ MainWindow::MainWindow(const Config& cfg, QWidget* parent)
     : QMainWindow(parent), m_cfg(cfg) {
     setWindowTitle(tr("Vxness Terminal"));
     setMinimumSize(980, 600);
-
-    // Where the window opens — and it opens MAXIMISED the first time.
-    //
-    // This used to be a flat resize(1360, 840) with no reference to the screen.
-    // On a display whose work area is smaller than that (1295x767 on the laptop
-    // this was found on) Windows keeps the width but leaves the window taller
-    // than the desktop, so the bottom of it — the blotter's Trade/Pending/
-    // History tabs and the balance/equity line under them — sits below the
-    // taskbar. The terminal came up showing a watchlist and a chart and nothing
-    // else, and every launch began by maximising it by hand before an open
-    // trade could even be seen.
-    //
-    // A trading screen wants the whole display, so that is the default now. The
-    // restored-down size is clamped to the screen as well, so un-maximising
-    // cannot reproduce the same off-screen window. Whatever the trader leaves
-    // it as is remembered — saveGeometry() carries the maximised flag, the
-    // restored size and the position together, so a second monitor is honoured
-    // too (restoreGeometry pulls a window back onto the desktop if that screen
-    // is gone).
-    const QByteArray geo = QByteArray::fromBase64(m_cfg.windowGeometry.toLatin1());
-    if (geo.isEmpty() || !restoreGeometry(geo)) {
-        const QScreen* scr = QGuiApplication::primaryScreen();
-        const QRect avail = scr ? scr->availableGeometry() : QRect(0, 0, 1360, 840);
-        resize(qMin(1360, avail.width()), qMin(840, avail.height()));
-        move(avail.center() - QPoint(width() / 2, height() / 2));
-        setWindowState(windowState() | Qt::WindowMaximized);
-    }
+    resize(1360, 840);
 
     m_api    = new ApiClient(m_cfg, this);
     m_stream = new PriceStream(m_cfg, this);
@@ -82,6 +56,9 @@ MainWindow::MainWindow(const Config& cfg, QWidget* parent)
     m_positions = new PositionsPanel;
 
     m_account->setPrivacy(m_cfg.privacy);
+    // Only the statement uses it, but it has to be in place before the first
+    // export, which can happen at any time after start-up.
+    m_positions->setTraderName(m_cfg.userName.isEmpty() ? m_cfg.email : m_cfg.userName);
     m_positions->setPrivacy(m_cfg.privacy);
 
     // The one-click strip floats in the chart's toolbar band, in the gap
@@ -119,17 +96,44 @@ MainWindow::MainWindow(const Config& cfg, QWidget* parent)
     // ── main split: market watch | centre column ──
     m_watch->setMinimumWidth(210);
     auto* body = new QSplitter(Qt::Horizontal);
+    m_bodySplit = body;
     body->addWidget(m_watch);
     body->addWidget(m_centerSplit);
     body->setStretchFactor(0, 0);
     body->setStretchFactor(1, 1);
     body->setCollapsible(0, false);
     body->setCollapsible(1, false);
-    body->setSizes({330, 1000});   // fits the market watch's four columns
+    // Sized from the columns the watchlist is actually showing, not a literal.
+    // With the default three that is the same ~276px as before, but it now
+    // follows the column set: switch Spread on and the boundary moves with it
+    // instead of leaving the new column cut off at the panel edge.
+    body->setSizes({m_watch->preferredWidth(), 1000});
     setCentralWidget(body);
 
-    // The blotter's starting height is set from resizeEvent — see
-    // applyDefaultSplit(), and the note there about why it cannot be done here.
+    // Give the blotter a sensible starting height once the window is really
+    // sized. Guard the height: on the first pass it can still be 0, and
+    // {0-200, 200} is not a meaningful split.
+    QTimer::singleShot(0, this, [this]() {
+        const int h = m_centerSplit->height();
+        if (h > 400) m_centerSplit->setSizes({h - 200, 200});
+    });
+
+    // Window size and position as the trader last left them, maximized state
+    // included — restoreGeometry() carries that. First run has nothing stored
+    // and opens maximized: a watchlist, a chart and a blotter side by side have
+    // nothing to gain from a small window, and everyone was maximizing it by
+    // hand on every single launch.
+    if (!m_cfg.windowGeometry.isEmpty())
+        restoreGeometry(QByteArray::fromBase64(m_cfg.windowGeometry.toLatin1()));
+    // The window is MAXIMIZED by main(), not here. Setting the state on a
+    // window that has never been shown does not survive restoreGeometry's own
+    // state handling — a geometry blob recorded while maximized restores the
+    // size but comes back un-maximized, which is exactly the "I have to
+    // maximize it every time" the desk reported. showMaximized() after
+    // construction has no such ambiguity.
+    //
+    // The restored geometry is still worth reading: it is the size the window
+    // returns to when a trader un-maximizes it mid-session.
 
     buildMenuBar();
 
@@ -158,6 +162,26 @@ MainWindow::MainWindow(const Config& cfg, QWidget* parent)
         m_api->fetchOrders();
     });
     m_accountTimer->start();
+
+    // Day's high/low for the Market Watch columns. One request per instrument,
+    // so it is drained a few at a time in the background; the columns track the
+    // session's own ticks until each seed lands.
+    m_rangeTimer = new QTimer(this);
+    m_rangeTimer->setInterval(250);
+    connect(m_rangeTimer, &QTimer::timeout, this, [this]() {
+        if (m_rangeQueue.isEmpty()) { m_rangeTimer->stop(); return; }
+        for (int i = 0; i < 4 && !m_rangeQueue.isEmpty(); ++i)
+            m_api->fetchDailyRange(m_rangeQueue.takeFirst());
+    });
+
+    // Re-seeded periodically because "the day's range" changes underneath a
+    // running terminal: at the daily rollover the server's bar starts again
+    // and yesterday's high would otherwise sit in the column until restart.
+    // Ticks alone can only ever widen a range, never reset one.
+    m_rangeReseedTimer = new QTimer(this);
+    m_rangeReseedTimer->setInterval(15 * 60 * 1000);
+    connect(m_rangeReseedTimer, &QTimer::timeout, this, &MainWindow::seedDailyRanges);
+    m_rangeReseedTimer->start();
 
     // Keep the access token alive. It lasts ~45 minutes and every /api/v1 call
     // — per-position close, SL/TP, the whole wallet — dies with it, so this
@@ -266,6 +290,60 @@ void MainWindow::buildMenuBar() {
         m_layoutGroup->setExclusive(true);
     });
 
+    // ── the face the data tables are drawn in ──
+    //
+    // A submenu rather than a settings page: it is a preference a trader
+    // changes once, looks at, and maybe changes again, and every one of these
+    // takes effect on the spot. Only faces that ship with the platform are
+    // offered — a font picker listing everything installed would let someone
+    // pick a display face that renders a blotter unreadable.
+    view->addSeparator();
+    QMenu* fontMenu = view->addMenu(tr("&Font"));
+
+    auto* familyGroup = new QActionGroup(this);
+    familyGroup->setExclusive(true);
+    struct { const char* family; const char* label; } faces[] = {
+        {"Tahoma",    QT_TR_NOOP("Tahoma  (MT5)")},
+        {"Segoe UI",  QT_TR_NOOP("Segoe UI")},
+        {"Verdana",   QT_TR_NOOP("Verdana")},
+        {"Arial",     QT_TR_NOOP("Arial")},
+        {"Consolas",  QT_TR_NOOP("Consolas  (monospace)")},
+    };
+    for (const auto& f : faces) {
+        QAction* a = fontMenu->addAction(tr(f.label));
+        a->setCheckable(true);
+        a->setChecked(Theme::tableFontFamily() == QLatin1String(f.family));
+        familyGroup->addAction(a);
+        connect(a, &QAction::triggered, this, [this, fam = QString(f.family)]() {
+            Theme::setTableFont(fam, Theme::tableFontSize());
+            m_cfg.tableFontFamily = fam;
+            m_cfg.save();
+            // The columns were sized for the old face; a wider one would clip.
+            fitWatchlistWidth();
+        });
+    }
+
+    fontMenu->addSeparator();
+    auto* sizeGroup = new QActionGroup(this);
+    sizeGroup->setExclusive(true);
+    struct { int px; const char* label; } sizes[] = {
+        {11, QT_TR_NOOP("Small")},
+        {12, QT_TR_NOOP("Normal")},
+        {14, QT_TR_NOOP("Large")},
+    };
+    for (const auto& z : sizes) {
+        QAction* a = fontMenu->addAction(tr(z.label));
+        a->setCheckable(true);
+        a->setChecked(Theme::tableFontSize() == z.px);
+        sizeGroup->addAction(a);
+        connect(a, &QAction::triggered, this, [this, px = z.px]() {
+            Theme::setTableFont(Theme::tableFontFamily(), px);
+            m_cfg.tableFontSize = px;
+            m_cfg.save();
+            fitWatchlistWidth();
+        });
+    }
+
     view->addSeparator();
     m_bloterAction = view->addAction(tr("Show &trade panel"));
     m_bloterAction->setCheckable(true);
@@ -325,8 +403,24 @@ void MainWindow::rebuildAccountsMenu() {
     m_accountsMenu->addSeparator();
     connect(m_accountsMenu->addAction(tr("&Wallet…")), &QAction::triggered, this, [this]() {
         WalletDialog dlg(m_cfg, this);
-        connect(&dlg, &WalletDialog::transferred, this, [this]() { m_api->fetchAccount(); });
+        // The dialog raises its own toast while it is open. Repeat the result
+        // here once it closes: the balances on screen have just jumped and the
+        // trader needs to see why, with the line left in the status bar as the
+        // record after the toast fades.
+        QString done;
+        connect(&dlg, &WalletDialog::transferred, this,
+                [this, &done](bool toWallet, double amount, const QString& account) {
+            const QString money = QString("$%L1").arg(amount, 0, 'f', 2);
+            done = toWallet
+                ? tr("%1 moved from %2 to your main wallet").arg(money, account)
+                : tr("%1 moved from your main wallet to %2").arg(money, account);
+            m_api->fetchAccount();
+        });
         dlg.exec();
+        if (!done.isEmpty()) {
+            setStatus(tr("✓ %1").arg(done), false);
+            Toast::success(this, tr("Transfer complete"), done);
+        }
     });
 }
 
@@ -401,6 +495,22 @@ void MainWindow::updateIdentity() {
 
 // --- wiring -----------------------------------------------------------------
 
+// The chart gets whatever the watchlist does not need. Both panes are given
+// explicit sizes because QSplitter distributes by ratio: handing it only the
+// new left width would leave the right one wherever it happened to be.
+void MainWindow::fitWatchlistWidth() {
+    if (!m_bodySplit || !m_watch) return;
+    const int total = m_bodySplit->width();
+    if (total <= 0) return;                  // not laid out yet
+
+    int want = m_watch->preferredWidth();
+    // Half the window at most. A trader who turns on every column should not
+    // find the chart squeezed into a strip; past that point the panel scrolls,
+    // which is what it did before any of this.
+    want = qBound(m_watch->minimumWidth(), want, total / 2);
+    m_bodySplit->setSizes({want, total - want});
+}
+
 void MainWindow::refreshAll() {
     m_api->fetchAccount();
     m_api->fetchPositions();
@@ -438,17 +548,6 @@ void MainWindow::connectServices() {
     // Clicking a chart pane makes it active — the strip and the order window
     // must follow it, not stay on whatever Market Watch last selected.
     connect(m_charts, &ChartArea::activeChartChanged, this, &MainWindow::onActiveChartChanged);
-    // A symbol picked inside the chart's own search box is the same choice as
-    // clicking a Market Watch row, so everything that follows the instrument —
-    // the one-click strip, News, Economic, the saved layout — has to follow it
-    // too. Without this the strip stays on the old instrument while the candles
-    // show the new one, which is one click from trading the wrong market.
-    //
-    // Only for the pane in focus: a pick in a background pane retitles that
-    // pane (ChartArea does that itself) but must not move the strip.
-    connect(m_charts, &ChartArea::symbolPickedInChart, this, [this](const QString& s) {
-        if (s == m_charts->activeSymbol()) onActiveChartChanged(0);
-    });
     // Grid changed (menu or a pane's ✕) — remember it for the next launch.
     connect(m_charts, &ChartArea::chartCountChanged, this,
             [this](int) { persistChartLayout(); });
@@ -457,6 +556,46 @@ void MainWindow::connectServices() {
     // row that was double-clicked by the time this fires.
     connect(m_watch, &WatchlistWidget::symbolDoubleClicked, this,
             [this](const QString& s) { onSymbolActivated(s); openOrderWindow(); });
+    connect(m_watch, &WatchlistWidget::specificationRequested,
+            this, &MainWindow::openSpecification);
+    m_watch->setHiddenColumns(m_cfg.watchHiddenColumns);
+    // Deferred: the saved column set is applied here, AFTER the constructor
+    // sized the splitter, and the splitter has no real width until the window
+    // has been laid out. Running it on the event loop gets both.
+    QTimer::singleShot(0, this, &MainWindow::fitWatchlistWidth);
+    m_watch->setFavourites(m_cfg.watchFavourites);
+    m_watch->setHiddenSymbols(m_cfg.watchHiddenSymbols);
+    m_watch->setSymbolColours(m_cfg.watchSymbolColours);
+    m_watch->setGridVisible(m_cfg.watchGrid);
+    connect(m_watch, &WatchlistWidget::hiddenSymbolsChanged, this,
+            [this](const QStringList& syms) {
+        m_cfg.watchHiddenSymbols = syms;
+        m_cfg.save();
+    });
+    connect(m_watch, &WatchlistWidget::symbolColoursChanged, this,
+            [this](const QStringList& pairs) {
+        m_cfg.watchSymbolColours = pairs;
+        m_cfg.save();
+    });
+    connect(m_watch, &WatchlistWidget::gridChanged, this, [this](bool on) {
+        m_cfg.watchGrid = on;
+        m_cfg.save();
+    });
+    connect(m_watch, &WatchlistWidget::favouritesChanged, this,
+            [this](const QStringList& symbols) {
+        m_cfg.watchFavourites = symbols;
+        m_cfg.save();
+    });
+    connect(m_watch, &WatchlistWidget::columnsChanged, this,
+            [this](const QStringList& keys) {
+        m_cfg.watchHiddenColumns = keys;
+        m_cfg.save();
+        fitWatchlistWidth();
+    });
+    connect(m_api, &ApiClient::dailyRangeReceived, this,
+            [this](const QString& sym, double high, double low) {
+        m_watch->setDailyRange(sym, high, low);
+    });
 
     // The chart (TradingView) pulls bars + ticks itself via the ChartBridge,
     // so no bars/tick wiring is needed here for it.
@@ -470,6 +609,19 @@ void MainWindow::connectServices() {
             [this](const QString& s, double v, double sl, double tp) {
         m_api->placeOrder("SELL", s, v, sl, tp, "terminal");
     });
+    // The strip refuses an order whose bracket sits on the wrong side of the
+    // market. Say why in the status bar, where every other trade outcome lands.
+    // The strip is draggable; remember where it was left. Saved on release
+    // rather than on every mouse move — this writes the whole config file.
+    m_ticket->setPositionRatio(QPointF(m_cfg.ticketPosX, m_cfg.ticketPosY));
+    connect(m_ticket, &OrderTicket::movedTo, this, [this](const QPointF& r) {
+        m_cfg.ticketPosX = r.x();
+        m_cfg.ticketPosY = r.y();
+        m_cfg.save();
+    });
+
+    connect(m_ticket, &OrderTicket::rejected, this,
+            [this](const QString& why) { setStatus(why, true); });
     connect(m_ticket, &OrderTicket::closeAll, this, [this](const QString& s) {
         if (QMessageBox::question(this, tr("Close positions"),
                 tr("Close ALL open %1 positions?").arg(s)) == QMessageBox::Yes)
@@ -519,10 +671,6 @@ void MainWindow::connectServices() {
     });
     connect(m_api, &ApiClient::positionsReceived, m_positions, &PositionsPanel::setPositions);
     connect(m_api, &ApiClient::positionsReceived, m_charts,    &ChartArea::setPositions);
-    // Pending orders go to the chart too. Without this they existed only in
-    // the blotter, so a trader watching the chart could not see the level
-    // they were waiting on, let alone drag it.
-    connect(m_api, &ApiClient::ordersReceived,    m_charts,    &ChartArea::setOrders);
     connect(m_api, &ApiClient::ordersReceived,    m_positions, &PositionsPanel::setOrders);
     connect(m_api, &ApiClient::historyReceived,   m_positions, &PositionsPanel::setHistory);
     connect(m_api, &ApiClient::transactionsReceived, m_positions, &PositionsPanel::setTransactions);
@@ -569,6 +717,34 @@ void MainWindow::connectServices() {
             return;
         }
         m_api->modifyBracket(id, kind, level);
+    });
+
+    // Share one position as a public card. The link is minted by the platform,
+    // so it needs a real session — an API-key sign-in cannot reach /api/v1.
+    connect(m_positions, &PositionsPanel::sharePosition, this,
+            [this](const OpenPosition& pos) {
+        if (!requireSession(tr("Sharing a trade"))) return;
+        ShareTradeDialog dlg(pos, m_specs.value(pos.symbol), m_lastAccount.leverage,
+                             m_api, m_cfg.restBase, this);
+        dlg.exec();
+    });
+
+    // Typed straight into the Comment cell. Same shape as a bracket edit: the
+    // server's answer decides what the cell ends up showing.
+    connect(m_positions, &PositionsPanel::commentEdited, this,
+            [this](const QString& id, const QString& text) {
+        if (!requireSession(tr("Editing a position comment"))) {
+            m_api->fetchPositions();   // put the cell back to the server's value
+            return;
+        }
+        m_api->modifyComment(id, text);
+    });
+
+    connect(m_api, &ApiClient::positionOpResult, this,
+            [this](const QString&, const QString& op, bool ok, const QString& msg) {
+        if (op != "comment") return;
+        setStatus(ok ? tr("Comment updated") : msg, !ok);
+        m_api->fetchPositions();
     });
 
     // The server's answer is what the cell should end up showing: a rejected
@@ -653,6 +829,15 @@ void MainWindow::connectServices() {
     });
 }
 
+void MainWindow::closeEvent(QCloseEvent* e) {
+    // Saved on the way out rather than on every move or resize: this writes the
+    // whole config file, and doing that on each drag of a window edge would be
+    // a file write per frame.
+    m_cfg.windowGeometry = QString::fromLatin1(saveGeometry().toBase64());
+    m_cfg.save();
+    QMainWindow::closeEvent(e);
+}
+
 void MainWindow::switchAccount(const QString& accountId) {
     if (accountId.isEmpty() || accountId == m_cfg.accountId) return;
     m_cfg.accountId = accountId;
@@ -700,23 +885,13 @@ void MainWindow::onSymbolsReceived(const QVector<SymbolSpec>& symbols) {
         const int       wantCount = m_cfg.chartCount;
         const QStringList wantSyms = m_cfg.chartSymbols;
 
-        // Pane 0's saved instrument has to be captured HERE, in the same
-        // snapshot as the rest, and carried out of this block in a member.
-        // Reading m_cfg.chartSymbols again further down does not work: by then
-        // persistChartLayout() has already rewritten it from the live panes,
-        // so the saved symbol is gone and the startup pick silently fell back
-        // to the default — which is the bug this whole block exists to avoid.
-        if (!wantSyms.isEmpty()) m_savedPane0Symbol = wantSyms.first();
-
         if (wantCount > 1)
             m_charts->setChartCount(wantCount);
-        // Pane 0 used to be skipped here, because the block below always forced
-        // the startup instrument on it. That is what made open trades vanish
-        // from the chart after a restart: the position overlay only draws
-        // positions whose symbol matches the CHARTED one (tx_positions.js
-        // filters on p.symbol === chart.symbol()), so a trader holding GBPUSD
-        // reopened the terminal onto gold and saw an empty chart with no lines.
-        // Panes 1..n are restored the same way they always were.
+        // Pane 0 is deliberately skipped: the terminal always opens on the
+        // startup instrument (XAUUSD, see below), so restoring the saved symbol
+        // there would immediately be overwritten anyway. Panes 1..n keep what
+        // they were showing, so a 2x2 comes back with its other three
+        // instruments intact.
         for (int i = 1; i < wantSyms.size() && i < m_charts->chartCount(); ++i) {
             const QString s = wantSyms.at(i);
             if (s.isEmpty() || !m_specs.contains(s)) continue;
@@ -728,36 +903,36 @@ void MainWindow::onSymbolsReceived(const QVector<SymbolSpec>& symbols) {
     }
 
     m_watch->setSymbols(symbols);
+    seedDailyRanges();
     // Snapshot prices immediately (before first ticks arrive).
     m_api->fetchPrices({});
     setStatus(tr("%1 instruments loaded").arg(symbols.size()));
 
-    // Reopen on the instrument the trader left the terminal on. Falling back to
-    // XAUUSD — the platform's headline instrument — only when there is nothing
-    // saved, because the alphabetical first is usually a pair with a closed
-    // market and an empty chart.
+    // Open on XAUUSD — the platform's headline instrument — rather than on the
+    // alphabetical first, which is usually a share with a closed market and an
+    // empty chart. The rest of the list is fallback for a deployment that does
+    // not carry gold.
     //
-    // This used to unconditionally pick gold, which quietly threw away the
-    // session: a trader holding GBPUSD came back to a gold chart, and because
-    // the position overlay only draws lines for the CHARTED symbol, their open
-    // trade looked like it had disappeared. The saved symbol has to win.
+    // This wins over whatever pane 0 was showing last session — every launch
+    // starts on gold. The grid (1/2/4) and the OTHER panes' instruments are
+    // still restored above, so a 2x2 comes back as it was apart from the pane
+    // in focus.
     if (!symbols.isEmpty()) {
-        QString pick;
-
-        // Pane 0's saved instrument, if it is one this deployment still carries.
-        if (!m_savedPane0Symbol.isEmpty() && m_specs.contains(m_savedPane0Symbol))
-            pick = m_savedPane0Symbol;
-
-        if (pick.isEmpty()) {
-            pick = symbols.front().symbol;
-            for (const QString& pref : {"XAUUSD", "EURUSD", "BTCUSD", "GBPUSD", "ETHUSD"}) {
-                if (m_specs.contains(pref)) { pick = pref; break; }
-            }
+        QString pick = symbols.front().symbol;
+        for (const QString& pref : {"XAUUSD", "EURUSD", "BTCUSD", "GBPUSD", "ETHUSD"}) {
+            if (m_specs.contains(pref)) { pick = pref; break; }
         }
-
         m_watch->selectSymbol(pick);   // moves selection -> triggers onSymbolActivated
         onSymbolActivated(pick);
     }
+}
+
+void MainWindow::seedDailyRanges() {
+    if (m_specs.isEmpty() || !m_rangeTimer) return;
+    // Rebuilt rather than appended to: a re-seed while the previous pass is
+    // still draining would otherwise queue every instrument twice.
+    m_rangeQueue = m_specs.keys();
+    m_rangeTimer->start();
 }
 
 void MainWindow::onSymbolActivated(const QString& symbol) {
@@ -795,50 +970,6 @@ void MainWindow::onActiveChartChanged(int) {
     m_positions->setNewsSymbol(sym);
     m_positions->setCalendarSymbol(sym);
     persistChartLayout();
-}
-
-// Called on close rather than on every move/resize: the file is rewritten
-// whole, and a drag across the desktop would otherwise write it a hundred times.
-// The blotter's share of the centre column, applied on the first layout pass
-// that has a real height.
-//
-// This used to be a QTimer::singleShot(0) in the constructor that bailed out
-// unless the splitter was already over 400px tall. On a fresh start it is not:
-// that timer fires before the window has been shown at its final size, so the
-// guard skipped, no sizes were ever set, and the chart — the pane carrying the
-// stretch factor — kept the whole column. The terminal opened with a watchlist
-// and a chart and NO Trade/Pending/History blotter and no balance line, until
-// the user resized the window by hand and the splitter re-laid itself out.
-//
-// Driving it from resizeEvent instead means it runs on the first pass that has
-// a real height, whatever produced it: show(), the maximise, or a restore from
-// saved geometry.
-void MainWindow::applyDefaultSplit() {
-    const int h = m_centerSplit->height();
-    if (h < 320) return;                       // not laid out yet; a later pass will
-    m_defaultSplitApplied = true;
-    // A share rather than a flat 200px: on a 1200px screen 200 is a sliver, and
-    // on a small laptop it is a third of the window. Clamped both ways so the
-    // chart always keeps the majority.
-    const int blotter = qBound(170, h * 28 / 100, 320);
-    m_centerSplit->setSizes({h - blotter, blotter});
-}
-
-void MainWindow::resizeEvent(QResizeEvent* e) {
-    QMainWindow::resizeEvent(e);
-    if (!m_defaultSplitApplied) applyDefaultSplit();
-}
-
-void MainWindow::persistWindowGeometry() {
-    const QString geo = QString::fromLatin1(saveGeometry().toBase64());
-    if (geo.isEmpty() || geo == m_cfg.windowGeometry) return;
-    m_cfg.windowGeometry = geo;
-    m_cfg.save();
-}
-
-void MainWindow::closeEvent(QCloseEvent* e) {
-    persistWindowGeometry();
-    QMainWindow::closeEvent(e);
 }
 
 void MainWindow::persistChartLayout() {
@@ -1014,6 +1145,7 @@ void MainWindow::logout() {
 
     m_cfg = dlg.config();
     m_api->setConfig(m_cfg);
+    m_positions->setTraderName(m_cfg.userName.isEmpty() ? m_cfg.email : m_cfg.userName);
     m_stream->setConfig(m_cfg);
     m_stream->start();
     m_accountTimer->start();
@@ -1048,13 +1180,42 @@ void MainWindow::openOrderWindow() {
     // dlg.symbol(), not m_currentSymbol — the picker inside the window may have
     // moved to a different instrument since it opened.
     const QString sym = dlg.symbol();
+    // Whatever the trader typed, or "terminal" when they typed nothing — the
+    // tag is what tells a position placed here from one placed on the website.
+    const QString note = dlg.comment().isEmpty() ? QStringLiteral("terminal")
+                                                 : dlg.comment();
     if (dlg.mode() == "market") {
         m_api->placeOrder(dlg.side().toUpper(), sym, dlg.lots(),
-                          dlg.stopLoss(), dlg.takeProfit(), "terminal");
+                          dlg.stopLoss(), dlg.takeProfit(), note);
     } else {
         m_api->placePendingOrder(sym, dlg.side(), dlg.orderType(),
-                                 dlg.lots(), dlg.price(), dlg.stopLoss(), dlg.takeProfit());
+                                 dlg.lots(), dlg.price(), dlg.stopLoss(), dlg.takeProfit(),
+                                 note);
     }
+}
+
+// MT5's Specification panel. Opened from the Market Watch right-click on the
+// instrument the trader pointed at, NOT on m_currentSymbol — those are the
+// same row here only because the menu selects it first, and relying on that
+// would break the moment the menu gains a way to name another instrument.
+void MainWindow::openSpecification(const QString& symbol) {
+    if (symbol.isEmpty()) return;
+    // No requireSession(): the trading catalog is public, so an API-key
+    // session can read contract terms even though it cannot reach the blotter.
+    // A symbol the table has no spec for still opens: the panel's live prices
+    // and the fetched contract terms do not depend on it, and an unexplained
+    // dead menu entry is worse than a sheet with a few dashes in it.
+    SymbolSpec spec = m_specs.value(symbol);
+    if (spec.symbol.isEmpty()) spec.symbol = symbol;
+    SymbolSpecDialog dlg(spec, m_lastQuotes.value(symbol), this);
+    // Bid, ask and the spread keep moving while the panel is open — a spread
+    // frozen at the moment the menu was clicked is the one figure in here that
+    // would actively mislead.
+    connect(m_stream, &PriceStream::tickReceived, &dlg, &SymbolSpecDialog::updateQuote);
+    connect(m_api, &ApiClient::instrumentSpecReceived, &dlg,
+            &SymbolSpecDialog::setInstrumentSpec);
+    m_api->fetchInstrumentSpec(symbol);
+    dlg.exec();
 }
 
 void MainWindow::openSettings() {

@@ -6,6 +6,7 @@
 #include <QGridLayout>
 #include <QTabWidget>
 #include <QLabel>
+#include <QLineEdit>
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QPushButton>
@@ -32,15 +33,40 @@ OrderDialog::OrderDialog(const QHash<QString, SymbolSpec>& specs,
     m_tabs->addTab(buildMarketTab(),  tr("Market"));
     m_tabs->addTab(buildPendingTab(), tr("Pending"));
 
+    // One comment for both tabs: it labels the TRADE, not the way it is
+    // entered, and a trader who types one and then switches from Market to
+    // Pending should not find it gone. The backend already accepted a comment
+    // on every order; the terminal simply never offered a way to write one and
+    // tagged everything "terminal".
+    const auto& cc = Theme::p();
+    auto* noteCap = new QLabel(tr("COMMENT"));
+    noteCap->setStyleSheet(QString("color:%1; font-size:10px; font-weight:800;"
+                                   "letter-spacing:1px;").arg(cc.muted));
+    m_comment = new QLineEdit;
+    m_comment->setMaxLength(255);        // the server's own limit
+    m_comment->setPlaceholderText(tr("Optional — shown in the Trade blotter"));
+    m_comment->setMinimumHeight(30);
+    m_comment->setStyleSheet(QString(
+        "QLineEdit{background:%1; border:1px solid %2; border-radius:6px;"
+        "padding:4px 8px; color:%3;}"
+        "QLineEdit:focus{border:1px solid %4;}")
+        .arg(cc.inputBg, cc.inputBorder, cc.textStrong, cc.accent));
+
     auto* lay = new QVBoxLayout(this);
     lay->setSpacing(9);
     lay->addWidget(buildHeader());
     lay->addWidget(m_tabs);
+    lay->addWidget(noteCap);
+    lay->addWidget(m_comment);
 
     applySymbol(symbol);
 }
 
 // ── Header: instrument picker + leverage ───────────────────────────
+QString OrderDialog::comment() const {
+    return m_comment ? m_comment->text().trimmed() : QString();
+}
+
 QWidget* OrderDialog::buildHeader() {
     const auto& c = Theme::p();
     auto* row = new QWidget;

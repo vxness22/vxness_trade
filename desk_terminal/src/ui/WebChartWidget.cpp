@@ -8,7 +8,6 @@
 #include <QWebEngineProfile>
 #include <QWebChannel>
 #include <QVBoxLayout>
-#include <QHBoxLayout>
 #include <QCoreApplication>
 #include <QFileInfo>
 #include <QFile>
@@ -139,60 +138,67 @@ QString WebChartWidget::resolveIndexHtml() {
 void WebChartWidget::setOverlayWidget(QWidget* w) {
     if (!w) return;
     m_overlay = w;
-
-    // The strip is a LAYOUT ROW above the chart, not a widget floating over it.
-    //
-    // It used to be parented to this widget with no layout, moved by hand into
-    // the chart's top toolbar band and raise()d. That relies on a plain Qt
-    // widget painting above a QWebEngineView sibling, and it does not: the web
-    // view renders through its own native surface, which composites OVER
-    // siblings regardless of Qt's stacking order on this Qt/GPU combination.
-    // The strip was created, shown, correctly positioned — and completely
-    // covered by the chart. Since that strip carries BUY and SELL, the terminal
-    // had no way to place a trade at all, while looking entirely healthy: the
-    // dialog watcher even reported "one-click strip SHOWN" the whole time.
-    //
-    // A layout row cannot be covered by anything, on any Qt version or GPU
-    // path. It costs ~40px off the top of the chart; being able to trade is
-    // worth more than those pixels.
-    auto* lay = qobject_cast<QVBoxLayout*>(layout());
-    if (!lay) return;
-
-    // A slim right-aligned band, not a full-width block. Dropped straight into
-    // the vertical layout the strip stretched to fill half the pane, turning
-    // the SELL tile into a chest-high red slab; the host row keeps it at its
-    // natural size and parks it where it used to float.
-    if (!m_overlayHost) {
-        m_overlayHost = new QWidget(this);
-        auto* h = new QHBoxLayout(m_overlayHost);
-        h->setContentsMargins(6, 2, 6, 2);
-        h->setSpacing(0);
-        lay->insertWidget(0, m_overlayHost, 0);
-        // Stretch on the view, not the strip: every pixel the layout has spare
-        // belongs to the candles.
-        lay->setStretchFactor(m_view, 1);
-    }
-    // Laid out from the LEFT with a trailing stretch, not the other way round.
-    // A leading stretch pushed a strip wider than the pane off the right edge,
-    // which reproduced the original symptom exactly — a row of the right height
-    // and nothing drawn in it. Anchored left, it is clipped at worst, never
-    // invisible.
-    auto* h = static_cast<QHBoxLayout*>(m_overlayHost->layout());
-    w->setParent(m_overlayHost);
-    w->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
-    h->insertWidget(0, w, 0);
-    if (h->count() == 1) h->addStretch(1);
+    // The strip re-sizes itself when a longer price arrives (BTCUSD's six
+    // figures against EURUSD's five decimals). Nothing else would notice — it
+    // is placed by hand, not by a layout — so it says so and we re-place it.
+    // Unique connection: setOverlayWidget runs again on every pane switch.
+    if (auto* t = qobject_cast<OrderTicket*>(w))
+        connect(t, &OrderTicket::sizeHintChanged, this,
+                &WebChartWidget::positionOverlay, Qt::UniqueConnection);
+    // Deliberately NOT added to the layout: it has to sit on top of the web
+    // view, not beside it. raise() puts it above the view in the stacking order.
+    w->setParent(this);
+    w->raise();
     w->show();
-    m_overlayHost->show();
     positionOverlay();
 }
 
 void WebChartWidget::positionOverlay() {
     if (!m_overlay) return;
-    // The layout owns the geometry now; all that is left is to let the strip
-    // ask for its natural height when a longer price arrives (BTCUSD's six
-    // figures against EURUSD's five decimals).
-    m_overlay->updateGeometry();
+    // A reparented widget keeps whatever geometry it had (a parentless widget
+    // defaults to 640x480), and with no layout governing it nothing ever
+    // corrects that — the strip stretched its BUY/SELL tiles right across the
+    // chart. Size it to its own sizeHint on every reposition instead.
+    m_overlay->adjustSize();
+    // Parked over the candles at the top right, BELOW the chart's own toolbar
+    // and below its legend.
+    //
+    // It used to sit in the toolbar band itself (y = 0), in the empty run
+    // between the Indicators controls and the icon cluster on the right. That
+    // run only exists on a wide chart. Narrow the pane — a 2x2 grid, or a
+    // window dragged in — and the placement clamped left until the strip
+    // covered the timeframe selector, which sits at roughly x=109 in that same
+    // row. The interval a chart is on is not something a trader can be asked
+    // to trade without, and no horizontal position is safe at every width.
+    //
+    // Dropping below the toolbar removes the width dependence, because the
+    // separation becomes vertical: the toolbar band is 38px tall and the
+    // legend's rows (OHLC, then Volume) end at 96px on a quarter pane, which
+    // is the tightest case. 104 clears both with a small gap.
+    //
+    // Measured against the running chart rather than guessed, at full width
+    // and in a 2x2 — at 104 every probe point under the strip is bare canvas,
+    // where the old placement sat squarely on the interval button.
+    // A strip the trader has dragged stays where they put it. The fraction is
+    // re-applied against the CURRENT pane size, so it holds its place through
+    // a resize or a grid change instead of drifting off the edge.
+    if (auto* t = qobject_cast<OrderTicket*>(m_overlay)) {
+        if (t->hasCustomPosition()) {
+            const int roomX = qMax(0, width()  - m_overlay->width());
+            const int roomY = qMax(0, height() - m_overlay->height());
+            m_overlay->move(int(t->positionRatio().x() * roomX),
+                            int(t->positionRatio().y() * roomY));
+            m_overlay->raise();
+            return;
+        }
+    }
+
+    const int toolbarAndLegend = 104;
+    // Only the price axis has to be cleared now, not the toolbar's icons too.
+    const int priceAxisW = 72;
+    const int x = qMax(58, width() - m_overlay->width() - priceAxisW);
+    m_overlay->move(x, toolbarAndLegend);
+    m_overlay->raise();
 }
 
 void WebChartWidget::resizeEvent(QResizeEvent* e) {
@@ -210,10 +216,6 @@ void WebChartWidget::showSymbol(const QString& symbol) {
 
 void WebChartWidget::setPositions(const QVector<OpenPosition>& positions) {
     m_bridge->setPositions(positions);
-}
-
-void WebChartWidget::setOrders(const QVector<PendingOrder>& orders) {
-    m_bridge->setOrders(orders);
 }
 
 void WebChartWidget::setCompact(bool compact) {

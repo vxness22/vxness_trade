@@ -15,10 +15,6 @@ class ChartBridge : public QObject {
     Q_PROPERTY(QString symbolsJson    READ symbolsJson    NOTIFY symbolsChanged)
     Q_PROPERTY(QString currentSymbol  READ currentSymbol  NOTIFY symbolChanged)
     Q_PROPERTY(QString positionsJson  READ positionsJson  NOTIFY positionsChanged)
-    // Pending orders for the charted symbol. Separate from positions: they are
-    // not open trades, they carry no P&L, and the only thing that can be done
-    // to one on the chart is move its trigger price or cancel it.
-    Q_PROPERTY(QString ordersJson     READ ordersJson     NOTIFY ordersChanged)
     Q_PROPERTY(QString theme          READ theme          NOTIFY themeChanged)
     // True while this pane is one of several. The web layer drops the drawing
     // toolbar and the bottom date-range bar in that state — in a quarter-sized
@@ -30,7 +26,6 @@ public:
     QString symbolsJson()   const { return m_symbolsJson; }
     QString currentSymbol() const { return m_currentSymbol; }
     QString positionsJson() const { return m_positionsJson; }
-    QString ordersJson() const { return m_ordersJson; }
     QString theme()         const { return m_theme; }
     bool    compact()       const { return m_compact; }
 
@@ -41,8 +36,7 @@ public:
 
     void setSymbols(const QVector<SymbolSpec>& symbols);  // called by MainWindow
     void setCurrentSymbol(const QString& symbol);          // watchlist selection
-    void setPositions(const QVector<OpenPosition>& positions);
-    void setOrders(const QVector<PendingOrder>& orders);  // account poll
+    void setPositions(const QVector<OpenPosition>& positions);  // account poll
 
     // JS -> C++: ask for history. Answered asynchronously via barsReady().
     Q_INVOKABLE void requestBars(const QString& symbol, const QString& timeframe,
@@ -53,11 +47,44 @@ public:
     Q_INVOKABLE void modifyBracket(const QString& positionId, const QString& kind, double level);
     Q_INVOKABLE void closePosition(const QString& positionId);
 
-    // JS -> C++: the trader dragged a pending order to a new trigger price,
-    // or pressed its cross. Only the price travels - size and brackets are
-    // edited in the blotter dialog, where there is room to show them.
-    Q_INVOKABLE void modifyOrderPrice(const QString& orderId, double price);
-    Q_INVOKABLE void cancelOrder(const QString& orderId);
+    // ── Saved chart layouts and templates ──────────────────────────────
+    //
+    // These back the charting library's save/load adapter, which is what puts
+    // "Save chart", indicator templates and drawing templates in the chart
+    // header. Without an adapter the library has nowhere to put any of it, so
+    // a trader's fibs and indicators died with the window — the terminal even
+    // disabled the header button rather than show one that could not work.
+    //
+    // Everything lives in ONE JSON file beside config.json, so a template
+    // saved on one chart pane is offered on all four, and survives a restart.
+    // Every call re-reads that file before writing: four panes share this
+    // store, and a cached copy would let one pane's save wipe another's.
+    //
+    // Content is passed as opaque strings in both directions. The shapes are
+    // the library's own and it is the only thing that reads them back.
+    Q_INVOKABLE QString listCharts() const;
+    Q_INVOKABLE QString chartContent(const QString& id) const;
+    // Returns the id the chart was stored under — a new one when `id` is empty.
+    Q_INVOKABLE QString saveChart(const QString& id, const QString& name,
+                                  const QString& symbol, const QString& resolution,
+                                  const QString& content);
+    Q_INVOKABLE void removeChart(const QString& id);
+
+    Q_INVOKABLE QString listStudyTemplates() const;
+    Q_INVOKABLE QString studyTemplateContent(const QString& name) const;
+    Q_INVOKABLE void saveStudyTemplate(const QString& name, const QString& content);
+    Q_INVOKABLE void removeStudyTemplate(const QString& name);
+
+    Q_INVOKABLE QString listChartTemplates() const;
+    Q_INVOKABLE QString chartTemplateContent(const QString& name) const;
+    Q_INVOKABLE void saveChartTemplate(const QString& name, const QString& content);
+    Q_INVOKABLE void removeChartTemplate(const QString& name);
+
+    Q_INVOKABLE QString listDrawingTemplates(const QString& tool) const;
+    Q_INVOKABLE QString drawingTemplateContent(const QString& tool, const QString& name) const;
+    Q_INVOKABLE void saveDrawingTemplate(const QString& tool, const QString& name,
+                                         const QString& content);
+    Q_INVOKABLE void removeDrawingTemplate(const QString& tool, const QString& name);
 
     // JS -> C++: a TradingView dialog (Indicators, settings, …) opened or
     // closed. Those render INSIDE the chart iframe, so the native one-click
@@ -78,7 +105,6 @@ signals:
     // would send the symbol straight back to the chart that just set it.
     void symbolPickedInChart(const QString& symbol);
     void positionsChanged();
-    void ordersChanged();
     void themeChanged(const QString& theme);
     void compactChanged(bool compact);
     void barsReady(const QString& reqId, const QString& barsJson);
@@ -97,7 +123,6 @@ private:
     PriceStream* m_stream;
     QString      m_symbolsJson = "[]";
     QString      m_positionsJson = "[]";
-    QString      m_ordersJson = "[]";
     QString      m_currentSymbol;
     bool         m_compact = false;
     QString      m_theme = "dark";

@@ -29,7 +29,9 @@ public:
     explicit WalletDialog(const Config& cfg, QWidget* parent = nullptr);
 
 signals:
-    void transferred();   // MainWindow refreshes the account after a transfer
+    // MainWindow refreshes the account after a transfer and echoes the result
+    // in the status bar, so the confirmation outlives this dialog.
+    void transferred(bool toWallet, double amount, const QString& accountLabel);
 
 private slots:
     void loadWallet();
@@ -40,10 +42,11 @@ private slots:
 private:
     QString v1Base() const;          // restBase with /api/algo -> /api/v1
     bool    toWallet() const;        // true = account -> wallet
-    void    setStatus(const QString& text, bool error);
-    // A message that OUTLIVES the refresh a transfer triggers - see the note in
-    // WalletDialog.cpp.
-    void    flash(const QString& text);
+    // sticky=true marks a transfer result, which survives the balance reload
+    // that follows it. Capacity hints ("wallet is empty") are not sticky and
+    // are cleared as soon as the selection changes.
+    void    setStatus(const QString& text, bool error, bool sticky = false);
+    QString accountLabel() const;    // account number of the current selection
     double  availableOnAccount() const;   // transferable amount for the selection
 
     Config m_cfg;
@@ -57,11 +60,9 @@ private:
     QPushButton*    m_transferBtn;
     QLabel*         m_status;
 
-    // True while a transfer's confirmation is on screen. Nothing routine is
-    // allowed to overwrite the status line during that window.
-    bool   m_flashing = false;
     double m_walletBalance = 0.0;
     // Per live account: balance, and free = balance - margin_used (transferable).
     struct AccountFunds { double balance = 0.0; double free = 0.0; double marginUsed = 0.0; };
     QHash<QString, AccountFunds> m_funds;
+    bool m_statusSticky = false;
 };

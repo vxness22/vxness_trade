@@ -160,4 +160,14 @@ inline QIcon layers(const QColor& c, int px = 18) {
         "<path d='M2 12l10 5 10-5'/>"), c, px);
 }
 
+// Share — the two-node graph with an outgoing arc, the glyph every platform
+// uses for "send this somewhere else".
+inline QIcon share(const QColor& c, int px = 18) {
+    return detail::render(detail::wrap(
+        "<circle cx='18' cy='5' r='3'/>"
+        "<circle cx='6' cy='12' r='3'/>"
+        "<circle cx='18' cy='19' r='3'/>"
+        "<path d='M8.6 13.5l6.8 4M15.4 6.5l-6.8 4'/>"), c, px);
+}
+
 } // namespace Icons

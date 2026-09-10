@@ -43,28 +43,34 @@ private slots:
     void onApiError(const QString& context, const QString& message, int httpStatus);
     void openSettings();
     void openOrderWindow();    // Market + Pending order ticket (F9)
+    // MT5's symbol Specification panel, from the Market Watch right-click.
+    void openSpecification(const QString& symbol);
     void onActiveChartChanged(int index);  // strip follows the active pane
     void persistChartLayout();             // grid + per-pane symbols -> Config
     void logout();              // clear the session and return to the sign-in card
     void applyTheme();          // restyle the bits that carry inline style sheets
 
 protected:
-    // Last chance to write the window's own geometry back to the config.
+    // Remembers where the window was and whether it was maximized.
     void closeEvent(QCloseEvent* e) override;
-    // Where the chart/blotter split is first sized — see applyDefaultSplit().
-    void resizeEvent(QResizeEvent* e) override;
 
 private:
-    void persistWindowGeometry();          // size/position/maximised -> Config
-    void applyDefaultSplit();              // chart over blotter, first pass only
-    bool m_defaultSplitApplied = false;
     void connectServices();
     void buildMenuBar();
     void rebuildAccountsMenu();
     void setStatus(const QString& text, bool error = false);
     void toggleTheme();
     void togglePrivacy();
+    // Moves the market-watch / chart boundary to exactly fit the columns the
+    // watchlist is showing. Called when that set changes, so switching a
+    // column on widens the panel rather than leaving the column half cut off.
+    void fitWatchlistWidth();
     void refreshAll();
+    // Queues every instrument for a day's-high/low fetch, for Market Watch's
+    // High and Low columns. Drained a few at a time rather than fired at once:
+    // this is one request per instrument and there are a couple of hundred of
+    // them, and none is worth delaying a price or a position poll behind.
+    void seedDailyRanges();
     // Starts/stops the JWT renewal timer from whatever is in m_cfg. Every
     // sign-in path has to call this: the access token dies after ~45 minutes,
     // and a session that never renews takes the wallet and per-position close
@@ -93,6 +99,9 @@ private:
 
     QLabel*  m_message;
     QTimer*  m_accountTimer;
+    QTimer*  m_rangeTimer = nullptr;    // drains m_rangeQueue
+    QTimer*  m_rangeReseedTimer = nullptr;
+    QStringList m_rangeQueue;           // instruments still awaiting a day's range
     QTimer*  m_sessionTimer = nullptr;   // renews the JWT before it lapses
     // One recovery attempt per failure episode. Without it an expired token
     // would loop: the poll 401s, that triggers a refresh, the refresh answers
@@ -108,11 +117,8 @@ private:
     // cannot be pointed at an instrument before its metadata exists. Symbols
     // can be re-fetched mid-session, hence the latch.
     bool m_chartLayoutRestored = false;
-    // Pane 0's instrument as it was on disk at launch. Captured during the
-    // layout restore because persistChartLayout() overwrites m_cfg.chartSymbols
-    // from the live panes before the startup symbol is chosen.
-    QString m_savedPane0Symbol;
     QFrame*  m_identityDivider = nullptr;  // hairline before the first menu
+    QSplitter* m_bodySplit  = nullptr;   // market watch | centre column
     QSplitter* m_centerSplit = nullptr;
 
     QHash<QString, SymbolSpec> m_specs;

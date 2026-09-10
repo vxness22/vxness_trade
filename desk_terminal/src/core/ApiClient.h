@@ -28,6 +28,16 @@ public:
     void fetchPositions();
     void fetchOrders();
     void fetchTransactions();   // ledger for the selected account
+    // Full contract specification for ONE instrument, on demand — the
+    // Market Watch's "Specification" panel. Lives on the platform's public
+    // trading catalog rather than the algo gateway, which serves only the
+    // fields needed to place an order.
+    void fetchInstrumentSpec(const QString& symbol);
+    // The day's high and low for one instrument, for the Market Watch
+    // columns. Deliberately NOT fetchBars(): that answers on barsReceived,
+    // which the chart's own pending-request queue consumes — a one-bar
+    // reply would satisfy, and truncate, a chart asking for a thousand.
+    void fetchDailyRange(const QString& symbol);
     void fetchHistory(int limit = 100);
 
     // action = "BUY" | "SELL". sl/tp <= 0 are omitted.
@@ -64,6 +74,18 @@ public:
     void refreshSession();
 
     void modifyBracket(const QString& positionId, const QString& kind, double level);
+    // The trader's label on an open position. Sent on its own, never
+    // alongside a bracket: the endpoint applies only the fields it is given,
+    // and bundling them would let a comment edit carry a stale S/L with it.
+    // An empty string clears the comment.
+    void modifyComment(const QString& positionId, const QString& comment);
+    // Mints a public share link for one position. description and
+    // linkDescription may be empty; mode is "pnl" | "roi" | "ticks" and decides
+    // which figure the card leads with. The server reuses a live link for the
+    // same position rather than minting a second one, so this is safe to call
+    // again after editing the text.
+    void createShareLink(const QString& positionId, const QString& description,
+                         const QString& linkDescription, const QString& mode);
     // lots <= 0 (or >= the position's size) closes it fully; a smaller value is
     // a partial close and leaves the remainder open.
     void closePositionById(const QString& positionId, double lots = 0.0);
@@ -77,6 +99,16 @@ signals:
     void positionsReceived(const QVector<OpenPosition>& positions);
     void ordersReceived(const QVector<PendingOrder>& orders);
     void transactionsReceived(const QVector<Transaction>& txns);
+    // Answer to fetchInstrumentSpec(). Always emitted, including on failure:
+    // spec.valid is false then and spec.error says why, so the panel that
+    // asked can say so instead of waiting on a reply that never comes.
+    void instrumentSpecReceived(const InstrumentSpec& spec);
+    // Answer to createShareLink(). ok=false carries the reason in .
+    void shareLinkCreated(bool ok, const QString& code);
+    // Answer to fetchDailyRange(). Emitted only on success: the columns
+    // track the session's own ticks meanwhile, so a failed seed costs a
+    // slightly narrow range, not an empty one, and is not worth a message.
+    void dailyRangeReceived(const QString& symbol, double high, double low);
     void historyReceived(const QVector<HistoryTrade>& history);
     // Result of a per-position modify/close. ok=false carries the reject reason
     // (so the chart can snap a dragged line back and toast the message).

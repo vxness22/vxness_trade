@@ -2,6 +2,16 @@
 <RCC version="1.0">
     <qresource prefix="/">
         <file>vxness-256.png</file>
+        <!-- The light-on-dark colourway of the brand mark, for the share
+             card. It lives in web/ because the chart watermark uses it too;
+             aliased in rather than duplicated so the two can never drift. -->
+        <file alias="vxness-mark-light.png">../web/vxness-mark-light.png</file>
+        <!-- Stepper chevrons for the one-click strip's price boxes. A style
+             sheet on a spin box replaces the native drawing of its arrows, so
+             they have to be supplied as images or they come out blank. Drawn
+             in a neutral grey that reads on both themes. -->
+        <file>spin-up.svg</file>
+        <file>spin-down.svg</file>
         <file>vxness.ico</file>
     </qresource>
 </RCC>

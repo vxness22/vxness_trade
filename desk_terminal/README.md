@@ -19,10 +19,6 @@ real time from the same LP feed as the web platform.
   CLOSE-all for the selected symbol (with confirmation).
 - **Account panel** — balance, credit, equity, margin used/free, margin
   level, leverage, open positions; auto-refreshes every 5s.
-- **News** — the TradingView timeline for the instrument in focus, in the
-  blotter beside Trade / Pending / History.
-- **Economic calendar** — the macro releases behind that instrument (rate
-  decisions, CPI, NFP, GDP), filtered by impact and by country.
 - **Live tick stream** over WebSocket with first-message auth and
   auto-reconnect.
 - **Dark theme**, dockable panels.
@@ -84,75 +80,15 @@ defaults:
 - REST base: `https://api.vxness.in/api/algo`
 - WebSocket: `wss://api.vxness.in/ws/algo/prices`
 
-The WebSocket must use the `api.` host — `trade.vxness.in` proxies REST but
+The WebSocket must use the `api.` host — `vxness.in` proxies REST but
 does not upgrade WebSocket connections. For a local backend, point both at your
 local gateway instead. Credentials are saved to
 `%APPDATA%\Vxness\Vxness Terminal\config.json`.
 
-> This build was forked from the SwissCresta terminal and shares no identity
-> with it: different config path, different installer AppId, and **no** config
-> migration. A SwissCresta sign-in is not carried over — that account does not
-> exist on Vxness's backend. Both apps can be installed side by side.
-
-## Releasing a Windows build
-
-```powershell
-powershell -ExecutionPolicy Bypass -File build-msvc.ps1      # compile + Qt runtime + CRT
-powershell -ExecutionPolicy Bypass -File make-installer.ps1  # dist\VxnessTerminal-Setup.exe
-```
-
-`make-installer.ps1` prints the size and SHA256 of what it produced. Publish it
-by replacing `/var/www/vxness-downloads/VxnessTerminal-Setup.exe` on the VPS and
-bumping the `?v=` on `WINDOWS_URL` in
-`frontend/src/website/src/components/desktop-terminal-download.jsx`. The
-filename is deliberately unversioned; the query string is the cache-buster,
-because nginx sends a four-hour `Cache-Control` on `/downloads/` and Cloudflare
-honours it. Without a new `?v=` the CDN keeps handing out the previous build for
-up to four hours, and the download succeeds and looks correct while doing it.
-
-Two things are worth checking after publishing: `https://vxness.in/build-meta.json`
-should name the commit the site was built from, and the SHA256 of the file the
-CDN serves should match what `make-installer.ps1` printed.
-
-## Code signing
-
-The installer and `terminal.exe` are unsigned unless a certificate is
-configured, and unsigned is expensive:
-
-* Chrome blocks the download outright - *"Unverified download blocked"*. It is
-  judging the signature, not the contents, and a 109 MB file is over its
-  deep-scan limit so it cannot look inside either.
-* Windows SmartScreen greets whoever runs it with *"Windows protected your PC -
-  Unknown publisher"*.
-* Smart App Control, where it is on, refuses to start the binary at all.
-
-An unsigned build can earn reputation download by download, but a fresh release
-starts from zero every time. A **self-signed certificate does not help** -
-nothing trusts it.
-
-The fix is an OV or EV code-signing certificate (Sectigo, DigiCert, GlobalSign,
-Certum...). EV costs more and carries SmartScreen reputation from the first
-signature; OV is cheaper and warms up over a few weeks. Since 2023 the private
-key may not sit on a disk, so a certificate arrives on a hardware token or in a
-cloud HSM - either way it presents itself as a certificate in the Windows store.
-
-Once it is installed on the release machine, point the build at it and every
-build signs itself:
-
-```powershell
-$env:VXNESS_SIGN_THUMBPRINT = "<the certificate's thumbprint>"
-powershell -ExecutionPolicy Bypass -File build-msvc.ps1
-powershell -ExecutionPolicy Bypass -File make-installer.ps1
-```
-
-That signs three things: `terminal.exe` (before it is packaged, so the copy on
-the trader's disk carries the signature), the installer, and the uninstaller
-Inno generates during the install. Everything is SHA-256 and timestamped -
-without a timestamp every signature would expire with the certificate, and
-installers already in the wild would start warning again.
-
-`sign.ps1` documents the variables and is a no-op on a machine with no
-certificate, so an ordinary developer build is unaffected.
+> This build shares a code lineage with other brokers' desktop terminals but
+> no identity: different config path, different installer AppId, and **no**
+> config migration. Another broker's sign-in is not carried over — that account
+> does not exist on Vxness's backend. The apps install side by side.
 
 ## ⚠️ Smart App Control must be off to run
 

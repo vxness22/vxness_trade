@@ -23,10 +23,10 @@ class QJsonArray;
 class LoginDialog : public QDialog {
     Q_OBJECT
 public:
-    static constexpr const char* VX_REST    = "https://api.vxness.in/api/algo";
-    static constexpr const char* VX_WS      = "wss://api.vxness.in/ws/algo/prices";
-    static constexpr const char* LOCAL_REST = "http://localhost:5000/api/algo";
-    static constexpr const char* LOCAL_WS   = "ws://localhost:5000/ws/algo/prices";
+    static constexpr const char* TX_REST    = "https://api.vxness.in/api/algo";
+    static constexpr const char* TX_WS      = "wss://api.vxness.in/ws/algo/prices";
+    static constexpr const char* LOCAL_REST = "http://localhost:8000/api/algo";
+    static constexpr const char* LOCAL_WS   = "ws://localhost:8000/ws/algo/prices";
 
     explicit LoginDialog(const Config& cfg, QWidget* parent = nullptr);
     Config config() const { return m_cfg; }

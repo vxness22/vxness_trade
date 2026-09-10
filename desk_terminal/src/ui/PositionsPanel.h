@@ -40,6 +40,10 @@ public slots:
     // panel's business.
     void setAccount(const AccountInfo& account);
 
+    // The trader's name, for the statement's header. It lives in the signed-in
+    // session rather than in any account payload, so the window hands it over.
+    void setTraderName(const QString& name);
+
     // Live headlines for the instrument in focus — see NewsPanel.
     void setNewsSymbol(const QString& symbol);
     // Macro releases for the economies behind that instrument — see
@@ -64,15 +68,25 @@ signals:
     void closePosition(const OpenPosition& position);
     // Edit this position's stop loss / take profit.
     void modifyBrackets(const OpenPosition& position);
+    // Share this position as a public card.
+    void sharePosition(const OpenPosition& position);
     // Cancel a listed pending order.
     void cancelOrder(const PendingOrder& order);
     // Amend a listed pending order (price / volume / brackets).
     void modifyOrder(const PendingOrder& order);
     // An S/L or T/P cell was edited in place. level 0 removes that bracket.
     void bracketEdited(const QString& positionId, const QString& kind, double level);
+    // The Comment cell was edited in place. An empty string clears it.
+    void commentEdited(const QString& positionId, const QString& comment);
 
 private slots:
+    // Handles every in-place edit on the Trade table: the two bracket cells
+    // and the comment. One slot because QTableWidget reports them all through
+    // the same itemChanged signal.
     void onBracketEdited(class QTableWidgetItem* item);
+    // Writes the History tab out as a standalone HTML statement — MT5's
+    // "Report", and the form a trader's accountant or broker asks for.
+    void exportHistoryReport();
 
 private:
     // Time filter, one per tab. Which timestamp it tests depends on the tab:
@@ -91,6 +105,8 @@ private:
     enum TxnKind { KindAll = 0, KindFunding, KindTrading };
 
     QWidget* buildHistorySummary();
+    // The statement's markup, built from the rows the History tab is showing.
+    QString historyReportHtml() const;
     void     refreshHistorySummary();
 
     QTabWidget*   m_tabs;
@@ -126,6 +142,7 @@ private:
     QVector<HistoryTrade> m_lastHistory;
     QVector<Transaction>  m_lastTxns;
     AccountInfo           m_lastAccount;
+    QString               m_traderName;
 
     // History summary — the closing figures MT5 puts under its History tab,
     // and the ones the desk asked for by name.

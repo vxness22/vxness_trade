@@ -51,6 +51,7 @@ set(SOURCES
     src/core/PriceStream.cpp
     src/core/ChartBridge.cpp
     src/ui/Theme.cpp
+    src/ui/Toast.cpp
     src/ui/LoginDialog.cpp
     src/ui/WatchlistWidget.cpp
     src/ui/WebChartWidget.cpp
@@ -66,6 +67,8 @@ set(SOURCES
     src/ui/OrderDialog.cpp
     src/ui/EditOrderDialog.cpp
     src/ui/WalletDialog.cpp
+    src/ui/SymbolSpecDialog.cpp
+    src/ui/ShareTradeDialog.cpp
     src/ui/MainWindow.cpp
 )
 
@@ -77,6 +80,7 @@ set(HEADERS
     src/core/PriceStream.h
     src/core/ChartBridge.h
     src/ui/Theme.h
+    src/ui/Toast.h
     src/ui/Icons.h
     src/ui/LoginDialog.h
     src/ui/WatchlistWidget.h
@@ -93,21 +97,21 @@ set(HEADERS
     src/ui/OrderDialog.h
     src/ui/EditOrderDialog.h
     src/ui/WalletDialog.h
+    src/ui/SymbolSpecDialog.h
+    src/ui/ShareTradeDialog.h
     src/ui/MainWindow.h
 )
 
 # The one version string for this release. Keep it in step with app.rc's
-# VERSIONINFO and installer.iss's AppVersion — they all describe the same
-# build. The Windows download filename is unversioned, but the site's ?v=
-# cache-buster on it is not
-# (frontend/src/website/src/components/desktop-terminal-download.jsx).
+# VERSIONINFO, installer.iss's AppVersion, and the version in the download
+# filename the website links to — they all describe the same build.
 #
 # This is NOT cosmetic on macOS. It is the only place the .app's
 # CFBundleShortVersionString comes from (resources/Info.plist.in), and
-# package-macos.sh reads that back to name the .dmg. It has drifted behind the
-# Windows version before, shipping the same code on the Mac under a
-# releases-old version number — the exact bug this comment warns about.
-set(TX_VERSION "1.1.6")
+# package-macos.sh reads that back to name the .dmg. It had drifted to 1.0.1
+# while Windows shipped 1.0.6, so the Mac build carried the same code under a
+# five-releases-old version number — the exact bug this comment warns about.
+set(TX_VERSION "2.0")
 
 # App icon + version info. The .rc gives the EXE its icon (Explorer, desktop
 # shortcut, taskbar); the .qrc carries the same artwork for setWindowIcon();

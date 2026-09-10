@@ -117,7 +117,6 @@ static double firstDouble(const QJsonObject& o, std::initializer_list<const char
 static OpenPosition parsePosition(const QJsonObject& o) {
     OpenPosition p;
     p.id           = o.value("id").toString();
-    p.ticket       = firstString(o, {"ticket", "trade_id"});
     p.symbol       = o.value("symbol").toString();
     p.side         = o.value("side").toString();
     p.lots         = o.value("lots").toDouble();
@@ -136,7 +135,6 @@ static OpenPosition parsePosition(const QJsonObject& o) {
 static PendingOrder parseOrder(const QJsonObject& o) {
     PendingOrder p;
     p.id        = o.value("id").toString();
-    p.ticket    = firstString(o, {"ticket", "trade_id"});
     p.symbol    = o.value("symbol").toString();
     p.type      = firstString(o, {"type", "order_type"});
     p.side      = o.value("side").toString();
@@ -165,7 +163,6 @@ static Transaction parseTransaction(const QJsonObject& o) {
 static HistoryTrade parseHistory(const QJsonObject& o) {
     HistoryTrade h;
     h.id          = o.value("id").toString();
-    h.ticket      = firstString(o, {"ticket", "trade_id"});
     h.symbol      = o.value("symbol").toString();
     h.side        = o.value("side").toString();
     h.lots        = o.value("lots").toDouble();
@@ -233,6 +230,90 @@ void ApiClient::fetchTransactions() {
     QNetworkReply* r = m_net->get(
         v1Request("/wallet/transactions?account_id=" + m_cfg.accountId));
     handleReply(r, "transactions", tr("Loading transactions"));
+}
+
+// The Market Watch's specification panel. This is the platform's public
+// trading catalog (/api/v1/trading/instruments/{symbol}), not the algo
+// gateway: the algo /symbols list is deliberately thin — enough to size an
+// order — while the catalog carries the pip size, the configured spread,
+// commission per lot and the overnight swaps a trader opens the panel to read.
+//
+// It answers through its own handler rather than handleReply() so a failed
+// lookup reaches the panel that asked instead of the status bar. A dialog the
+// trader has open should explain its own blank fields.
+void ApiClient::fetchInstrumentSpec(const QString& symbol) {
+    if (symbol.trimmed().isEmpty()) return;
+    const QString sym = symbol.toUpper();
+    QNetworkReply* r = m_net->get(v1Request("/trading/instruments/" + sym));
+    connect(r, &QNetworkReply::finished, this, [this, r, sym]() {
+        r->deleteLater();
+        const int http = r->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const QJsonObject o = QJsonDocument::fromJson(r->readAll()).object();
+
+        InstrumentSpec s;
+        s.symbol = sym;
+        if (r->error() != QNetworkReply::NoError || http >= 400) {
+            s.error = apiDetail(o, r->errorString());
+            emit instrumentSpecReceived(s);
+            return;
+        }
+
+        s.symbol       = o.value("symbol").toString(sym);
+        s.displayName  = o.value("display_name").toString();
+        s.segment      = o.value("segment").toString();
+        s.digits       = o.value("digits").toInt(5);
+        s.pipSize      = o.value("pip_size").toDouble();
+        s.minLot       = o.value("min_lot").toDouble();
+        s.maxLot       = o.value("max_lot").toDouble();
+        s.contractSize = o.value("contract_size").toDouble();
+
+        const QJsonObject sp = o.value("spread").toObject();
+        s.spreadType  = sp.value("type").toString();
+        s.spreadValue = sp.value("value").toDouble();
+        s.priceImpact = sp.value("price_impact").toDouble();
+
+        s.commissionPerLot = o.value("commission_preview_per_lot").toDouble();
+        // null means no swap has been configured, which is not the same as a
+        // zero rate — see InstrumentSpec::hasSwaps.
+        const QJsonValue sl = o.value("swap_long");
+        const QJsonValue ss = o.value("swap_short");
+        s.hasSwaps  = !sl.isNull() && !sl.isUndefined();
+        s.swapLong  = sl.toDouble();
+        s.swapShort = ss.toDouble();
+        s.swapFree  = o.value("swap_free").toBool();
+        s.valid     = true;
+        emit instrumentSpecReceived(s);
+    });
+}
+
+// The day's range for one instrument, for Market Watch's High / Low columns.
+//
+// This is the /bars endpoint, but on its own reply handler rather than through
+// handleReply()'s "bars" kind. ChartBridge answers the chart's requestBars()
+// off barsReceived and pops one entry from its pending queue per reply, so a
+// one-bar range request fired while a chart happened to be loading the same
+// symbol and timeframe would be handed to the chart instead — a thousand-bar
+// history silently truncated to a single candle.
+void ApiClient::fetchDailyRange(const QString& symbol) {
+    if (symbol.trimmed().isEmpty()) return;
+    const QString sym = symbol.toUpper();
+    QUrlQuery q;
+    q.addQueryItem("symbol", sym);
+    q.addQueryItem("timeframe", "1d");
+    q.addQueryItem("limit", "1");
+    QNetworkReply* r = m_net->get(makeRequest("/bars?" + q.toString()));
+    connect(r, &QNetworkReply::finished, this, [this, r, sym]() {
+        r->deleteLater();
+        const int http = r->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (r->error() != QNetworkReply::NoError || http >= 400) return;
+        const QJsonArray bars = QJsonDocument::fromJson(r->readAll())
+                                    .object().value("bars").toArray();
+        if (bars.isEmpty()) return;   // no history for this instrument yet
+        // Newest first, so the current day is the first entry.
+        const Bar b = parseBar(bars.first().toObject());
+        if (b.high <= 0.0 || b.low <= 0.0) return;
+        emit dailyRangeReceived(sym, b.high, b.low);
+    });
 }
 
 void ApiClient::fetchOrders() {
@@ -311,7 +392,6 @@ static void handleOrderOp(ApiClient* self, QNetworkReply* reply, const QString& 
         emit self->orderOpResult(
             op, ok,
             ok ? (op == "cancel" ? QObject::tr("Order cancelled")
-                : op == "modify" ? QObject::tr("Pending order updated")
                                  : QObject::tr("Pending order placed"))
                : apiDetail(o, reply->errorString()));
     });
@@ -375,6 +455,43 @@ void ApiClient::modifyBracket(const QString& positionId, const QString& kind, do
     QNetworkReply* r = m_net->put(v1Request("/positions/" + positionId),
                                   QJsonDocument(body).toJson(QJsonDocument::Compact));
     handlePositionOp(this, r, positionId, "modify");
+}
+
+void ApiClient::createShareLink(const QString& positionId, const QString& description,
+                                const QString& linkDescription, const QString& mode) {
+    QJsonObject body;
+    // Null rather than "" for an empty box: the server stores the field as
+    // given, and an empty string would print as a blank caption on the card.
+    body["description"]      = description.isEmpty()     ? QJsonValue(QJsonValue::Null)
+                                                          : QJsonValue(description);
+    body["link_description"] = linkDescription.isEmpty() ? QJsonValue(QJsonValue::Null)
+                                                          : QJsonValue(linkDescription);
+    body["display_mode"]     = mode;
+
+    QNetworkReply* r = m_net->post(v1Request("/positions/" + positionId + "/share"),
+                                   QJsonDocument(body).toJson(QJsonDocument::Compact));
+    connect(r, &QNetworkReply::finished, this, [this, r]() {
+        r->deleteLater();
+        const int http = r->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const QJsonObject o = QJsonDocument::fromJson(r->readAll()).object();
+        if (r->error() != QNetworkReply::NoError || http >= 400) {
+            emit shareLinkCreated(false, apiDetail(o, r->errorString()));
+            return;
+        }
+        const QString code = o.value("short_code").toString();
+        if (code.isEmpty()) { emit shareLinkCreated(false, tr("No share code returned.")); return; }
+        emit shareLinkCreated(true, code);
+    });
+}
+
+void ApiClient::modifyComment(const QString& positionId, const QString& comment) {
+    QJsonObject body;
+    // Always present, so the server sees the field as "set" and applies it —
+    // clearing a comment is an empty string, not an omission.
+    body["comment"] = comment;
+    QNetworkReply* r = m_net->put(v1Request("/positions/" + positionId),
+                                  QJsonDocument(body).toJson(QJsonDocument::Compact));
+    handlePositionOp(this, r, positionId, "comment");
 }
 
 // The refresh cookie is sent by hand rather than through a cookie jar: the

@@ -9,55 +9,34 @@
 #define BuildDir SourcePath + "build-msvc"
 
 [Setup]
-; A FRESH AppId. This build shares a code lineage with other brokers' desktop
-; terminals; keeping one of their AppIds would make the Vxness installer
-; overwrite an existing install of one of them and take over its Apps &
-; features entry, on a machine whose owner may still trade there.
+; Vxness's OWN AppId — the one every published VxnessTerminal-Setup.exe has
+; carried. It must stay this value: Inno matches an existing install by AppId,
+; so a different GUID does not upgrade the copy a trader already has, it
+; installs a SECOND one beside it with its own Apps & features entry.
 ;
-; KNOWN CONSEQUENCE: the VxnessTerminal-Setup.exe published in July 2025 was
-; built elsewhere and its AppId could not be recovered from the compressed
-; installer. Anyone who installed that build will get a SECOND "Vxness
-; Terminal" entry rather than an in-place upgrade, and should uninstall the old
-; one manually. From this release onward upgrades are in place — so once
-; published, do NOT change this GUID again.
+; This build shares a code lineage with other brokers' desktop terminals, and
+; the branch it was merged from arrived carrying THEIR AppId. That is the
+; mistake this comment exists to stop: adopting another broker's GUID would
+; make this installer overwrite their install and take over its uninstall
+; entry. Vxness is a different platform and keeps its own.
 AppId={{77A56844-D704-463B-89ED-115A5A224749}
 AppName={#MyApp}
-; Keep in step with FILEVERSION/PRODUCTVERSION in resources/app.rc and
-; TX_VERSION in CMakeLists.txt. The download FILENAME is deliberately
-; unversioned (see OutputBaseFilename), so bumping this does not require
-; touching the website link — only the ?v= cache-buster on it
-; (frontend/src/website/src/components/desktop-terminal-download.jsx).
-AppVersion=1.1.6
+; Must match the version in the filename below, and that filename is what the
+; website's download button already links to
+; (frontend/trader/src/landing/marketing/Navbar.tsx). Bump both together, and
+; the site's href with them, or the link 404s.
+AppVersion=2.0
 AppPublisher=Vxness
 DefaultDirName={autopf}\Vxness Terminal
 DefaultGroupName=Vxness Terminal
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#MyExe}
 OutputDir={#SourcePath}dist
-; UNVERSIONED on purpose. The site links to
-;   https://vxness.in/downloads/VxnessTerminal-Setup.exe
-; and nginx serves that path straight off disk, so a versioned filename would
-; break the download button on every release until someone edited the navbar.
-; The version still travels inside the installer (AppVersion above) and in the
-; executable's own version info (resources/app.rc).
-OutputBaseFilename=VxnessTerminal-Setup
+OutputBaseFilename=VxnessTerminal-Setup-2.0
 SetupIconFile={#SourcePath}resources\vxness.ico
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
-
-; Code signing, when make-installer.ps1 was given a certificate (it passes
-; /DSIGN and the tool itself on the ISCC command line).
-;
-; Declared behind #ifdef on purpose: naming a SignTool that ISCC has not been
-; given aborts the compile, and a developer building an unsigned test installer
-; has no certificate. SignedUninstaller covers the one file that cannot be
-; signed from outside — the uninstaller is generated on the trader's machine
-; during the install, so Inno has to sign it as it builds it in.
-#ifdef SIGN
-SignTool=signtool
-SignedUninstaller=yes
-#endif
 
 ; ── Installing over a RUNNING terminal ───────────────────────────────
 ; Symptom this fixes:

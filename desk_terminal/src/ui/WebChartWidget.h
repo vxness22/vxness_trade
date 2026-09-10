@@ -17,8 +17,7 @@ public:
 
     void setSymbols(const QVector<SymbolSpec>& symbols);
     void showSymbol(const QString& symbol);
-    void setPositions(const QVector<OpenPosition>& positions);
-    void setOrders(const QVector<PendingOrder>& orders);   // feeds broker adapter
+    void setPositions(const QVector<OpenPosition>& positions);   // feeds broker adapter
     void setTheme(const QString& theme);   // "dark" | "light" -> TradingView + overlay
 
     // Floats a widget over the top-left of the chart canvas — MT5 parks its
@@ -50,9 +49,5 @@ private:
     ChartBridge*    m_bridge;
     QWebEngineView* m_view;
     QWebChannel*    m_channel;
-    QWidget* m_overlay = nullptr;
-    // Slim right-aligned row that hosts the one-click strip above the chart.
-    // The strip is NOT floated over the web view: QWebEngineView composites its
-    // native surface over sibling widgets, which hid it completely.
-    QWidget* m_overlayHost = nullptr;
+    QWidget*        m_overlay = nullptr;
 };

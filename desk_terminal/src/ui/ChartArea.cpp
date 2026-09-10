@@ -12,9 +12,27 @@
 
 ChartArea::ChartArea(ApiClient* api, PriceStream* stream, QWidget* parent)
     : QWidget(parent), m_api(api), m_stream(stream) {
-    m_grid = new QGridLayout(this);
+    // The tiled charts and the strip of minimized title bars are stacked, so
+    // a minimized pane gives its space to the charts still tiled rather than
+    // leaving a gap in the grid where it used to be.
+    auto* root = new QVBoxLayout(this);
+    root->setContentsMargins(0, 0, 0, 0);
+    root->setSpacing(2);
+
+    m_gridHost = new QWidget(this);
+    m_grid = new QGridLayout(m_gridHost);
     m_grid->setContentsMargins(0, 0, 0, 0);
     m_grid->setSpacing(2);
+
+    m_minStrip = new QWidget(this);
+    m_minLay = new QHBoxLayout(m_minStrip);
+    m_minLay->setContentsMargins(0, 0, 0, 0);
+    m_minLay->setSpacing(2);
+    m_minLay->addStretch(1);
+    m_minStrip->hide();
+
+    root->addWidget(m_gridHost, 1);
+    root->addWidget(m_minStrip, 0);
 
     m_panes.resize(4);
     ensurePane(0);
@@ -29,7 +47,7 @@ ChartArea::Pane& ChartArea::ensurePane(int index) {
     Pane& p = m_panes[index];
     if (p.chart) return p;
 
-    p.frame = new QFrame(this);
+    p.frame = new QFrame(m_gridHost);
     // Named so paintPaneStates() can target THIS frame and nothing else. A bare
     // `QFrame{...}` selector also matches every QFrame-derived descendant — and
     // QLabel derives from QFrame — so the active pane's accent border was being
@@ -52,16 +70,25 @@ ChartArea::Pane& ChartArea::ensurePane(int index) {
 
     p.title = new QLabel(tr("Chart %1").arg(index + 1), p.header);
 
-    p.closeBtn = new QToolButton(p.header);
-    p.closeBtn->setText(QStringLiteral("✕"));      // ✕
-    p.closeBtn->setFixedSize(14, 14);
-    p.closeBtn->setCursor(Qt::ArrowCursor);
-    p.closeBtn->setToolTip(tr("Close this chart"));
-    p.closeBtn->setFocusPolicy(Qt::NoFocus);            // must not steal pane focus
-    p.closeBtn->setAutoRaise(true);
+    // The three window controls, in the order every desktop puts them.
+    auto mkBtn = [&](const QString& glyph, const QString& tip) {
+        auto* b = new QToolButton(p.header);
+        b->setText(glyph);
+        b->setFixedSize(14, 14);
+        b->setCursor(Qt::ArrowCursor);
+        b->setToolTip(tip);
+        b->setFocusPolicy(Qt::NoFocus);            // must not steal pane focus
+        b->setAutoRaise(true);
+        return b;
+    };
+    p.minBtn   = mkBtn(QStringLiteral("–"), tr("Minimize this chart"));   // –
+    p.maxBtn   = mkBtn(QStringLiteral("□"), tr("Maximize this chart"));   // □
+    p.closeBtn = mkBtn(QStringLiteral("✕"), tr("Close this chart"));      // ✕
 
     h->addWidget(p.title);
     h->addStretch(1);
+    h->addWidget(p.minBtn);
+    h->addWidget(p.maxBtn);
     h->addWidget(p.closeBtn);
 
     // The whole header selects the pane; the ✕ closes it. Both read their slot
@@ -71,9 +98,22 @@ ChartArea::Pane& ChartArea::ensurePane(int index) {
     p.title->installEventFilter(this);
     p.header->setProperty("paneIndex", index);
     p.title->setProperty("paneIndex", index);
+    p.minBtn->setProperty("paneIndex", index);
+    p.maxBtn->setProperty("paneIndex", index);
     p.closeBtn->setProperty("paneIndex", index);
     connect(p.closeBtn, &QToolButton::clicked, this, [this, btn = p.closeBtn]() {
         closePane(btn->property("paneIndex").toInt());
+    });
+    connect(p.minBtn, &QToolButton::clicked, this, [this, btn = p.minBtn]() {
+        const int i = btn->property("paneIndex").toInt();
+        // The same button restores a minimized pane, so the title bar in the
+        // strip is not a dead end — it is the only way back for a pane that
+        // has left the grid.
+        if (i >= 0 && i < m_panes.size() && m_panes[i].minimized) restorePane(i);
+        else                                                      minimizePane(i);
+    });
+    connect(p.maxBtn, &QToolButton::clicked, this, [this, btn = p.maxBtn]() {
+        toggleMaximizePane(btn->property("paneIndex").toInt());
     });
 
     p.chart = new WebChartWidget(m_api, m_stream, p.frame);
@@ -104,7 +144,6 @@ ChartArea::Pane& ChartArea::ensurePane(int index) {
     // Panes built after startup have missed every fan-out so far; replay them.
     if (!m_symbols.isEmpty())   p.chart->setSymbols(m_symbols);
     if (!m_positions.isEmpty()) p.chart->setPositions(m_positions);
-    if (!m_orders.isEmpty()) p.chart->setOrders(m_orders);
     p.chart->setTheme(Theme::name());
     // A new pane opens on whatever the active one is showing, which is almost
     // always what a trader comparing timeframes wants as a starting point.
@@ -130,7 +169,15 @@ void ChartArea::setChartCount(int count) {
     const int n = qBound(1, count, 4);
     if (n == m_count) return;
     m_count = n;
-    for (int i = 0; i < n; ++i) ensurePane(i);
+    // Asking for a grid is asking to see it: staying maximized would show one
+    // chart and silently ignore the choice just made in the menu.
+    m_maximized = -1;
+    for (int i = 0; i < n; ++i) {
+        ensurePane(i);
+        // A pane brought back by a bigger layout must not still be parked in
+        // the minimized strip from an earlier session of the same window.
+        m_panes[i].minimized = false;
+    }
     if (m_active >= n) setActive(0);
     relayout();
     emit chartCountChanged(m_count);
@@ -145,10 +192,17 @@ void ChartArea::closePane(int index) {
     // Move rather than delete, so the pane keeps its symbol/timeframe/drawings
     // and its QWebEngineView is not torn down and rebuilt. Parking it past
     // m_count is enough to hide it — relayout() only shows the first m_count.
-    const Pane closed = m_panes[index];
+    Pane closed = m_panes[index];
+    // A closed pane comes back through the layout menu, and it should come
+    // back as a chart rather than as a title bar in the strip.
+    closed.minimized = false;
     m_panes.remove(index);
     m_panes.append(closed);
     --m_count;
+    // Slots shift under a close, so a stored one no longer means what it did.
+    // Restoring the grid is also the only sensible answer here: while a pane
+    // is maximized it is the only one on screen, so it is the one being closed.
+    m_maximized = -1;
 
     // Keep the selection pointing at the same PANE where possible. Closing the
     // active one falls to whatever slid into its slot (or the new last pane if
@@ -163,59 +217,149 @@ void ChartArea::closePane(int index) {
     emit chartCountChanged(m_count);
 }
 
+void ChartArea::tile(const QVector<int>& order) {
+    const int n = order.size();
+    for (int k = 0; k < n; ++k) {
+        Pane& p = m_panes[order.at(k)];
+        // 1 -> one cell across both columns
+        // 2 -> side by side
+        // 3 -> two on top, the third spanning the bottom row
+        // 4 -> 2x2
+        // The 3 case arises by closing a pane out of a 2x2, or by minimizing
+        // one; spanning the odd one out beats leaving a dead quarter empty.
+        int row = 0, col = 0, colSpan = 1;
+        if (n == 1) {
+            colSpan = 2;
+        } else if (n == 2) {
+            col = k;
+        } else if (n == 3) {
+            if (k < 2) { col = k; }
+            else       { row = 1; colSpan = 2; }
+        } else {
+            row = k / 2;
+            col = k % 2;
+        }
+        m_grid->addWidget(p.frame, row, col, 1, colSpan);
+        p.frame->show();
+    }
+    const bool twoRows = (n >= 3);
+    for (int r = 0; r < 2; ++r)
+        m_grid->setRowStretch(r, (twoRows || r == 0) ? 1 : 0);
+    for (int c = 0; c < 2; ++c)
+        m_grid->setColumnStretch(c, 1);
+}
+
 void ChartArea::relayout() {
     // Detach everything first: QGridLayout keeps an item at its old cell
     // otherwise, and 4 -> 2 would leave the bottom row occupying dead space.
     for (Pane& p : m_panes) {
         if (!p.frame) continue;
         m_grid->removeWidget(p.frame);
+        m_minLay->removeWidget(p.frame);
         p.frame->hide();
+        // Undo a previous stint in the strip before deciding this pass.
+        p.frame->setMinimumHeight(0);
+        p.frame->setMaximumHeight(QWIDGETSIZE_MAX);
     }
+
+    // Three groups: the pane shown alone (if any), the ones tiled, and the
+    // ones docked in the strip as title bars.
+    QVector<int> tiled;
+    QVector<int> docked;
     for (int i = 0; i < m_count; ++i) {
+        if (m_panes[i].minimized) docked.append(i);
+        else if (m_maximized < 0 || m_maximized == i) tiled.append(i);
+    }
+    if (m_maximized >= 0 && m_maximized < m_count && !m_panes[m_maximized].minimized)
+        tiled = {m_maximized};
+
+    for (int i : tiled)
+        if (m_panes[i].chart) m_panes[i].chart->show();
+    tile(tiled);
+
+    for (int i : docked) {
         Pane& p = m_panes[i];
-        // 1 -> one cell across both columns
-        // 2 -> side by side
-        // 3 -> two on top, the third spanning the bottom row
-        // 4 -> 2x2
-        // The 3 case only arises by closing a pane out of a 2x2; spanning the
-        // odd one out beats leaving a dead quarter of the area empty.
-        int row = 0, col = 0, colSpan = 1;
-        if (m_count == 1) {
-            colSpan = 2;
-        } else if (m_count == 2) {
-            col = i;
-        } else if (m_count == 3) {
-            if (i < 2) { col = i; }
-            else       { row = 1; colSpan = 2; }
-        } else {
-            row = i / 2;
-            col = i % 2;
-        }
-        m_grid->addWidget(p.frame, row, col, 1, colSpan);
+        // Only the title bar is left. The chart is HIDDEN rather than merely
+        // squeezed: a WebChartWidget carries a 220x160 minimum, which a frame
+        // still containing one could never shrink below.
+        if (p.chart) p.chart->hide();
+        const int barH = (p.header ? p.header->height() : 18) + 2;   // + frame margins
+        p.frame->setFixedHeight(barH > 4 ? barH : 20);
+        p.frame->setMinimumWidth(170);
+        // Before the stretch, so the bars pack from the left.
+        m_minLay->insertWidget(m_minLay->count() - 1, p.frame);
         p.frame->show();
     }
-    const bool twoRows = (m_count >= 3);
-    for (int r = 0; r < 2; ++r)
-        m_grid->setRowStretch(r, (twoRows || r == 0) ? 1 : 0);
-    for (int c = 0; c < 2; ++c)
-        m_grid->setColumnStretch(c, 1);
+    m_minStrip->setVisible(!docked.isEmpty());
+    // Every chart minimized leaves the grid genuinely empty; it should not go
+    // on claiming the height it would have used.
+    m_gridHost->setVisible(!tiled.isEmpty());
 
-    // The header row is noise when there is only one chart — and with a single
-    // pane the ✕ would be a dead control anyway, since closePane() refuses it.
-    for (Pane& p : m_panes)
-        if (p.header) p.header->setVisible(m_count > 1);
+    // Every chart carries the three controls, single chart included — that is
+    // what a chart window looks like. Close is the one that cannot always
+    // apply: closePane() refuses the last chart, so it says so by going flat.
+    for (Pane& p : m_panes) {
+        if (p.header) p.header->setVisible(true);
+        if (p.closeBtn) p.closeBtn->setEnabled(m_count > 1);
+    }
 
     // Split view: strip the chart's drawing toolbar and bottom date-range bar.
     // At full size they are worth their room; in a half or quarter pane they
     // eat most of it. setCompact() is a no-op when the value is unchanged, so
     // this does not rebuild charts on every relayout — only when the grid
     // actually crosses between one pane and several.
+    const bool split = tiled.size() > 1;
     for (Pane& p : m_panes)
-        if (p.chart) p.chart->setCompact(m_count > 1);
+        if (p.chart) p.chart->setCompact(split);
 
     refreshPaneHeaders();
     paintPaneStates();
     if (m_overlay) setOverlayWidget(m_overlay);   // re-home it on the active pane
+}
+
+void ChartArea::minimizePane(int index) {
+    if (index < 0 || index >= m_count) return;
+    Pane& p = m_panes[index];
+    if (p.minimized) return;
+    p.minimized = true;
+    // A maximized pane that is then minimized has nothing left to be maximized
+    // over, so the grid comes back with it.
+    if (m_maximized == index) m_maximized = -1;
+
+    // The one-click strip and the order window follow the ACTIVE pane, and a
+    // pane in the strip has no chart to sit on. Hand the selection to one that
+    // is still tiled; if none is, the strip has nowhere to go and the trader
+    // gets it back by restoring a chart.
+    if (m_active == index) {
+        for (int i = 0; i < m_count; ++i) {
+            if (!m_panes[i].minimized) { setActive(i); break; }
+        }
+    }
+    relayout();
+}
+
+void ChartArea::restorePane(int index) {
+    if (index < 0 || index >= m_count) return;
+    if (!m_panes[index].minimized) return;
+    m_panes[index].minimized = false;
+    relayout();
+    // Bringing a chart back is a choice to look at it, so it takes the
+    // selection with it — otherwise the price strip stays on another pane.
+    setActive(index);
+}
+
+void ChartArea::toggleMaximizePane(int index) {
+    if (index < 0 || index >= m_count) return;
+    if (m_maximized == index) {
+        m_maximized = -1;
+    } else {
+        // Maximizing from the strip restores the pane on the way — the button
+        // means "show me this chart", and a minimized one cannot be shown.
+        m_panes[index].minimized = false;
+        m_maximized = index;
+        setActive(index);
+    }
+    relayout();
 }
 
 void ChartArea::refreshPaneHeaders() {
@@ -230,12 +374,32 @@ void ChartArea::refreshPaneHeaders() {
         // panes along.
         if (p.header)   p.header->setProperty("paneIndex", i);
         p.title->setProperty("paneIndex", i);
+        if (p.minBtn)   p.minBtn->setProperty("paneIndex", i);
+        if (p.maxBtn)   p.maxBtn->setProperty("paneIndex", i);
         if (p.closeBtn) p.closeBtn->setProperty("paneIndex", i);
+
+        // Each control shows what it will DO next, not the state it is in.
+        if (p.minBtn) {
+            p.minBtn->setText(p.minimized ? QStringLiteral("▭")    // ▭ restore
+                                          : QStringLiteral("–"));  // – minimize
+            p.minBtn->setToolTip(p.minimized ? tr("Restore this chart")
+                                             : tr("Minimize this chart"));
+        }
+        if (p.maxBtn) {
+            const bool maxed = (m_maximized == i);
+            p.maxBtn->setText(maxed ? QStringLiteral("❐")     // ❐ restore down
+                                    : QStringLiteral("□"));   // □ maximize
+            p.maxBtn->setToolTip(maxed ? tr("Restore this chart")
+                                       : tr("Maximize this chart"));
+        }
     }
 }
 
 void ChartArea::setActive(int index) {
     if (index < 0 || index >= m_count || index == m_active) return;
+    // A pane in the minimized strip has no chart on screen for the one-click
+    // strip to sit on, so it cannot be the active one.
+    if (m_panes[index].minimized) return;
     m_active = index;
     paintPaneStates();
     if (m_overlay) setOverlayWidget(m_overlay);
@@ -255,7 +419,7 @@ void ChartArea::paintPaneStates() {
     for (int i = 0; i < m_panes.size(); ++i) {
         Pane& p = m_panes[i];
         if (!p.frame) continue;
-        const bool active = (i == m_active) && m_count > 1;
+        const bool active = (i == m_active) && m_count > 1 && !p.minimized;
         // #chartPane, not a bare QFrame: the type selector matches subclasses,
         // and QLabel is one, so this border used to be drawn around every label
         // parented into the pane — the one-click strip's price tiles ended up
@@ -269,15 +433,20 @@ void ChartArea::paintPaneStates() {
             p.title->setStyleSheet(QString(
                 "background:transparent; border:none; color:%1; font-size:10px; font-weight:700;")
                 .arg(active ? c.textStrong : c.muted));
+        // Minimize and maximize are reversible, so they hover to the accent
+        // rather than to the destructive colour reserved for close.
+        const QString ctrlCss = QString(
+            "QToolButton{background:transparent; border:none; color:%1;"
+            " font-size:10px; font-weight:700; padding:0;}"
+            "QToolButton:hover{color:%2;}"
+            "QToolButton:disabled{color:%3;}");
+        if (p.minBtn) p.minBtn->setStyleSheet(ctrlCss.arg(c.muted, c.accent, c.dim));
+        if (p.maxBtn) p.maxBtn->setStyleSheet(ctrlCss.arg(c.muted, c.accent, c.dim));
         if (p.closeBtn)
             // Muted until hovered, then `down` (the sell/red semantic) so the
             // destructive action reads as destructive without shouting for
             // attention in four headers at once.
-            p.closeBtn->setStyleSheet(QString(
-                "QToolButton{background:transparent; border:none; color:%1;"
-                " font-size:10px; font-weight:700; padding:0;}"
-                "QToolButton:hover{color:%2;}")
-                .arg(c.muted, c.down));
+            p.closeBtn->setStyleSheet(ctrlCss.arg(c.muted, c.down, c.dim));
     }
 }
 
@@ -311,13 +480,6 @@ void ChartArea::setPositions(const QVector<OpenPosition>& positions) {
     // position on the symbol a background pane shows still has to be visible
     // and draggable there.
     for (Pane& p : m_panes) if (p.chart) p.chart->setPositions(positions);
-}
-
-void ChartArea::setOrders(const QVector<PendingOrder>& orders) {
-    m_orders = orders;
-    // Every pane, for the same reason positions go to every pane: a pending
-    // order on the instrument a background pane shows belongs on that chart.
-    for (Pane& p : m_panes) if (p.chart) p.chart->setOrders(orders);
 }
 
 void ChartArea::setTheme(const QString& theme) {

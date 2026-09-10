@@ -14,19 +14,10 @@
  *     projected P&L live on the pill that rides them.
  *   - one segmented pill per line  -> [badge][price][P&L][lots][✕], real HTML,
  *     pinned at the LEFT edge (clear of the drawing toolbar) on the line it
- *     describes. The entry pill's ✕ closes the position; the SL/TP ones
- *     remove that bracket. Both ask first.
- *   - a transparent strip on each SET bracket, spanning the pane at the line's
- *     own y, so the LINE is the drag handle and not only the pill.
- *   - PENDING ORDERS, drawn the same way: a dotted line at the trigger price
- *     with [BUY LIMIT][price][lots][X]. Drag it to move the trigger, press the
- *     cross to cancel. Dotted rather than dashed because a chart can carry an
- *     open position and a resting order on the same instrument, and the line
- *     style is what tells them apart at a glance.
+ *     describes. Entry pill's ✕ closes the position.
  *   - an UNSET bracket shows as a badge-only handle parked on the right at the
  *     entry line — drag it down/up to create the bracket.
- *   - press & drag a badge/price segment, or the line itself -> dashed preview
- *     line + shaded zone
+ *   - press & drag a badge/price segment -> dashed preview line + shaded zone
  *     follow the cursor showing the target price and the P&L there; release
  *     saves immediately. A plain click (no drag) opens a type-a-price dialog
  *     instead (blank removes the bracket).
@@ -44,15 +35,14 @@
  */
 
 (function () {
-  // Colours lifted from SwisDex ChartingLibraryChart: entry line coloured by
+  // Colours lifted from the web terminal ChartingLibraryChart: entry line coloured by
   // side (BUY blue / SELL red), its label coloured by P&L (profit blue / loss
   // red / break-even gray); SL amber, TP teal.
   var BUY_COLOR = "#3b82f6", SELL_COLOR = "#ef4444";
   var SL_COLOR  = "#f59e0b", TP_COLOR   = "#14b8a6";
   var SL_ZONE   = "rgba(239,68,68,0.10)", TP_ZONE = "rgba(20,184,166,0.10)";
   var PROFIT_POS = "#3b82f6", PROFIT_NEG = "#ef4444", BREAKEVEN = "#9ca3af";
-  var LINE_SOLID = 0, LINE_DASHED = 2, LINE_DOTTED = 1;
-  var ORDER_BUY = "#3b82f6", ORDER_SELL = "#ef4444";
+  var LINE_SOLID = 0, LINE_DASHED = 2;
   var BTN_RIGHT_PX = 268;         // clear of the price axis + its P&L label
   var LEFT_PX      = 54;          // clear of the left drawing toolbar
 
@@ -94,10 +84,6 @@
     this._drawn = {};      // "posId|kind" -> level currently on screen
     this._rows = [];       // [{ p, entry, sl, tp }] pill rows
     this._rowKey = "";     // rebuild pills only when the position set changes
-    this._orders = {};        // orderId -> server record
-    this._orderShapes = {};   // orderId -> line handle
-    this._orderRows = [];     // [{ o, pill, strip }]
-    this._orderKey = "";      // rebuild order pills only when the set changes
     this._quote = {};      // symbol -> { bid, ask } for live P&L between polls
     this._calibOffset = null;
 
@@ -145,14 +131,12 @@
         self._quote[sym] = { bid: bid, ask: ask };
       });
       bind(bridge.positionsChanged, function () { self._sync(); });
-      bind(bridge.ordersChanged, function () { self._syncOrders(); });
       bind(bridge.positionOp, function (id, op, ok, msg) { self._onOp(id, op, ok, msg); });
       // No themeChanged handler here on purpose: app.js rebuilds the widget and
       // this overlay on a theme switch, and the new instance picks up the new
       // colours in its constructor.
 
       self._sync();
-      self._syncOrders();
       self._startLoop();
     });
   }
@@ -178,36 +162,11 @@
   Overlay.prototype._isBuy = function (p) {
     return String(p.side).toLowerCase() !== "sell";
   };
-  // USD value of one unit of the symbol's QUOTE currency. `Δprice * lots *
-  // contract` is denominated in that quote currency, not in dollars — on USDJPY
-  // it is yen, so a pill would read ~146x the real number without this.
-  // Mirrors backend utils/symbolMeta.js quoteToUsd.
-  Overlay.prototype._quoteToUsd = function (sym, price) {
-    var s = String(sym || "").toUpperCase();
-    var m = this._meta[s];
-    // metals / crypto / commodities / indices are all quoted in USD
-    if (m && m.category && m.category !== "Forex") return 1;
-    if (!/^[A-Z]{6}$/.test(s)) return 1;
-
-    var base = s.slice(0, 3), quote = s.slice(3, 6);
-    if (quote === "USD") return 1;
-
-    var p = Number(price);
-    if (base === "USD") return p > 0 ? 1 / p : 1;
-
-    // cross: convert the quote currency through its own USD pair
-    var direct = this._quote[quote + "USD"];
-    if (direct && direct.bid > 0 && direct.ask > 0) return (direct.bid + direct.ask) / 2;
-    var inverse = this._quote["USD" + quote];
-    if (inverse && inverse.bid > 0 && inverse.ask > 0) return 2 / (inverse.bid + inverse.ask);
-    return 1;
-  };
   // What the position would realise if it closed at `level`. The server stays
   // authoritative — this only previews a level before it is committed.
   Overlay.prototype._pnlAt = function (p, level) {
     var dir = this._isBuy(p) ? 1 : -1;
-    var raw = (level - Number(p.open_price)) * dir * Number(p.lots) * this._contract(p.symbol);
-    return raw * this._quoteToUsd(p.symbol, level);
+    return (level - Number(p.open_price)) * dir * Number(p.lots) * this._contract(p.symbol);
   };
   // Live P&L for the entry pill: anchor on the server's authoritative profit and
   // add only the move since the price that profit was computed at. Exact at each
@@ -221,40 +180,22 @@
     var cur = this._isBuy(p) ? q.bid : q.ask;
     if (!(cur > 0)) return base;
     var dir = this._isBuy(p) ? 1 : -1;
-    var move = (cur - ref) * dir * Number(p.lots) * this._contract(p.symbol);
-    return base + move * this._quoteToUsd(p.symbol, cur);
+    return base + (cur - ref) * dir * Number(p.lots) * this._contract(p.symbol);
   };
 
-  // A bracket is checked against the CURRENT MARKET, not the entry price.
-  //
-  // It used to be checked against the entry, which forbade the single most
-  // common stop management there is: buy at 525, price runs to 530, move the
-  // stop to 526 to lock in a profit. That is not an invalid stop — it is the
-  // whole point of having one — and the rule rejected it as "must be BELOW the
-  // buy price". Break-even and trailing stops were impossible.
-  //
-  // What actually makes a bracket invalid is sitting on the wrong side of the
-  // market, because the server would trigger it on the very next tick: a BUY's
-  // stop has to be below the bid it will be closed at, and its target above.
-  // Where those levels fall relative to the entry is the trader's business.
-  // This mirrors the server's own check in PUT /api/v1/positions/:id.
-  //
+  // A bracket may only sit on the side of the entry that its purpose implies:
+  // BUY  -> TP above entry, SL below.   SELL -> TP below entry, SL above.
   // Returns "" when the level is acceptable (0 = remove, always allowed).
   Overlay.prototype._invalidReason = function (p, kind, level) {
     if (!(level > 0)) return "";
+    var entry = Number(p.open_price) || 0;
     var isBuy = this._isBuy(p);
-    var q = this._quote[p.symbol];
-    // A BUY is closed at the bid, a SELL at the ask. With no tick yet, fall back
-    // to the entry rather than blocking an edit on missing data.
-    var ref = q ? (isBuy ? Number(q.bid) : Number(q.ask)) : (Number(p.open_price) || 0);
-    if (!(ref > 0)) return "";
-    var at = " (" + fmt(ref, this._digits(p.symbol)) + ")";
     if (kind === "tp") {
-      if (isBuy  && level <= ref) return "Take Profit must be ABOVE the current price" + at + ".";
-      if (!isBuy && level >= ref) return "Take Profit must be BELOW the current price" + at + ".";
+      if (isBuy  && level <= entry) return "Take Profit must be ABOVE the buy price.";
+      if (!isBuy && level >= entry) return "Take Profit must be BELOW the sell price.";
     } else {
-      if (isBuy  && level >= ref) return "Stop Loss must be BELOW the current price" + at + ".";
-      if (!isBuy && level <= ref) return "Stop Loss must be ABOVE the current price" + at + ".";
+      if (isBuy  && level >= entry) return "Stop Loss must be BELOW the buy price.";
+      if (!isBuy && level <= entry) return "Stop Loss must be ABOVE the sell price.";
     }
     return "";
   };
@@ -262,7 +203,7 @@
   // ---- price <-> pixel -----------------------------------------------------
 
   Overlay.prototype._buildOverlayEl = function () {
-    // A sibling layer over the chart area (like SwisDex's overlayRef), NOT a
+    // A sibling layer over the chart area (like the web terminal's overlayRef), NOT a
     // child of #tv_chart — the TradingView widget renders into an iframe there
     // and would stack over anything inside it. This sits on top, transparent to
     // pointer events except on the pills themselves.
@@ -446,10 +387,7 @@
 
       var isBuy = self._isBuy(p);
       var pnl = Number(p.profit) || 0;
-      // USD notional — pnl is already USD, so the denominator has to be too or
-      // the return % is off by the quote-currency factor on non-USD pairs.
-      var notional = Number(p.open_price) * Number(p.lots) * self._contract(p.symbol) *
-                     self._quoteToUsd(p.symbol, Number(p.open_price));
+      var notional = Number(p.open_price) * Number(p.lots) * self._contract(p.symbol);
       var pct = notional > 0 ? (pnl / notional) * 100 : 0;
       var entryText = (isBuy ? "BUY " : "SELL ") + Number(p.lots).toFixed(2) + "  " +
                       fmtProfit(pnl) + " (" + (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%)";
@@ -506,8 +444,7 @@
     var ov = this._overlay;
     if (!ov) { this._rows = []; return; }
     this._rows.forEach(function (r) {
-      [r.entry.el, r.sl.el, r.tp.el, r.slZone, r.tpZone,
-       r.slStrip, r.tpStrip].forEach(function (el) {
+      [r.entry.el, r.sl.el, r.tp.el, r.slZone, r.tpZone].forEach(function (el) {
         try { ov.removeChild(el); } catch (e) {}
       });
     });
@@ -549,28 +486,6 @@
     return { el: el, badge: badge, price: price, pnl: pnl, lots: lots, x: x };
   };
 
-  // The line itself, as something you can grab.
-  //
-  // Dragging used to work only on the pill's badge and price segments — about
-  // 60px at the far left — while the line those segments control runs the width
-  // of the pane. Everyone aims at the line, and nothing happened. This is a
-  // transparent strip pinned to the same y, spanning the pane, carrying the
-  // identical press-drag-release behaviour.
-  //
-  // Thin on purpose: it sits over the chart, so anything taller starts eating
-  // crosshair and drawing clicks at that price. It also sits BELOW the pill
-  // (z-index 5 vs 6), or it would swallow the pill's own segments and ✕.
-  // Shown only while the bracket is SET — an unset bracket draws no line, so a
-  // strip there would be an invisible band intercepting clicks over bare chart.
-  Overlay.prototype._mkStrip = function () {
-    var el = document.createElement("div");
-    el.style.cssText =
-      "position:absolute;left:0;right:0;height:11px;transform:translateY(-50%);" +
-      "display:none;pointer-events:auto;z-index:5;background:transparent;";
-    this._overlay.appendChild(el);
-    return el;
-  };
-
   Overlay.prototype._buildPills = function (positions) {
     this._clearPills();
     var self = this, ov = this._overlay;
@@ -597,50 +512,25 @@
         });
       };
 
-      // SL / TP pills — badge, price and the line itself are the drag handles,
-      // and the ✕ clears the bracket. Removal asks first: the button sits one
-      // click from the drag handle, and dropping a stop leaves a live position
-      // with nothing under it.
-      //
-      // Always act on the LIVE record, never on `p`: that is the snapshot the
-      // pill was built from, and a poll may have moved the level since.
-      var live = function () { return self._pos[String(p.id)] || p; };
-      var mkBracket = function (kind, label, color) {
-        var pill = self._mkPill();
-        pill.badge.textContent = kind.toUpperCase();
-        pill.badge.style.color = color;
-        pill.el.style.borderColor = color;
-        pill.badge.title = pill.price.title =
-          label + " — drag up/down to set, or click to type";
-        self._attachDrag(pill.badge, p, kind);
-        self._attachDrag(pill.price, p, kind);
+      // SL / TP pills — badge and price are the drag handles. No ✕: a bracket is
+      // removed by clicking it and leaving the price blank.
+      var sl = self._mkPill();
+      sl.badge.textContent = "SL";
+      sl.badge.style.color = SL_COLOR;
+      sl.el.style.borderColor = SL_COLOR;
+      sl.badge.title = sl.price.title = "Stop Loss — drag up/down to set, or click to type";
+      self._attachDrag(sl.badge, p, "sl");
+      self._attachDrag(sl.price, p, "sl");
+      sl.x.remove();
 
-        var strip = self._mkStrip();
-        strip.title = label + " — drag anywhere on the line";
-        self._attachDrag(strip, p, kind);
-
-        pill.x.title = "Remove " + label.toLowerCase() + " on " + side + " " +
-                       Number(p.lots).toFixed(2) + " " + p.symbol;
-        pill.x.onclick = function (e) {
-          e.stopPropagation();
-          self._dialog({
-            title: "Remove " + label.toLowerCase(),
-            body: "Remove the " + label.toLowerCase() + " on " + side + " " +
-                  Number(p.lots).toFixed(2) + " " + p.symbol + "? The position " +
-                  (kind === "sl" ? "stays open with no stop." : "stays open."),
-            confirmLabel: "Remove",
-            danger: kind === "sl",
-            // 0 is this overlay's "clear it" level — ApiClient turns it into the
-            // explicit JSON null the endpoint reads as a removal.
-            onConfirm: function () { self._commit(live(), kind, 0); },
-          });
-        };
-        return { pill: pill, strip: strip };
-      };
-
-      var slParts = mkBracket("sl", "Stop Loss", SL_COLOR);
-      var tpParts = mkBracket("tp", "Take Profit", TP_COLOR);
-      var sl = slParts.pill, tp = tpParts.pill;
+      var tp = self._mkPill();
+      tp.badge.textContent = "TP";
+      tp.badge.style.color = TP_COLOR;
+      tp.el.style.borderColor = TP_COLOR;
+      tp.badge.title = tp.price.title = "Take Profit — drag up/down to set, or click to type";
+      self._attachDrag(tp.badge, p, "tp");
+      self._attachDrag(tp.price, p, "tp");
+      tp.x.remove();
 
       // Shaded entry->SL / entry->TP zones, positioned by the rAF loop.
       var slZone = document.createElement("div");
@@ -651,9 +541,7 @@
         TP_ZONE + ";pointer-events:none;visibility:hidden;z-index:4;";
       ov.appendChild(slZone); ov.appendChild(tpZone);
 
-      self._rows.push({ p: p, entry: entry, sl: sl, tp: tp,
-                        slStrip: slParts.strip, tpStrip: tpParts.strip,
-                        slZone: slZone, tpZone: tpZone });
+      self._rows.push({ p: p, entry: entry, sl: sl, tp: tp, slZone: slZone, tpZone: tpZone });
     });
   };
 
@@ -690,34 +578,6 @@
       // Always drag against the LIVE record — `p` is the snapshot the pill was
       // built from and its open price may have been re-polled since.
       var live = function () { return self._pos[String(p.id)] || p; };
-
-      // The bracket's OWN line follows the cursor as well.
-      //
-      // Only the preview used to move, which left the real dashed line parked at
-      // the old level right beside it — two lines for one bracket, and the one
-      // that looks official pointing at the price you are dragging away from.
-      //
-      // Throttled to one chart write per frame: pointermove fires several times
-      // faster than the chart can usefully redraw, and each move is a
-      // getShapeById + setPoints round trip into the library.
-      //
-      // _drawn is updated with it because it records where the line actually IS.
-      // That is what lets a later _sync() — an abandoned drag, a refused level,
-      // the next poll — notice the line is off its true price and put it back.
-      var key = String(p.id) + "|" + kind;
-      var lineRaf = 0, lineWant = 0;
-      var trackLine = function (price) {
-        lineWant = price;
-        if (lineRaf) return;
-        lineRaf = requestAnimationFrame(function () {
-          lineRaf = 0;
-          var g = self._shapes[String(p.id)];
-          if (g && g[kind] && lineWant > 0) {
-            self._moveLine(g[kind], lineWant);
-            self._drawn[key] = lineWant;
-          }
-        });
-      };
       var d = self._digits(p.symbol);
       var entryY = function () {
         var g = self._geom();
@@ -725,7 +585,6 @@
         return self._paneY(Number(live().open_price) || 0, g) + self._calibOffset;
       };
       var cleanup = function () {
-        if (lineRaf) { cancelAnimationFrame(lineRaf); lineRaf = 0; }
         [zone, line, lbl].forEach(function (x) {
           try { self._overlay.removeChild(x); } catch (err) {}
         });
@@ -746,7 +605,6 @@
           zone.style.top = Math.min(ey, cy) + "px";
           zone.style.height = Math.abs(ey - cy) + "px";
         }
-        if (price > 0) trackLine(Number(price));
       };
 
       el.onpointerup = function (ev) {
@@ -754,10 +612,7 @@
         try { el.releasePointerCapture(ev.pointerId); } catch (err) {}
         cleanup();
 
-        // A plain click is not a move: the line may have been nudged a pixel or
-        // two on the way, so put it back on the level the position actually
-        // carries before opening the type-a-price dialog.
-        if (!moved) { self._sync(); self._promptBracket(live(), kind); return; }
+        if (!moved) { self._promptBracket(live(), kind); return; }   // plain click
 
         var r = self._host.getBoundingClientRect();
         var price = self._priceForY(ev.clientY - r.top);
@@ -814,23 +669,7 @@
     // sat there for seconds after the drag was released.
     var live = this._pos[id];
     if (live) live[kind] = level;
-
-    // Redraw the LINE now too, not just the pill.
-    //
-    // The pill rides the rAF loop, so it lands on the new level the instant the
-    // drag is released; the dashed line is a chart shape and only _sync() ever
-    // moves one. Without this call that wait is the next positions poll, so the
-    // line sat seconds behind a pill claiming a level it was not drawn at.
-    //
-    // _sync() re-reads the poll's own (still stale) positions, but _pendingSet
-    // was set immediately above and it overrides this bracket there, so the
-    // line is drawn at the level being sent.
-    //
-    // And _drawn is deliberately NOT pre-set to the new level here. It records
-    // where the line actually IS; writing the target into it made _sync's dirty
-    // check compare equal and skip the move altogether, which is why the line
-    // never followed the pill at all.
-    this._sync();
+    if (level > 0) this._drawn[id + "|" + kind] = level;
 
     this._bridge.modifyBracket(id, kind, level);
   };
@@ -864,12 +703,6 @@
     });
     this._binds = [];
     try { this._clearPills(); } catch (e) {}
-    try { this._clearOrderPills(); } catch (e) {}
-    try {
-      var self = this;
-      Object.keys(this._orderShapes).forEach(function (id) { self._removeShape(self._orderShapes[id]); });
-      this._orderShapes = {};
-    } catch (e) {}
     if (this._dlg) { try { this._dlg.remove(); } catch (e) {} this._dlg = null; }
     if (this._overlay && this._overlay.parentNode) {
       try { this._overlay.parentNode.removeChild(this._overlay); } catch (e) {}
@@ -891,49 +724,16 @@
           r.tp.el.style.display = "none";
           r.slZone.style.visibility = "hidden";
           r.tpZone.style.visibility = "hidden";
-          r.slStrip.style.display = "none";
-          r.tpStrip.style.display = "none";
-        });
-        self._orderRows.forEach(function (r) {
-          r.pill.el.style.display = "none";
-          r.strip.style.display = "none";
         });
         return;
       }
       var off = self._calibOffset;
       var h = self._host ? self._host.clientHeight : g.h;
 
-      // Rows already placed in the left column this frame, so a second position
-      // on the same instrument does not land underneath the first.
-      //
-      // Two trades on one symbol are usually opened seconds apart at the same
-      // or near-identical price, which put them at the same y and the same x —
-      // a pixel-perfect overlap that looked exactly like the older trade had
-      // vanished. Only the PILLS are nudged; the entry lines stay on their true
-      // price, because a line drawn away from the price it represents is a lie
-      // about where the trade sits.
-      var takenY = [];
-      var STACK_PX = 22;                       // pill height plus a hairline gap
-      var declash = function (y) {
-        for (var pass = 0; pass < 16; pass++) {
-          var hit = false;
-          for (var i = 0; i < takenY.length; i++) {
-            if (Math.abs(y - takenY[i]) < STACK_PX) { y += STACK_PX; hit = true; break; }
-          }
-          if (!hit) break;
-        }
-        return y;
-      };
-
       // Place a pill on `price`; false if it would fall outside the pane.
-      // `stack` opts the pill into overlap avoidance (entry pills only — SL/TP
-      // pills are drag handles, and moving one away from its line would make
-      // the grab point disagree with the level being dragged).
-      var put = function (pill, price, stack) {
+      var put = function (pill, price) {
         var y = self._paneY(price, g) + off;
-        if (stack) y = declash(y);
         if (!(y > 8) || y > h - 8) { pill.el.style.display = "none"; return false; }
-        if (stack) takenY.push(y);
         pill.el.style.top = y + "px";
         pill.el.style.display = "flex";
         return true;
@@ -959,7 +759,7 @@
         var open = Number(p.open_price) || 0;
 
         // Entry — live P&L off the current bid (buy) / ask (sell).
-        if (put(r.entry, open, true)) {
+        if (put(r.entry, open)) {
           var pnl = self._livePnl(p);
           setText(r.entry.price, fmt(open, d));
           setText(r.entry.pnl, fmtProfit(pnl));
@@ -970,15 +770,10 @@
         // SL / TP: full pill on its own line when set, aligned on the left with
         // the entry pill so all three read as one column; badge-only
         // drag-to-create handle parked on the right at the entry line when unset.
-        var bracket = function (pill, kind, strip) {
+        var bracket = function (pill, kind) {
           var val = Number(p[kind]) || 0;
           var set = val > 0;
-          var visible = put(pill, set ? val : open);
-          // The strip tracks the pill: the same y while the bracket is set and
-          // on screen, gone otherwise.
-          strip.style.display = (set && visible) ? "block" : "none";
-          if (set && visible) strip.style.top = pill.el.style.top;
-          if (!visible) return;
+          if (!put(pill, set ? val : open)) return;
           if (set) {
             pill.el.style.left = LEFT_PX + "px";
             pill.el.style.right = "auto";
@@ -990,235 +785,22 @@
             pill.price.style.display = "flex";
             pill.pnl.style.display   = "flex";
             pill.lots.style.display  = "flex";
-            pill.x.style.display     = "flex";
           } else {
             pill.el.style.left = "auto";
             pill.el.style.right = (BTN_RIGHT_PX + (kind === "tp" ? 34 : 72)) + "px";
             pill.price.style.display = "none";
             pill.pnl.style.display   = "none";
             pill.lots.style.display  = "none";
-            // Nothing to remove yet — this is the drag-to-create handle.
-            pill.x.style.display     = "none";
           }
         };
         var ey = self._paneY(open, g) + off;
-        bracket(r.sl, "sl", r.slStrip);
-        bracket(r.tp, "tp", r.tpStrip);
+        bracket(r.sl, "sl");
+        bracket(r.tp, "tp");
         drawZone(r.slZone, ey, p.sl);
         drawZone(r.tpZone, ey, p.tp);
       });
-
-      // Pending orders ride the same loop: their price is fixed until the
-      // trader moves it, but the pane scrolls and zooms under them.
-      self._orderRows.forEach(function (r) {
-        var o = self._orders[String(r.o.id)] || r.o;
-        var lvl = Number(o.price) || 0;
-        var visible = lvl > 0 && put(r.pill, lvl);
-        r.strip.style.display = visible ? "block" : "none";
-        if (visible) {
-          r.strip.style.top = r.pill.el.style.top;
-          r.pill.el.style.left = LEFT_PX + "px";
-          r.pill.el.style.right = "auto";
-          setText(r.pill.price, fmt(lvl, self._digits(o.symbol)));
-          setText(r.pill.lots, Number(o.lots).toFixed(2));
-        }
-      });
     };
     this._raf = requestAnimationFrame(step);
-  };
-
-  // ---- pending orders ------------------------------------------------------
-
-  var ORDER_LABEL = function (o) {
-    var side = String(o.side || "").toUpperCase();
-    var type = String(o.type || "").toUpperCase();
-    return (side === "SELL" ? "SELL" : "BUY") + " " + (type === "STOP" ? "STOP" : "LIMIT");
-  };
-
-  Overlay.prototype._clearOrderPills = function () {
-    var ov = this._overlay;
-    if (!ov) { this._orderRows = []; return; }
-    this._orderRows.forEach(function (r) {
-      [r.pill.el, r.strip].forEach(function (el) {
-        try { ov.removeChild(el); } catch (e) {}
-      });
-    });
-    this._orderRows = [];
-  };
-
-  Overlay.prototype._removeOrder = function (id) {
-    var h = this._orderShapes[id];
-    if (h) { this._removeShape(h); delete this._orderShapes[id]; }
-    delete this._orders[id];
-  };
-
-  // Reads bridge.ordersJson and reconciles it with what is drawn.
-  Overlay.prototype._syncOrders = function () {
-    if (!this._chart) return;
-    var arr = [];
-    try { arr = JSON.parse(this._bridge.ordersJson || "[]") || []; } catch (e) {}
-    var sym = this._symbol;
-    var mine = arr.filter(function (o) { return !sym || o.symbol === sym; });
-    var self = this, seen = {};
-
-    mine.forEach(function (o) {
-      var id = String(o.id);
-      seen[id] = true;
-      // An edit in flight keeps its optimistic price until the server answers,
-      // for the same reason a dragged bracket does: the poll that lands in
-      // between still carries the old level.
-      var pend = self._pendingOrder;
-      if (pend && pend.id === id) o.price = pend.price;
-      self._orders[id] = o;
-
-      var color = String(o.side).toLowerCase() === "sell" ? ORDER_SELL : ORDER_BUY;
-      var lvl = Number(o.price) || 0;
-      var h = self._orderShapes[id];
-      if (!h) {
-        if (lvl > 0) self._orderShapes[id] = self._makeLine(lvl, "", color, LINE_DOTTED, true);
-      } else if (self._drawn["order|" + id] !== lvl) {
-        self._moveLine(h, lvl);
-      }
-      self._drawn["order|" + id] = lvl;
-    });
-
-    Object.keys(this._orderShapes).forEach(function (id) {
-      if (!seen[id]) { self._removeOrder(id); delete self._drawn["order|" + id]; }
-    });
-
-    var key = mine.map(function (o) {
-      return o.id + ":" + o.side + ":" + o.type + ":" + o.lots;
-    }).join(",");
-    if (key !== this._orderKey) {
-      this._orderKey = key;
-      this._buildOrderPills(mine);
-    }
-  };
-
-  Overlay.prototype._buildOrderPills = function (orders) {
-    this._clearOrderPills();
-    var self = this, ov = this._overlay;
-    if (!ov) return;
-
-    orders.forEach(function (o) {
-      var color = String(o.side).toLowerCase() === "sell" ? ORDER_SELL : ORDER_BUY;
-      var pill = self._mkPill();
-      pill.badge.textContent = ORDER_LABEL(o);
-      pill.badge.style.color = color;
-      pill.el.style.borderColor = color;
-      pill.el.style.borderStyle = "dotted";
-      pill.badge.title = pill.price.title =
-        "Pending order \u2014 drag to move the trigger price";
-      pill.pnl.style.display = "none";          // an order has no P&L yet
-
-      self._attachOrderDrag(pill.badge, o);
-      self._attachOrderDrag(pill.price, o);
-
-      var strip = self._mkStrip();
-      strip.title = "Pending order \u2014 drag anywhere on the line";
-      self._attachOrderDrag(strip, o);
-
-      pill.x.title = "Cancel this order";
-      pill.x.onclick = function (e) {
-        e.stopPropagation();
-        var live = self._orders[String(o.id)] || o;
-        self._dialog({
-          title: "Cancel order",
-          body: "Cancel this " + ORDER_LABEL(live) + " on " + live.symbol + " \u2014 " +
-                Number(live.lots).toFixed(2) + " lots at " +
-                fmt(Number(live.price), self._digits(live.symbol)) + "?",
-          confirmLabel: "Cancel order",
-          danger: true,
-          onConfirm: function () { self._bridge.cancelOrder(String(live.id)); },
-        });
-      };
-
-      self._orderRows.push({ o: o, pill: pill, strip: strip });
-    });
-  };
-
-  // Press and drag a pending order to a new trigger price. Release sends it.
-  //
-  // No shaded zone and no P&L preview, unlike a bracket: an order that has not
-  // filled has no entry to measure from, so the only honest thing to show while
-  // dragging is the price itself.
-  Overlay.prototype._attachOrderDrag = function (el, o) {
-    var self = this;
-    var color = String(o.side).toLowerCase() === "sell" ? ORDER_SELL : ORDER_BUY;
-    el.style.cursor = "ns-resize";
-    el.style.touchAction = "none";
-
-    el.onpointerdown = function (e) {
-      e.preventDefault(); e.stopPropagation();
-      try { el.setPointerCapture(e.pointerId); } catch (err) {}
-      var startY = e.clientY, moved = false;
-      var id = String(o.id);
-      var d = self._digits(o.symbol);
-      var key = "order|" + id;
-
-      var line = document.createElement("div");
-      line.style.cssText = "position:absolute;left:0;right:0;top:0;height:0;border-top:1px dotted " +
-        color + ";pointer-events:none;z-index:7;";
-      var lbl = document.createElement("div");
-      lbl.style.cssText = "position:absolute;left:50%;top:0;transform:translate(-50%,-50%);background:" +
-        color + ";color:#fff;font:700 11px Inter,'Segoe UI',sans-serif;padding:2px 9px;" +
-        "border-radius:4px;pointer-events:none;z-index:8;white-space:nowrap;" +
-        "box-shadow:0 1px 5px rgba(0,0,0,.5);";
-      self._overlay.appendChild(line);
-      self._overlay.appendChild(lbl);
-
-      var lineRaf = 0, lineWant = 0;
-      var trackLine = function (price) {
-        lineWant = price;
-        if (lineRaf) return;
-        lineRaf = requestAnimationFrame(function () {
-          lineRaf = 0;
-          var h = self._orderShapes[id];
-          if (h && lineWant > 0) { self._moveLine(h, lineWant); self._drawn[key] = lineWant; }
-        });
-      };
-      var cleanup = function () {
-        if (lineRaf) { cancelAnimationFrame(lineRaf); lineRaf = 0; }
-        [line, lbl].forEach(function (x) {
-          try { self._overlay.removeChild(x); } catch (err) {}
-        });
-      };
-
-      el.onpointermove = function (ev) {
-        if (Math.abs(ev.clientY - startY) > 3) moved = true;
-        var r = self._host.getBoundingClientRect();
-        var cy = ev.clientY - r.top;
-        var price = self._priceForY(cy);
-        line.style.top = cy + "px";
-        lbl.style.top = cy + "px";
-        lbl.textContent = ORDER_LABEL(o) + "  " + (price ? fmt(price, d) : "\u2014");
-        if (price > 0) trackLine(Number(price));
-      };
-
-      el.onpointerup = function (ev) {
-        el.onpointermove = null; el.onpointerup = null;
-        try { el.releasePointerCapture(ev.pointerId); } catch (err) {}
-        cleanup();
-        if (!moved) { self._syncOrders(); return; }   // a click is not a move
-
-        var r = self._host.getBoundingClientRect();
-        var price = self._priceForY(ev.clientY - r.top);
-        if (!price || !(price > 0)) { self._toast("Could not read price"); return; }
-        var level = Number(price.toFixed(d));
-
-        // Hold the dragged level until the server answers, and move the record
-        // now so the pill does not snap back for the seconds until it does.
-        self._pendingOrder = { id: id, price: level };
-        var live = self._orders[id];
-        if (live) live.price = level;
-        self._drawn[key] = level;
-        self._bridge.modifyOrderPrice(id, level);
-        self._okToast(ORDER_LABEL(o) + " moved to " + fmt(level, d));
-        // The server's own answer arrives as a fresh ordersJson, which clears
-        // this. If the edit is refused, that same refresh puts the line back.
-        setTimeout(function () { self._pendingOrder = null; }, 4000);
-      };
-    };
   };
 
   // ---- dialog + toasts -----------------------------------------------------

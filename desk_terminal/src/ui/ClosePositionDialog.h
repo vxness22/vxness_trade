@@ -27,6 +27,10 @@ public:
 
 private:
     void setPercent(int pct);
+    // The lot size the box is showing right now, clamped to the position.
+    // Everything that needs it goes through here so the estimate, the buttons
+    // and the value actually sent can never disagree.
+    double currentLots() const;
     void refresh();          // est. P/L + which quick button reads as selected
 
     OpenPosition m_pos;

@@ -1,4 +1,5 @@
 #include "ui/Theme.h"
+#include <QGuiApplication>
 #include <QColor>
 
 namespace Theme {
@@ -16,30 +17,25 @@ const Palette DARK = {
     /* muted        */ "#7c828c",
     /* dim          */ "#6b7280",
 
-    /* accent       */ "#2fbf71",
-    /* accentHover  */ "#26a35f",
+    /* accent       */ "#3b82f6",
+    /* accentHover  */ "#2563eb",
     /* up           */ "#26a269",
     /* down         */ "#e01b24",
     /* warn         */ "#f59e0b",
-    // The logo's own sweep, sampled from resources/vxness-256.png: cyan through
-    // green into lime. The cyan and lime ends are what keep it distinguishable
-    // from `up` — see the note above LIGHT.
-    /* accentGrad   */ "qlineargradient(x1:0, y1:0, x2:1, y2:0,"
-                       " stop:0 #0fa8c8, stop:0.5 #2fbf71, stop:1 #8fd014)",
 
     /* inputBg      */ "#1a1d23",
     /* inputBorder  */ "#2a2e36",
 
     /* cardBg       */ "#14161b",
     /* cardBorder   */ "#23262e",
-    /* cardHover    */ "#2c4a3c",
-    /* cardSelBg    */ "#12281d",
-    /* cardSelBorder*/ "#2fbf71",
+    /* cardHover    */ "#3a4358",
+    /* cardSelBg    */ "#172033",
+    /* cardSelBorder*/ "#3b82f6",
 
     /* tableBg      */ "#0f1115",
     /* tableAlt     */ "#12141a",
     /* rowHover     */ "#171b22",
-    /* rowSel       */ "#17342a",
+    /* rowSel       */ "#1c2b4a",
     /* rowSelText   */ "#ffffff",
 
     /* btnBg        */ "#22262e",
@@ -49,7 +45,7 @@ const Palette DARK = {
 
     /* menuBg       */ "#16181d",
     /* menuBorder   */ "#2a2e36",
-    /* menuSel      */ "#193326",
+    /* menuSel      */ "#1e2a44",
 
     /* scrollHandle */ "#2c313a",
     /* scrollHover  */ "#3a404b",
@@ -58,19 +54,13 @@ const Palette DARK = {
 };
 
 // MetaTrader-style light scheme: grey window chrome, white data surfaces, a
-// visible 1px grid on every table and the vxness green brand/accent. The
-// terminal defaults to this mode because the MT5 layout it mirrors is light.
-//
-// ONE THING TO WATCH: the accent is now green, and green also means "up" /
-// BUY (`up` below). They are deliberately different tones — the brand is a
-// cyan-to-lime sweep, `up` is a flat forest green — but if a control ever reads
-// as a BUY when it is not, this is why. BUY/SELL surfaces never use `accent`;
-// they take `up`/`down` explicitly, so the two only ever meet by eye.
+// visible 1px grid on every table and a deep-blue brand/accent. The terminal
+// defaults to this mode because the MT5 layout it now mirrors is a light UI.
 const Palette LIGHT = {
     /* bg           */ "#eef0f3",
     /* panel        */ "#f4f5f7",
     /* panelAlt     */ "#e6e9ee",
-    /* headerBg     */ "#128a4e",   // the green brand strip above the menu bar
+    /* headerBg     */ "#1a5fb4",   // the blue brand strip above the menu bar
     /* border       */ "#c3c8d1",
 
     /* text         */ "#1f2430",
@@ -78,29 +68,25 @@ const Palette LIGHT = {
     /* muted        */ "#5a6472",
     /* dim          */ "#8a94a3",
 
-    /* accent       */ "#128a4e",
-    /* accentHover  */ "#0e6b3c",
+    /* accent       */ "#1a5fb4",
+    /* accentHover  */ "#14498a",
     /* up           */ "#127a35",
     /* down         */ "#c01c28",
     /* warn         */ "#b45309",
-    // Darker stops than the dark theme's: the same cyan/lime on white washes
-    // out and drops white button text below a readable contrast ratio.
-    /* accentGrad   */ "qlineargradient(x1:0, y1:0, x2:1, y2:0,"
-                       " stop:0 #0d8fa8, stop:0.5 #128a4e, stop:1 #6faf10)",
 
     /* inputBg      */ "#ffffff",
     /* inputBorder  */ "#b9bfca",
 
     /* cardBg       */ "#ffffff",
     /* cardBorder   */ "#c3c8d1",
-    /* cardHover    */ "#8fd4ab",
-    /* cardSelBg    */ "#d3f0de",
-    /* cardSelBorder*/ "#128a4e",
+    /* cardHover    */ "#8fb0dd",
+    /* cardSelBg    */ "#cfe0f7",
+    /* cardSelBorder*/ "#1a5fb4",
 
     /* tableBg      */ "#ffffff",
     /* tableAlt     */ "#f6f8fa",
-    /* rowHover     */ "#e9f7ef",
-    /* rowSel       */ "#d3f0de",
+    /* rowHover     */ "#e8f0fb",
+    /* rowSel       */ "#cfe0f7",
     /* rowSelText   */ "#0d1117",
 
     /* btnBg        */ "#e9ecf1",
@@ -110,7 +96,7 @@ const Palette LIGHT = {
 
     /* menuBg       */ "#ffffff",
     /* menuBorder   */ "#b9bfca",
-    /* menuSel      */ "#d3f0de",
+    /* menuSel      */ "#cfe0f7",
 
     /* scrollHandle */ "#b6bcc7",
     /* scrollHover  */ "#98a0ad",
@@ -163,6 +149,65 @@ QPalette qtPalette() {
     q.setColor(QPalette::Disabled, QPalette::Text,       QColor(c.dim));
     q.setColor(QPalette::Disabled, QPalette::ButtonText, QColor(c.dim));
     return q;
+}
+
+namespace {
+// The chosen face, defaulted to what MT5 draws in. Held here rather than read
+// from the Config on every call: tableFont() runs for every table repaint.
+QString g_tableFamily = QStringLiteral("Tahoma");
+int     g_tableSize   = 12;
+}
+
+QString tableFontFamily() { return g_tableFamily; }
+int     tableFontSize()   { return g_tableSize; }
+
+void setTableFont(const QString& family, int px) {
+    const QString f = family.trimmed().isEmpty() ? QStringLiteral("Tahoma") : family;
+    const int s = qBound(9, px, 18);
+    if (f == g_tableFamily && s == g_tableSize) return;   // nothing to redraw
+    g_tableFamily = f;
+    g_tableSize   = s;
+    emit notifier()->changed();          // the panels restyle off this
+}
+
+QFont tableFont() {
+    // Tahoma, because that is the face MetaTrader 5 draws its Market Watch and
+    // blotter in, and matching it is what the desk asked for by name.
+    //
+    // Given as a LIST rather than a single family: Tahoma ships with Windows
+    // but not with macOS, and setFamily() with a missing name leaves Qt to
+    // substitute whatever it likes. The fallbacks are the closest faces that
+    // do ship there, so the mac build lands somewhere deliberate instead.
+    QFont f = QGuiApplication::font();
+    // The chosen family first, then faces that DO ship elsewhere. A single
+    // setFamily() with a name the system lacks leaves Qt to substitute
+    // whatever it likes; this way the mac build lands somewhere deliberate.
+    f.setFamilies({g_tableFamily,
+                   QStringLiteral("Geneva"),          // macOS, Tahoma's lineage
+                   QStringLiteral("DejaVu Sans"),
+                   QStringLiteral("Verdana")});
+    f.setStyleHint(QFont::SansSerif);
+    f.setPixelSize(g_tableSize);
+    return f;
+}
+
+QString spinStyle() {
+    const Palette& c = p();
+    return QString(
+        "QDoubleSpinBox{background:%1; color:%2; border:1px solid %3;"
+        "border-radius:6px; padding:4px 6px;}"
+        "QDoubleSpinBox:focus{border:1px solid %4;}"
+        "QDoubleSpinBox::up-button, QDoubleSpinBox::down-button{"
+        "subcontrol-origin:border; width:17px; background:%5; border:none;"
+        "border-left:1px solid %3;}"
+        "QDoubleSpinBox::up-button{subcontrol-position:top right;"
+        "border-top-right-radius:6px;}"
+        "QDoubleSpinBox::down-button{subcontrol-position:bottom right;"
+        "border-bottom-right-radius:6px;}"
+        "QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover{background:%6;}"
+        "QDoubleSpinBox::up-arrow{image:url(:/spin-up.svg); width:9px; height:6px;}"
+        "QDoubleSpinBox::down-arrow{image:url(:/spin-down.svg); width:9px; height:6px;}")
+        .arg(c.inputBg, c.textStrong, c.inputBorder, c.accent, c.btnBg, c.btnHover);
 }
 
 QString styleSheet() {
@@ -275,7 +320,6 @@ QMenu::item:selected { background: %MENUSEL%; }
         .replace("%TEXT%",        c.text)
         .replace("%MUTED%",       c.muted)
         .replace("%DIM%",         c.dim)
-        .replace("%ACCENTGRAD%",  c.accentGrad)
         .replace("%ACCENT%",      c.accent)
         .replace("%INPUTBG%",     c.inputBg)
         .replace("%INPUTBORDER%", c.inputBorder)

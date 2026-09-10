@@ -40,7 +40,6 @@ Config Config::load() {
     if (o.contains("accountId")) c.accountId = o.value("accountId").toString();
     if (o.contains("userName"))  c.userName  = o.value("userName").toString();
     if (o.contains("email"))     c.email     = o.value("email").toString();
-    if (o.contains("windowGeometry")) c.windowGeometry = o.value("windowGeometry").toString();
     if (o.contains("theme"))     c.theme     = o.value("theme").toString("dark");
     if (o.contains("privacy"))   c.privacy   = o.value("privacy").toBool();
     if (o.contains("accountsJson")) c.accountsJson = o.value("accountsJson").toString();
@@ -54,6 +53,39 @@ Config Config::load() {
         c.chartSymbols.clear();
         for (const QJsonValue& v : o.value("chartSymbols").toArray())
             c.chartSymbols << v.toString();
+    }
+    if (o.contains("windowGeometry")) c.windowGeometry = o.value("windowGeometry").toString();
+    if (o.contains("watchGrid")) c.watchGrid = o.value("watchGrid").toBool(true);
+    if (o.contains("watchSymbolColours")) {
+        c.watchSymbolColours.clear();
+        for (const QJsonValue& v : o.value("watchSymbolColours").toArray())
+            c.watchSymbolColours << v.toString();
+    }
+    if (o.contains("watchHiddenSymbols")) {
+        c.watchHiddenSymbols.clear();
+        for (const QJsonValue& v : o.value("watchHiddenSymbols").toArray())
+            c.watchHiddenSymbols << v.toString();
+    }
+    if (o.contains("tableFontFamily") && !o.value("tableFontFamily").toString().isEmpty())
+        c.tableFontFamily = o.value("tableFontFamily").toString();
+    // Clamped: a hand-edited file must not be able to set a size that renders
+    // the blotter unreadable or taller than its rows.
+    if (o.contains("tableFontSize"))
+        c.tableFontSize = qBound(9, o.value("tableFontSize").toInt(12), 18);
+    if (o.contains("ticketPosX")) c.ticketPosX = o.value("ticketPosX").toDouble(-1.0);
+    if (o.contains("ticketPosY")) c.ticketPosY = o.value("ticketPosY").toDouble(-1.0);
+    if (o.contains("watchFavourites")) {
+        c.watchFavourites.clear();
+        for (const QJsonValue& v : o.value("watchFavourites").toArray())
+            c.watchFavourites << v.toString();
+    }
+    // Absent from the file means a first run, and a first run shows the three
+    // columns a trader watches all day. An empty ARRAY is different: it is a
+    // trader who has switched every column on, and must be left that way.
+    if (o.contains("watchHiddenColumns")) {
+        c.watchHiddenColumns.clear();
+        for (const QJsonValue& v : o.value("watchHiddenColumns").toArray())
+            c.watchHiddenColumns << v.toString();
     }
     // Stored endpoints are accepted only if they still address THIS API shape.
     //
@@ -78,7 +110,6 @@ Config Config::load() {
     const QString storedWs = o.value("wsUrl").toString();
     if (storedWs.contains(QStringLiteral("/ws/algo/")))
         c.wsUrl = storedWs;
-
     return c;
 }
 
@@ -89,7 +120,6 @@ bool Config::save() const {
     o["accountId"]    = accountId;
     o["userName"]     = userName;
     o["email"]        = email;
-    o["windowGeometry"] = windowGeometry;
     o["theme"]        = theme;
     o["privacy"]      = privacy;
     o["accountsJson"] = accountsJson;
@@ -99,6 +129,16 @@ bool Config::save() const {
     o["wsUrl"]        = wsUrl;
     o["chartCount"]   = chartCount;
     o["chartSymbols"] = QJsonArray::fromStringList(chartSymbols);
+    o["watchHiddenColumns"] = QJsonArray::fromStringList(watchHiddenColumns);
+    o["watchFavourites"]    = QJsonArray::fromStringList(watchFavourites);
+    o["watchHiddenSymbols"] = QJsonArray::fromStringList(watchHiddenSymbols);
+    o["watchGrid"]          = watchGrid;
+    o["watchSymbolColours"] = QJsonArray::fromStringList(watchSymbolColours);
+    o["tableFontFamily"]    = tableFontFamily;
+    o["tableFontSize"]      = tableFontSize;
+    o["ticketPosX"]         = ticketPosX;
+    o["ticketPosY"]         = ticketPosY;
+    o["windowGeometry"]    = windowGeometry;
 
     QFile f(filePath());
     if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))

@@ -2,6 +2,7 @@
 #include "core/ApiError.h"
 #include "ui/Theme.h"
 #include "ui/SpinInput.h"
+#include "ui/Toast.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -16,8 +17,6 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QUrl>
-#include <QTimer>
-#include <QSignalBlocker>
 
 WalletDialog::WalletDialog(const Config& cfg, QWidget* parent)
     : QDialog(parent), m_cfg(cfg), m_net(new QNetworkAccessManager(this)) {
@@ -34,10 +33,18 @@ WalletDialog::WalletDialog(const Config& cfg, QWidget* parent)
     m_direction = new QComboBox;
     m_direction->addItem(tr("Main wallet  →  trading account"), false);
     m_direction->addItem(tr("Trading account  →  main wallet"), true);
-    connect(m_direction, &QComboBox::currentIndexChanged, this, &WalletDialog::onDirectionChanged);
+    // A user-driven change of direction/account invalidates whatever the status
+    // line says, including the result of the previous transfer.
+    connect(m_direction, &QComboBox::currentIndexChanged, this, [this]() {
+        m_statusSticky = false;
+        onDirectionChanged();
+    });
 
     m_account = new QComboBox;
-    connect(m_account, &QComboBox::currentIndexChanged, this, &WalletDialog::onAccountChanged);
+    connect(m_account, &QComboBox::currentIndexChanged, this, [this]() {
+        m_statusSticky = false;
+        onAccountChanged();
+    });
 
     m_amount = new QDoubleSpinBox;
     m_amount->setRange(0.01, 1000000.0);
@@ -126,29 +133,15 @@ QString WalletDialog::v1Base() const {
 
 bool WalletDialog::toWallet() const { return m_direction->currentData().toBool(); }
 
-// A confirmation the refresh cannot wipe.
-//
-// A successful transfer immediately reloads the wallet, and that reload
-// rewrites the account list and re-runs onDirectionChanged(). Both used to be
-// free to replace the status line, so the "Moved $200" the trader was owed
-// lasted a fraction of a second - the money moved and the screen said nothing
-// about it, which is the one moment a trading app has to be explicit.
-//
-// It holds for eight seconds, then the panel goes back to describing what can
-// be moved next.
-void WalletDialog::flash(const QString& text) {
-    m_flashing = true;
-    setStatus(text, false);
-    QTimer::singleShot(8000, this, [this]() {
-        if (!m_flashing) return;
-        m_flashing = false;
-        onDirectionChanged();          // back to the ordinary hint
-    });
-}
-
-void WalletDialog::setStatus(const QString& text, bool error) {
+void WalletDialog::setStatus(const QString& text, bool error, bool sticky) {
     m_status->setStyleSheet(QString("color:%1;").arg(error ? Theme::p().down : Theme::p().up));
     m_status->setText(text);
+    m_statusSticky = sticky;
+}
+
+QString WalletDialog::accountLabel() const {
+    // Items read "PT36420423 · $31,793.93" — the trader knows the number.
+    return m_account->currentText().section(QChar(0x00B7), 0, 0).trimmed();
 }
 
 double WalletDialog::availableOnAccount() const {
@@ -172,15 +165,8 @@ void WalletDialog::loadWallet() {
         const int http = r->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         const QJsonObject o = QJsonDocument::fromJson(r->readAll()).object();
         if (r->error() != QNetworkReply::NoError || http >= 400) {
-            // A 404 carrying no {"detail": ...} is the gateway itself saying it
-            // has no such route — the wallet endpoints are newer than some
-            // deployments. Qt renders that as "server replied:" with nothing
-            // after the colon, which reads like a bug in the terminal. Name it.
-            setStatus(http == 404 && o.isEmpty()
-                        ? tr("This server does not offer wallet transfers yet. "
-                             "It needs the platform update that adds them.")
-                        : tr("Couldn't load wallet: %1")
-                              .arg(apiDetail(o, r->errorString())), true);
+            setStatus(tr("Couldn't load wallet: %1")
+                      .arg(apiDetail(o, r->errorString())), true);
             return;
         }
 
@@ -191,16 +177,6 @@ void WalletDialog::loadWallet() {
 
         const QString keep = m_account->currentData().toString();
         m_funds.clear();
-        // Rebuilt with the signals held.
-        //
-        // clear() sets the index to -1 and every addItem() moves it again, and
-        // each of those reached onAccountChanged -> onDirectionChanged with an
-        // empty selection, which reads "nothing transferable" and wrote that
-        // over whatever the status line was saying. Since loadWallet() runs
-        // right after a transfer, the sentence it landed on was the
-        // confirmation the trader had just been given: the money moved, and the
-        // screen said the wallet was empty.
-        QSignalBlocker blockAccounts(m_account);
         m_account->clear();
         // Only live accounts come back here — the backend refuses wallet
         // transfers on demo accounts, so a demo account must not be offered.
@@ -258,9 +234,12 @@ void WalletDialog::onDirectionChanged() {
     m_amount->setEnabled(any);
     m_maxBtn->setEnabled(any);
     m_transferBtn->setEnabled(any && m_account->count() > 0);
-    if (!m_flashing && !any && !m_cfg.token.trimmed().isEmpty())
+    if (m_statusSticky) return;   // a transfer result outranks a capacity hint
+    if (!any && !m_cfg.token.trimmed().isEmpty())
         setStatus(out ? tr("Nothing transferable on this account right now.")
                       : tr("The main wallet is empty."), false);
+    else
+        m_status->clear();          // otherwise the previous hint goes stale
 }
 
 void WalletDialog::onAccountChanged() { onDirectionChanged(); }
@@ -275,7 +254,6 @@ void WalletDialog::doTransfer() {
 
     m_transferBtn->setEnabled(false);
     m_transferBtn->setText(tr("Transferring…"));
-    m_flashing = false;                // a new transfer supersedes the last one
     m_status->clear();
 
     QJsonObject body;
@@ -284,26 +262,34 @@ void WalletDialog::doTransfer() {
     const QString path = out ? "/wallet/transfer-trading-to-main"
                              : "/wallet/transfer-main-to-trading";
 
+    // The account label is captured now: loadWallet() below rebuilds the combo
+    // with fresh balances, so reading it afterwards would give the wrong text.
+    const QString account = accountLabel();
+
     QNetworkReply* r = m_net->post(bearerReq(v1Base() + path, m_cfg),
                                    QJsonDocument(body).toJson(QJsonDocument::Compact));
-    connect(r, &QNetworkReply::finished, this, [this, r, out, amount]() {
+    connect(r, &QNetworkReply::finished, this, [this, r, out, amount, account]() {
         r->deleteLater();
         m_transferBtn->setEnabled(true);
         m_transferBtn->setText(tr("Transfer"));
         const int http = r->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         const QJsonObject o = QJsonDocument::fromJson(r->readAll()).object();
+        const QString money = QString("$%L1").arg(amount, 0, 'f', 2);
+
         if (r->error() != QNetworkReply::NoError || http >= 400) {
-            setStatus(http == 404 && o.isEmpty()
-                        ? tr("This server does not offer wallet transfers yet. "
-                             "It needs the platform update that adds them.")
-                        : tr("Transfer failed: %1")
-                              .arg(apiDetail(o, r->errorString())), true);
+            const QString why = apiDetail(o, r->errorString());
+            setStatus(tr("Transfer failed: %1").arg(why), true, true);
+            Toast::error(this, tr("Transfer failed"), why);
             return;
         }
-        flash(out ? tr("✓ Moved $%L1 to your main wallet").arg(amount, 0, 'f', 2)
-                  : tr("✓ Moved $%L1 to account %2").arg(amount, 0, 'f', 2)
-                        .arg(m_account->currentText().section(' ', 0, 0)));
-        emit transferred();
+
+        const QString line = out
+            ? tr("%1 moved from %2 to your main wallet").arg(money, account)
+            : tr("%1 moved from your main wallet to %2").arg(money, account);
+        setStatus(tr("✓ %1").arg(line), false, true);
+        Toast::success(this, tr("Transfer complete"), line);
+
+        emit transferred(out, amount, account);
         loadWallet();   // balances on both sides have moved
     });
 }

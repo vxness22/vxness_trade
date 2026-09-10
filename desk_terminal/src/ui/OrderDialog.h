@@ -8,6 +8,7 @@ class QComboBox;
 class QDoubleSpinBox;
 class QPushButton;
 class QTabWidget;
+class QLineEdit;
 
 // The terminal's order window: Market and Pending in one dialog, laid out like
 // the web platform's ticket so a trader moving between the two is not
@@ -49,6 +50,9 @@ public:
     double  price() const;       // pending tab only
     double  stopLoss() const;    // 0 => not set
     double  takeProfit() const;
+    // The trader's own label for the trade, empty when they typed nothing.
+    // Shared by both tabs — it describes the trade, not how it is entered.
+    QString comment() const;
 
 public slots:
     // Fed from PriceStream while the dialog is open.
@@ -81,6 +85,7 @@ private:
     bool   m_applying = false;
 
     QTabWidget* m_tabs = nullptr;
+    QLineEdit*  m_comment = nullptr;
     QComboBox*  m_symbolBox = nullptr;
     QLabel*     m_leverageLbl = nullptr;
 

@@ -82,7 +82,7 @@ void AccountPanel::applyTheme() {
         k->setStyleSheet(QString("background:transparent; color:%1; font-size:11px;").arg(c.muted));
     for (QLabel* v : m_values)
         v->setStyleSheet(QString("background:transparent; color:%1; font-size:11px;"
-                                 "font-weight:700; font-family:Consolas,monospace;")
+                                 "font-weight:700; ")
                          .arg(c.textStrong));
 
     m_refresh->setIcon(Icons::refresh(QColor(c.muted), 12));
@@ -124,7 +124,7 @@ void AccountPanel::renderFloating() {
                       : m_floating > 0   ? c.up
                       : m_floating < 0   ? c.down : c.textStrong;
     v->setStyleSheet(QString("background:transparent; font-size:11px; font-weight:700;"
-                             "font-family:Consolas,monospace; color:%1;").arg(col));
+                             " color:%1;").arg(col));
     v->setToolTip(m_openCount == 0
                   ? tr("No open positions")
                   : tr("Unrealised P/L across %n open position(s). Becomes real "
@@ -140,7 +140,7 @@ void AccountPanel::clear() {
     for (QLabel* v : m_values) {
         v->setText("—");
         v->setStyleSheet(QString("background:transparent; color:%1; font-size:11px;"
-                                 "font-weight:700; font-family:Consolas,monospace;")
+                                 "font-weight:700; ")
                          .arg(c.textStrong));
     }
 }
@@ -190,6 +190,6 @@ void AccountPanel::setAccount(const AccountInfo& a) {
     const double flat = a.balance + a.credit;
     m_values["equity"]->setStyleSheet(QString(
         "background:transparent; font-size:11px; font-weight:700;"
-        "font-family:Consolas,monospace; color:%1;")
+        " color:%1;")
         .arg(a.equity > flat ? c.up : a.equity < flat ? c.down : c.textStrong));
 }

@@ -2,6 +2,15 @@
 #include "ui/NewsPanel.h"
 #include "ui/CalendarPanel.h"
 #include "ui/Theme.h"
+#include <QFileDialog>
+#include <QMessageBox>
+#include <QDesktopServices>
+#include <QStandardPaths>
+#include <QTextStream>
+#include <QDateTime>
+#include <QDir>
+#include <QUrl>
+#include <algorithm>
 #include "ui/Icons.h"
 #include <QTabWidget>
 #include <QTableWidget>
@@ -19,6 +28,8 @@
 #include <QLocale>
 #include <QApplication>
 #include <QFont>
+#include <QStyledItemDelegate>
+#include <QLineEdit>
 #include <QColor>
 
 static const char* MASK = "••••";
@@ -57,8 +68,59 @@ private:
 
 } // namespace
 
+// Styles the editor that appears when a cell is typed into.
+//
+// Without this the editor is a plain QLineEdit, and a plain QLineEdit picks up
+// the application-wide input rule: a 1px border, a 3px radius and 3px of
+// vertical padding. The blotter's rows are 20px tall, so that left about 12px
+// for the text and the digits came out clipped and mis-set against the cells
+// either side of them — visibly a different size from the value the trader was
+// replacing.
+//
+// So the editor is given the CELL's font and alignment, no frame, no radius
+// and no vertical padding, and it is laid over exactly the cell rectangle. It
+// keeps the accent border, because an edit box that is invisible is its own
+// problem.
+class CellEditDelegate : public QStyledItemDelegate {
+public:
+    using QStyledItemDelegate::QStyledItemDelegate;
+
+    QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& opt,
+                          const QModelIndex& idx) const override {
+        QWidget* w = QStyledItemDelegate::createEditor(parent, opt, idx);
+        auto* edit = qobject_cast<QLineEdit*>(w);
+        if (!edit) return w;
+
+        const auto& c = Theme::p();
+        // opt.font is the item's own font — the monospace one the price
+        // columns are drawn in, not the widget default.
+        edit->setFont(opt.font);
+        const QVariant align = idx.data(Qt::TextAlignmentRole);
+        edit->setAlignment(align.isValid()
+            ? Qt::Alignment(align.toInt())
+            : Qt::Alignment(Qt::AlignLeft | Qt::AlignVCenter));
+        edit->setFrame(false);
+        edit->setStyleSheet(QString(
+            "QLineEdit{background:%1; color:%2; border:1px solid %3;"
+            "border-radius:0; padding:0px 5px; margin:0;"
+            "selection-background-color:%3; selection-color:#ffffff;}")
+            .arg(c.inputBg, c.textStrong, c.accent));
+        return edit;
+    }
+
+    // Exactly the cell, so the text sits where it sat a moment ago instead of
+    // jumping by the editor's own margins.
+    void updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& opt,
+                              const QModelIndex&) const override {
+        editor->setGeometry(opt.rect);
+    }
+};
+
 static QTableWidget* makeTable(const QStringList& headers) {
     auto* t = new QTableWidget;
+    // One face across Market Watch, Trade, Pending, History and the ledger —
+    // the desk asked for the same compact look in all of them.
+    t->setFont(Theme::tableFont());
     t->setColumnCount(headers.size());
     t->setHorizontalHeaderLabels(headers);
     t->verticalHeader()->setVisible(false);
@@ -81,6 +143,20 @@ static QTableWidgetItem* cell(const QString& text, Qt::Alignment a = Qt::AlignLe
     it->setTextAlignment(a);
     it->setFlags(it->flags() & ~Qt::ItemIsEditable);
     return it;
+}
+
+// The Comment cell, editable in place like the brackets beside it. Carries the
+// position id and the text it was rendered with, so a commit knows which
+// position it belongs to and whether anything actually changed — the table is
+// rebuilt every four seconds and a rebuild must not read as an edit.
+static QTableWidgetItem* commentCell(const QString& text, const QString& positionId) {
+    auto* it = new QTableWidgetItem(text);
+    it->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    it->setData(Qt::UserRole, positionId);
+    it->setData(Qt::UserRole + 1, text);
+    it->setToolTip(QObject::tr("Double-click to edit this position's comment. "
+                               "Clear the cell to remove it."));
+    return it;   // editable: the flag is left on, unlike cell()
 }
 
 // An S/L or T/P cell the trader can type into. Carries the position id and the
@@ -127,21 +203,12 @@ static QString shortTime(const QString& iso) {
 // MT5 writes the side in lower case in the Type column ("buy" / "sell").
 static QString typeText(const QString& side) { return side.toLower(); }
 
-// MT5 tickets are short numbers, and so is this platform's: every trade gets a
-// T-number, which is what admin, support and the web platform quote back. Show
-// THAT when the gateway sends it, so a trader reading a ticket off this blotter
-// is reading the same one everyone else can look up.
-//
-// The fallback is the trade's API id — a Mongo ObjectId, shown as its tail
-// because in full it made the Ticket column wider than every other column
-// combined. That is all an older gateway can offer. Either way the tooltip
-// carries both, since the id is what a bug report needs.
-static QTableWidgetItem* ticketCell(const QString& id, const QString& ticket) {
-    const QString shown = !ticket.isEmpty()
-                            ? ticket
-                            : (id.size() > 12 ? "…" + id.right(8) : id);
-    auto* it = cell(shown);
-    it->setToolTip(ticket.isEmpty() ? id : ticket + "\n" + id);
+// MT5 tickets are short numbers; this backend issues UUIDs, and showing one in
+// full made the Ticket column wider than every other column combined. Show the
+// tail (which is what distinguishes them) and keep the whole id in a tooltip.
+static QTableWidgetItem* ticketCell(const QString& id) {
+    auto* it = cell(id.size() > 12 ? "…" + id.right(8) : id);
+    it->setToolTip(id);
     return it;
 }
 
@@ -218,6 +285,24 @@ QWidget* PositionsPanel::buildFilterBar(int tab) {
     h->addWidget(box);
     h->addWidget(date);
     h->addStretch();
+
+    // History alone gets an export. It is the tab a trader is asked to produce
+    // for an accountant, a broker or a dispute, and until now the only way to
+    // hand that over was a screenshot of a scrolling table.
+    if (tab == 2) {
+        const auto& c = Theme::p();
+        auto* save = new QPushButton(tr("Save report"));
+        save->setCursor(Qt::PointingHandCursor);
+        save->setFocusPolicy(Qt::NoFocus);
+        save->setToolTip(tr("Save the trades shown here as an HTML statement"));
+        save->setStyleSheet(QString(
+            "QPushButton{background:%1; color:%2; border:1px solid %3;"
+            "border-radius:4px; padding:3px 10px; font-weight:600;}"
+            "QPushButton:hover{border-color:%4; color:%4;}")
+            .arg(c.btnBg, c.textStrong, c.btnBorder, c.accent));
+        connect(save, &QPushButton::clicked, this, &PositionsPanel::exportHistoryReport);
+        h->addWidget(save);
+    }
 
     // Pagination, Transactions only. The other three tabs hold a working set a
     // trader wants to see whole — open positions and live pending orders are
@@ -398,19 +483,491 @@ void PositionsPanel::refreshHistorySummary() {
     paint(m_sumBalance,    m_lastAccount.balance, false);
 }
 
+void PositionsPanel::setTraderName(const QString& name) { m_traderName = name; }
+
 void PositionsPanel::setAccount(const AccountInfo& account) {
     if (!account.valid) return;
     m_lastAccount = account;
     refreshHistorySummary();
 }
 
+// ── HTML statement ─────────────────────────────────────────────────────────
+//
+// A MetaTrader-shaped account statement: the house over an account line, then
+// Closed Transactions, Open Trades, Working Orders, a Summary, and the details
+// block with a balance curve. That is the layout a broker, an accountant or a
+// prop desk already knows how to read, which is the whole reason to copy it
+// rather than invent one.
+//
+// Balance operations sit IN the closed table, the way MT writes them: a
+// deposit is a line in the account's history, not a separate document, and a
+// statement that omits them cannot be reconciled against a bank record.
+//
+// The file is standalone. No stylesheet, no script, no linked images — the
+// brand mark is inlined and the chart is hand-drawn SVG. It has to open years
+// from now on a machine that has never heard of this terminal.
+//
+// Everything obeys the tab's period filter, so the document always matches the
+// screen it was exported from.
+
+namespace {
+
+// One row of the account's history, whether it came from a trade or a balance
+// operation. Merged so the closed table can be ordered by time the way MT's is.
+struct StatementRow {
+    QDateTime when;
+    bool      isBalance = false;
+    // trade
+    HistoryTrade trade;
+    // balance operation
+    QString   note;
+    double    amount = 0.0;
+    QString   id;
+};
+
+QDateTime parseStamp(const QString& iso) {
+    QDateTime t = QDateTime::fromString(iso, Qt::ISODateWithMs);
+    if (!t.isValid()) t = QDateTime::fromString(iso, Qt::ISODate);
+    return t;
+}
+
+} // namespace
+
+QString PositionsPanel::historyReportHtml() const {
+    const QString currency = m_lastAccount.currency.isEmpty()
+                                 ? QStringLiteral("USD") : m_lastAccount.currency;
+    const QString period = (m_range[2] ? m_range[2]->currentText() : tr("All"));
+
+    auto num  = [](double v, int dp) { return QString::number(v, 'f', dp); };
+    auto esc  = [](const QString& t) { return t.toHtmlEscaped(); };
+    auto cls  = [](double v) { return v >= 0 ? QStringLiteral("pos") : QStringLiteral("neg"); };
+    auto money = [&](double v) {
+        return QStringLiteral("%1 %2").arg(QString::number(v, 'f', 2), currency);
+    };
+    auto stamp = [](const QDateTime& t) {
+        return t.isValid() ? t.toLocalTime().toString(QStringLiteral("yyyy.MM.dd HH:mm"))
+                           : QStringLiteral("");
+    };
+
+    // ── gather, filtered by the tab's period ──
+    QVector<StatementRow> closed;
+    for (const HistoryTrade& t : m_lastHistory) {
+        if (!passes(2, t.closedAt)) continue;
+        StatementRow r;
+        r.when = parseStamp(t.closedAt);
+        r.trade = t;
+        r.id = t.id;
+        closed.append(r);
+    }
+    double deposit = 0, withdrawal = 0;
+    for (const Transaction& t : m_lastTxns) {
+        if (!passes(2, t.createdAt) || !isFunding(t.type)) continue;
+        (t.amount >= 0 ? deposit : withdrawal) += t.amount;
+        StatementRow r;
+        r.when = parseStamp(t.createdAt);
+        r.isBalance = true;
+        r.amount = t.amount;
+        r.id = t.id;
+        r.note = t.description.isEmpty() ? t.type : t.description;
+        closed.append(r);
+    }
+    // Oldest first, the way a ledger reads. Rows whose timestamp would not
+    // parse keep their relative order rather than being dropped.
+    std::stable_sort(closed.begin(), closed.end(),
+                     [](const StatementRow& a, const StatementRow& b) {
+        if (!a.when.isValid() || !b.when.isValid()) return false;
+        return a.when < b.when;
+    });
+
+    double gross = 0, swap = 0, comm = 0, grossProfit = 0, grossLoss = 0;
+    int wins = 0, losses = 0, longs = 0, longWins = 0, shorts = 0, shortWins = 0;
+    double largestWin = 0, largestLoss = 0;
+    for (const StatementRow& r : closed) {
+        if (r.isBalance) continue;
+        const HistoryTrade& t = r.trade;
+        const double net = t.profit + t.swap + t.commission;
+        gross += t.profit; swap += t.swap; comm += t.commission;
+        if (net >= 0) { grossProfit += net; ++wins;  largestWin  = qMax(largestWin, net); }
+        else          { grossLoss   += net; ++losses; largestLoss = qMin(largestLoss, net); }
+        const bool isLong = t.side.compare(QStringLiteral("buy"), Qt::CaseInsensitive) == 0;
+        if (isLong) { ++longs;  if (net >= 0) ++longWins; }
+        else        { ++shorts; if (net >= 0) ++shortWins; }
+    }
+    const double closedPl = gross + swap + comm;
+
+    double floating = 0;
+    for (const OpenPosition& p : m_lastPositions) floating += p.profit;
+
+    QString h;
+    h += QStringLiteral("<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">\n");
+    h += QStringLiteral("<title>") + esc(tr("Vxness statement")) + QStringLiteral("</title>\n<style>\n");
+    h += QStringLiteral(
+         "body{font:12px Tahoma,Geneva,Verdana,sans-serif;color:#111827;background:#fff;"
+         "margin:24px;}\n"
+         ".house{display:flex;align-items:center;justify-content:center;gap:12px;"
+         "font:700 26px Georgia,'Times New Roman',serif;margin:0 0 14px;}\n"
+         ".house img{width:40px;height:40px;object-fit:contain;}\n"
+         ".meta{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px;}\n"
+         ".meta td{padding:2px 6px;white-space:nowrap;}\n"
+         ".meta .r{text-align:right;}\n"
+         ".section{font-weight:700;font-size:13px;margin:14px 0 4px;}\n"
+         "table.deals{border-collapse:collapse;width:100%;font-size:11px;}\n"
+         "table.deals th,table.deals td{border:1px solid #b8b8b8;padding:3px 6px;"
+         "white-space:nowrap;text-align:right;}\n"
+         "table.deals th{background:#e9e9e9;font-weight:700;text-align:center;}\n"
+         "table.deals td.l{text-align:left;}\n"
+         "table.deals td.c{text-align:center;}\n"
+         "table.deals tbody tr:nth-child(even){background:#fafafa;}\n"
+         "table.deals tr.bal td{background:#f4f6fb;font-style:italic;}\n"
+         "tfoot td,td.tot{font-weight:700;background:#e9e9e9;}\n"
+         ".none{border:1px solid #b8b8b8;border-top:none;padding:6px;text-align:center;"
+         "color:#6b7280;font-size:11px;}\n"
+         ".pos{color:#146c2e;}.neg{color:#a91b1b;}\n"
+         ".sum{border-collapse:collapse;font-size:11px;margin-top:4px;}\n"
+         ".sum td{border:1px solid #b8b8b8;padding:3px 10px;white-space:nowrap;}\n"
+         ".sum td.k{background:#e9e9e9;font-weight:700;}\n"
+         ".stats{border-collapse:collapse;font-size:11px;width:100%;margin-top:4px;}\n"
+         ".stats td{border:1px solid #b8b8b8;padding:3px 8px;white-space:nowrap;}\n"
+         ".stats td.k{background:#f3f4f6;}\n"
+         ".stats td.v{text-align:right;font-weight:700;}\n"
+         ".chart{border:1px solid #b8b8b8;margin-top:4px;background:#fff;}\n"
+         ".foot{margin-top:18px;color:#9ca3af;font-size:10px;}\n");
+    h += QStringLiteral("</style></head><body>\n");
+
+    // ── the house: the mark, then the name ──
+    //
+    // The mark is inlined as a data: URI rather than linked. An <img src>
+    // pointing at a server, or at a path on this machine, renders as a broken
+    // box the moment the file leaves here. The artwork is already in the
+    // resource bundle for the window icon, so nothing new ships to carry it.
+    QString logo;
+    {
+        QFile mark(QStringLiteral(":/vxness-256.png"));
+        if (mark.open(QIODevice::ReadOnly))
+            logo = QStringLiteral("data:image/png;base64,")
+                 + QString::fromLatin1(mark.readAll().toBase64());
+    }
+    h += QStringLiteral("<div class=\"house\">");
+    if (!logo.isEmpty())
+        h += QStringLiteral("<img src=\"") + logo + QStringLiteral("\" alt=\"\">");
+    h += QStringLiteral("<span>") + esc(tr("Vxness")) + QStringLiteral("</span></div>\n");
+
+    const QString leverage = m_lastAccount.leverage > 0
+        ? QStringLiteral("1:%1").arg(m_lastAccount.leverage) : QStringLiteral("—");
+    h += QStringLiteral("<table class=\"meta\"><tr>");
+    h += QStringLiteral("<td><b>") + esc(tr("Account:")) + QStringLiteral("</b> ")
+       + esc(m_lastAccount.account.isEmpty() ? tr("—") : m_lastAccount.account)
+       + QStringLiteral("</td>");
+    h += QStringLiteral("<td><b>") + esc(tr("Name:")) + QStringLiteral("</b> ")
+       + esc(m_traderName.isEmpty() ? tr("—") : m_traderName) + QStringLiteral("</td>");
+    h += QStringLiteral("<td><b>") + esc(tr("Currency:")) + QStringLiteral("</b> ")
+       + esc(currency) + QStringLiteral("</td>");
+    h += QStringLiteral("<td><b>") + esc(tr("Leverage:")) + QStringLiteral("</b> ")
+       + esc(leverage) + QStringLiteral("</td>");
+    h += QStringLiteral("<td class=\"r\">")
+       + esc(QDateTime::currentDateTime().toString(QStringLiteral("yyyy MMMM d, HH:mm")))
+       + QStringLiteral("</td></tr><tr><td colspan=\"5\"><b>") + esc(tr("Period:"))
+       + QStringLiteral("</b> ") + esc(period) + QStringLiteral("  &nbsp;·&nbsp;  ")
+       + esc(m_lastAccount.isDemo ? tr("Demo account") : tr("Live account"))
+       + QStringLiteral("</td></tr></table>\n");
+
+    // ── Closed Transactions ──
+    const QStringList dealCols = {tr("Ticket"), tr("Open Time"), tr("Type"), tr("Size"),
+                                  tr("Item"), tr("Price"), tr("S / L"), tr("T / P"),
+                                  tr("Close Time"), tr("Price"), tr("Commission"),
+                                  tr("Taxes"), tr("Swap"), tr("Profit")};
+    auto dealHead = [&]() {
+        QString t = QStringLiteral("<table class=\"deals\"><thead><tr>");
+        for (const QString& c : dealCols)
+            t += QStringLiteral("<th>") + esc(c) + QStringLiteral("</th>");
+        return t + QStringLiteral("</tr></thead><tbody>\n");
+    };
+
+    h += QStringLiteral("<div class=\"section\">") + esc(tr("Closed Transactions:"))
+       + QStringLiteral("</div>\n") + dealHead();
+
+    for (const StatementRow& r : closed) {
+        if (r.isBalance) {
+            // A balance operation: MT writes it with the type in the Type
+            // column, the note where an instrument would be, and the money in
+            // Profit. The price columns stay empty because there is no trade.
+            h += QStringLiteral("<tr class=\"bal\">");
+            h += QStringLiteral("<td class=\"l\">") + esc(r.id) + QStringLiteral("</td>");
+            h += QStringLiteral("<td class=\"c\">") + esc(stamp(r.when)) + QStringLiteral("</td>");
+            h += QStringLiteral("<td class=\"c\">") + esc(tr("balance")) + QStringLiteral("</td>");
+            h += QStringLiteral("<td></td>");
+            h += QStringLiteral("<td class=\"l\" colspan=\"9\">") + esc(r.note)
+               + QStringLiteral("</td>");
+            h += QStringLiteral("<td class=\"%1\">%2</td>").arg(cls(r.amount), num(r.amount, 2));
+            h += QStringLiteral("</tr>\n");
+            continue;
+        }
+        const HistoryTrade& t = r.trade;
+        const int d = digitsFor(t.symbol);
+        h += QStringLiteral("<tr>");
+        h += QStringLiteral("<td class=\"l\">") + esc(t.id) + QStringLiteral("</td>");
+        h += QStringLiteral("<td class=\"c\">") + esc(stamp(parseStamp(t.openedAt)))
+           + QStringLiteral("</td>");
+        h += QStringLiteral("<td class=\"c\">") + esc(t.side.toLower()) + QStringLiteral("</td>");
+        h += QStringLiteral("<td>") + num(t.lots, 2) + QStringLiteral("</td>");
+        h += QStringLiteral("<td class=\"l\">") + esc(t.symbol) + QStringLiteral("</td>");
+        h += QStringLiteral("<td>") + num(t.openPrice, d) + QStringLiteral("</td>");
+        // Closed trades come back without their brackets — the platform keeps
+        // the levels on the open position, not on the history row — so these
+        // stay blank rather than being filled with a guess.
+        h += QStringLiteral("<td></td><td></td>");
+        h += QStringLiteral("<td class=\"c\">") + esc(stamp(r.when)) + QStringLiteral("</td>");
+        h += QStringLiteral("<td>") + num(t.closePrice, d) + QStringLiteral("</td>");
+        h += QStringLiteral("<td>") + num(t.commission, 2) + QStringLiteral("</td>");
+        // Taxes: the platform charges none and stores no such field. The column
+        // is here because MT's statement has it and readers look for it; the
+        // zero is the honest value, not a placeholder.
+        h += QStringLiteral("<td>0.00</td>");
+        h += QStringLiteral("<td>") + num(t.swap, 2) + QStringLiteral("</td>");
+        h += QStringLiteral("<td class=\"%1\">%2</td>").arg(cls(t.profit), num(t.profit, 2));
+        h += QStringLiteral("</tr>\n");
+    }
+    h += QStringLiteral("</tbody><tfoot><tr><td colspan=\"13\" class=\"l\">")
+       + esc(tr("Closed P/L:")) + QStringLiteral("</td><td class=\"%1\">%2</td>")
+             .arg(cls(closedPl), num(closedPl, 2))
+       + QStringLiteral("</tr></tfoot></table>\n");
+    if (closed.isEmpty())
+        h += QStringLiteral("<div class=\"none\">") + esc(tr("No transactions"))
+           + QStringLiteral("</div>\n");
+
+    // ── Open Trades ──
+    h += QStringLiteral("<div class=\"section\">") + esc(tr("Open Trades:"))
+       + QStringLiteral("</div>\n") + dealHead();
+    for (const OpenPosition& p : m_lastPositions) {
+        const int d = digitsFor(p.symbol);
+        h += QStringLiteral("<tr>");
+        h += QStringLiteral("<td class=\"l\">") + esc(p.id) + QStringLiteral("</td>");
+        h += QStringLiteral("<td class=\"c\">") + esc(stamp(parseStamp(p.openedAt)))
+           + QStringLiteral("</td>");
+        h += QStringLiteral("<td class=\"c\">") + esc(p.side.toLower()) + QStringLiteral("</td>");
+        h += QStringLiteral("<td>") + num(p.lots, 2) + QStringLiteral("</td>");
+        h += QStringLiteral("<td class=\"l\">") + esc(p.symbol) + QStringLiteral("</td>");
+        h += QStringLiteral("<td>") + num(p.openPrice, d) + QStringLiteral("</td>");
+        h += QStringLiteral("<td>") + (p.sl > 0 ? num(p.sl, d) : QString()) + QStringLiteral("</td>");
+        h += QStringLiteral("<td>") + (p.tp > 0 ? num(p.tp, d) : QString()) + QStringLiteral("</td>");
+        h += QStringLiteral("<td></td>");     // still open: no close time
+        h += QStringLiteral("<td>") + (p.currentPrice > 0 ? num(p.currentPrice, d) : QString())
+           + QStringLiteral("</td>");
+        h += QStringLiteral("<td>") + num(p.commission, 2) + QStringLiteral("</td>");
+        h += QStringLiteral("<td>0.00</td>");
+        h += QStringLiteral("<td>") + num(p.swap, 2) + QStringLiteral("</td>");
+        h += QStringLiteral("<td class=\"%1\">%2</td>").arg(cls(p.profit), num(p.profit, 2));
+        h += QStringLiteral("</tr>\n");
+    }
+    h += QStringLiteral("</tbody><tfoot><tr><td colspan=\"13\" class=\"l\">")
+       + esc(tr("Floating P/L:")) + QStringLiteral("</td><td class=\"%1\">%2</td>")
+             .arg(cls(floating), num(floating, 2))
+       + QStringLiteral("</tr></tfoot></table>\n");
+    if (m_lastPositions.isEmpty())
+        h += QStringLiteral("<div class=\"none\">") + esc(tr("No transactions"))
+           + QStringLiteral("</div>\n");
+
+    // ── Working Orders — pending, not yet filled ──
+    h += QStringLiteral("<div class=\"section\">") + esc(tr("Working Orders:"))
+       + QStringLiteral("</div>\n");
+    h += QStringLiteral("<table class=\"deals\"><thead><tr>");
+    for (const QString& c : {tr("Ticket"), tr("Open Time"), tr("Type"), tr("Size"),
+                             tr("Item"), tr("Price"), tr("S / L"), tr("T / P"),
+                             tr("Market Price")})
+        h += QStringLiteral("<th>") + esc(c) + QStringLiteral("</th>");
+    h += QStringLiteral("</tr></thead><tbody>\n");
+    for (const PendingOrder& o : m_lastOrders) {
+        const int d = digitsFor(o.symbol);
+        h += QStringLiteral("<tr>");
+        h += QStringLiteral("<td class=\"l\">") + esc(o.id) + QStringLiteral("</td>");
+        h += QStringLiteral("<td class=\"c\">") + esc(stamp(parseStamp(o.createdAt)))
+           + QStringLiteral("</td>");
+        h += QStringLiteral("<td class=\"c\">")
+           + esc(QStringLiteral("%1 %2").arg(o.side.toLower(), o.type.toLower()).trimmed())
+           + QStringLiteral("</td>");
+        h += QStringLiteral("<td>") + num(o.lots, 2) + QStringLiteral("</td>");
+        h += QStringLiteral("<td class=\"l\">") + esc(o.symbol) + QStringLiteral("</td>");
+        h += QStringLiteral("<td>") + num(o.price, d) + QStringLiteral("</td>");
+        h += QStringLiteral("<td>") + (o.sl > 0 ? num(o.sl, d) : QString()) + QStringLiteral("</td>");
+        h += QStringLiteral("<td>") + (o.tp > 0 ? num(o.tp, d) : QString()) + QStringLiteral("</td>");
+        h += QStringLiteral("<td></td>");
+        h += QStringLiteral("</tr>\n");
+    }
+    h += QStringLiteral("</tbody></table>\n");
+    if (m_lastOrders.isEmpty())
+        h += QStringLiteral("<div class=\"none\">") + esc(tr("No transactions"))
+           + QStringLiteral("</div>\n");
+
+    // ── Summary ──
+    h += QStringLiteral("<div class=\"section\">") + esc(tr("Summary:"))
+       + QStringLiteral("</div>\n<table class=\"sum\">\n");
+    auto sumRow = [&](const QString& k1, const QString& v1,
+                      const QString& k2, const QString& v2) {
+        h += QStringLiteral("<tr><td class=\"k\">") + esc(k1) + QStringLiteral("</td><td>")
+           + esc(v1) + QStringLiteral("</td><td class=\"k\">") + esc(k2)
+           + QStringLiteral("</td><td>") + esc(v2) + QStringLiteral("</td></tr>\n");
+    };
+    sumRow(tr("Deposit"),         money(deposit),
+           tr("Credit Facility"), money(m_lastAccount.credit));
+    sumRow(tr("Withdrawal"),      money(withdrawal),
+           tr("Closed Trade P/L"), money(closedPl));
+    sumRow(tr("Balance"),         money(m_lastAccount.balance),
+           tr("Floating P/L"),    money(floating));
+    sumRow(tr("Equity"),          money(m_lastAccount.equity),
+           tr("Free Margin"),     money(m_lastAccount.freeMargin));
+    h += QStringLiteral("</table>\n");
+
+    // ── Details: the balance curve, then the usual performance figures ──
+    //
+    // The curve is built by walking the closed rows in order from the balance
+    // this period STARTED at, which is today's balance with everything that
+    // happened since taken back off it. Trades and balance operations both
+    // move the line, because both moved the account.
+    h += QStringLiteral("<div class=\"section\">") + esc(tr("Details:"))
+       + QStringLiteral("</div>\n");
+
+    QVector<double> curve;
+    {
+        double moved = closedPl + deposit + withdrawal;
+        double running = m_lastAccount.balance - moved;
+        curve.append(running);
+        for (const StatementRow& r : closed) {
+            running += r.isBalance ? r.amount
+                                   : (r.trade.profit + r.trade.swap + r.trade.commission);
+            curve.append(running);
+        }
+    }
+
+    // Drawdown, MT's definitions: absolute is how far below the opening
+    // balance the account ever went; maximal is the deepest peak-to-trough
+    // drop in money; relative is that drop against the peak it fell from.
+    double peak = curve.isEmpty() ? 0 : curve.first();
+    double lowest = peak, maxDd = 0, maxDdPct = 0;
+    for (double v : curve) {
+        peak = qMax(peak, v);
+        lowest = qMin(lowest, v);
+        const double dd = peak - v;
+        if (dd > maxDd) {
+            maxDd = dd;
+            maxDdPct = peak > 0 ? (dd / peak) * 100.0 : 0.0;
+        }
+    }
+    const double absDd = curve.isEmpty() ? 0 : qMax(0.0, curve.first() - lowest);
+
+    if (curve.size() > 1) {
+        // Inline SVG: no chart library, nothing fetched, and it scales when the
+        // statement is printed.
+        const int W = 900, H = 220, padL = 6, padR = 6, padT = 10, padB = 10;
+        double lo = curve.first(), hi = curve.first();
+        for (double v : curve) { lo = qMin(lo, v); hi = qMax(hi, v); }
+        if (qFuzzyCompare(lo + 1.0, hi + 1.0)) { hi = lo + 1.0; }
+        const double spanX = double(W - padL - padR) / double(curve.size() - 1);
+        const double spanY = double(H - padT - padB) / (hi - lo);
+
+        QString pts;
+        for (int i = 0; i < curve.size(); ++i) {
+            const double x = padL + i * spanX;
+            const double y = H - padB - (curve[i] - lo) * spanY;
+            pts += QStringLiteral("%1,%2 ").arg(num(x, 1), num(y, 1));
+        }
+        h += QStringLiteral("<svg class=\"chart\" viewBox=\"0 0 %1 %2\" width=\"100%\" "
+                            "height=\"%2\" preserveAspectRatio=\"none\">")
+                 .arg(W).arg(H);
+        h += QStringLiteral("<polyline fill=\"none\" stroke=\"#2d6df6\" stroke-width=\"1.6\" "
+                            "points=\"") + pts.trimmed() + QStringLiteral("\"/>");
+        h += QStringLiteral("</svg>\n");
+        h += QStringLiteral("<div style=\"font-size:10px;color:#6b7280;margin:2px 0 8px;\">")
+           + esc(tr("Balance — %1 to %2").arg(money(curve.first()), money(curve.last())))
+           + QStringLiteral("</div>\n");
+    }
+
+    const double profitFactor = grossLoss < 0 ? grossProfit / qAbs(grossLoss) : 0.0;
+    const int totalTrades = wins + losses;
+    const double expected = totalTrades > 0 ? closedPl / totalTrades : 0.0;
+    auto pct = [&](int part, int whole) {
+        return whole > 0 ? QStringLiteral("%1 (%2%)").arg(part).arg(num(100.0 * part / whole, 2))
+                         : QStringLiteral("%1").arg(part);
+    };
+
+    h += QStringLiteral("<table class=\"stats\">\n");
+    auto st = [&](const QString& k1, const QString& v1,
+                  const QString& k2, const QString& v2) {
+        h += QStringLiteral("<tr><td class=\"k\">") + esc(k1)
+           + QStringLiteral("</td><td class=\"v\">") + esc(v1)
+           + QStringLiteral("</td><td class=\"k\">") + esc(k2)
+           + QStringLiteral("</td><td class=\"v\">") + esc(v2)
+           + QStringLiteral("</td></tr>\n");
+    };
+    st(tr("Gross Profit"),   money(grossProfit), tr("Gross Loss"), money(grossLoss));
+    st(tr("Total Net Profit"), money(closedPl),  tr("Profit Factor"),
+       profitFactor > 0 ? num(profitFactor, 2) : QStringLiteral("—"));
+    st(tr("Expected Payoff"), money(expected),   tr("Absolute Drawdown"), money(absDd));
+    st(tr("Maximal Drawdown"),
+       QStringLiteral("%1 (%2%)").arg(money(maxDd), num(maxDdPct, 2)),
+       tr("Total Trades"), QString::number(totalTrades));
+    st(tr("Short Positions (won %)"), pct(shortWins, shorts),
+       tr("Long Positions (won %)"),  pct(longWins, longs));
+    st(tr("Profit Trades (% of total)"), pct(wins, totalTrades),
+       tr("Loss Trades (% of total)"),   pct(losses, totalTrades));
+    st(tr("Largest profit trade"), money(largestWin),
+       tr("Largest loss trade"),   money(largestLoss));
+    st(tr("Average profit trade"), money(wins > 0 ? grossProfit / wins : 0.0),
+       tr("Average loss trade"),   money(losses > 0 ? grossLoss / losses : 0.0));
+    st(tr("Swap"), money(swap), tr("Commission"), money(comm));
+    h += QStringLiteral("</table>\n");
+
+    h += QStringLiteral("<div class=\"foot\">") + esc(tr("Vxness Terminal"))
+       + QStringLiteral("</div>\n</body></html>\n");
+    return h;
+}
+
+void PositionsPanel::exportHistoryReport() {
+    const QString stamp = QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmm"));
+    const QString acct  = m_lastAccount.account.isEmpty() ? QStringLiteral("account")
+                                                          : m_lastAccount.account;
+    QString dir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    if (dir.isEmpty()) dir = QDir::homePath();
+    const QString suggested = QStringLiteral("%1/Vxness-statement-%2-%3.html")
+                                  .arg(dir, acct, stamp);
+
+    const QString path = QFileDialog::getSaveFileName(
+        this, tr("Save trade statement"), suggested, tr("HTML statement (*.html)"));
+    if (path.isEmpty()) return;                  // cancelled
+
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+        QMessageBox::warning(this, tr("Save report"),
+                             tr("Could not write %1:\n%2").arg(path, f.errorString()));
+        return;
+    }
+    // UTF-8 explicitly: the statement carries the account currency and whatever
+    // symbol names the broker configured, and the file has to survive being
+    // opened on a machine with a different default encoding.
+    QTextStream out(&f);
+    out.setEncoding(QStringConverter::Utf8);
+    out << historyReportHtml();
+    f.close();
+
+    // Opened straight away, because "save a report" always ends with reading
+    // it, and a file the trader then has to go and find is half a feature.
+    QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+}
+
 PositionsPanel::PositionsPanel(QWidget* parent) : QWidget(parent) {
     m_tabs = new QTabWidget;
     m_tabs->setDocumentMode(true);
 
+    // Commission sits beside Swap because the two are the same kind of figure —
+    // what the position costs to hold, as opposed to what it has made. History
+    // already carried it; the open positions did not, so a trader could only
+    // learn a trade's commission after closing it.
+    //
+    // Comment is what the order was tagged with when it was placed, which is
+    // the only thing distinguishing two otherwise identical positions on the
+    // same instrument.
     m_posTable = makeTable({tr("Symbol"), tr("Ticket"), tr("Time"), tr("Type"), tr("Volume"),
                             tr("Price"), tr("S/L"), tr("T/P"), tr("Price"), tr("Swap"),
-                            tr("Profit"), tr("Action")});
+                            tr("Commission"), tr("Profit"), tr("Comment"), tr("Action")});
     m_orderTable = makeTable({tr("Symbol"), tr("Ticket"), tr("Time"), tr("Type"), tr("Volume"),
                               tr("Price"), tr("S/L"), tr("T/P"), tr("Action")});
     m_histTable = makeTable({tr("Symbol"), tr("Ticket"), tr("Time"), tr("Type"), tr("Volume"),
@@ -424,9 +981,29 @@ PositionsPanel::PositionsPanel(QWidget* parent) : QWidget(parent) {
     // 68px fits the two 22px icon buttons (edit + close) with their spacing and
     // the header word. It was 92 while the edit control was a wider "S/L" text
     // button; that has since become a pencil icon.
+    // The Trade tab carries fourteen columns, which is past what an equal
+    // share of the width can render: at that point every column truncates,
+    // headers included — "Commission" came out as "ommissio" and the prices
+    // as "1.162…". So this one table sizes each column to its content and
+    // lets Comment, which has no natural width, absorb whatever is left.
+    // Wider than the panel and it scrolls, which is the honest outcome for a
+    // table with this many columns; the other tabs keep the equal share.
+    auto* posHeader = m_posTable->horizontalHeader();
+    posHeader->setSectionResizeMode(QHeaderView::ResizeToContents);
+    // Comment is NOT stretched. A stretch section absorbs the leftover width,
+    // which only works when the row already fits; here the row is wider than
+    // the pane, so the stretch fought the scroll and the LAST column — Action,
+    // with the close button in it — stayed clipped at the right edge even at
+    // maximum scroll. A trader could not reach the ✕ at all. Content-sized
+    // like the rest, the row has a true width and scrolling reaches its end.
+    const int commentCol = m_posTable->columnCount() - 2;
+    posHeader->setSectionResizeMode(commentCol, QHeaderView::Interactive);
+    m_posTable->setColumnWidth(commentCol, 120);
+
     const int closeCol = m_posTable->columnCount() - 1;
-    m_posTable->horizontalHeader()->setSectionResizeMode(closeCol, QHeaderView::Fixed);
-    m_posTable->setColumnWidth(closeCol, 68);
+    posHeader->setSectionResizeMode(closeCol, QHeaderView::Fixed);
+    // 96px: three 24px icon buttons (share, edit, close) with their spacing.
+    m_posTable->setColumnWidth(closeCol, 96);
     // 68px, matching the Trade tab: this cell now holds the same edit + cancel
     // pair rather than a lone ✕.
     const int cancelCol = m_orderTable->columnCount() - 1;
@@ -438,6 +1015,9 @@ PositionsPanel::PositionsPanel(QWidget* parent) : QWidget(parent) {
     m_posTable->setEditTriggers(QAbstractItemView::DoubleClicked
                                 | QAbstractItemView::EditKeyPressed);
     connect(m_posTable, &QTableWidget::itemChanged, this, &PositionsPanel::onBracketEdited);
+    // Only this table takes edits, so only this one needs the editor styled to
+    // sit in a 20px row.
+    m_posTable->setItemDelegate(new CellEditDelegate(m_posTable));
 
     // Each tab is table + its own filter bar, so a range chosen on History does
     // not silently reach into the open-positions tab.
@@ -466,6 +1046,10 @@ PositionsPanel::PositionsPanel(QWidget* parent) : QWidget(parent) {
 }
 
 void PositionsPanel::applyTheme() {
+    // The face can change under us too — View > Font runs through this same
+    // signal — so it is re-applied before the rows are drawn again.
+    for (QTableWidget* t : {m_posTable, m_orderTable, m_histTable, m_txnTable})
+        if (t) t->setFont(Theme::tableFont());
     // Colours live in the row items, so the tables are simply re-rendered.
     setPositions(m_lastPositions);
     setOrders(m_lastOrders);
@@ -510,6 +1094,17 @@ void PositionsPanel::onBracketEdited(QTableWidgetItem* item) {
     // edit from a repaint.
     if (m_populating || !item) return;
     const int col = item->column();
+    // 12 is Comment, 6 and 7 the two brackets — the only editable cells here.
+    if (col == 12) {
+        const QString id = item->data(Qt::UserRole).toString();
+        if (id.isEmpty()) return;
+        const QString was = item->data(Qt::UserRole + 1).toString();
+        const QString now = item->text().trimmed();
+        if (now == was) return;                 // a repaint, or the same text
+        item->setData(Qt::UserRole + 1, now);
+        emit commentEdited(id, now);
+        return;
+    }
     if (col != 6 && col != 7) return;
 
     const QString id = item->data(Qt::UserRole).toString();
@@ -562,7 +1157,7 @@ void PositionsPanel::setPositions(const QVector<OpenPosition>& positions) {
     };
     for (const OpenPosition& p : shown) {
         m_posTable->setItem(r, 0, cell(p.symbol));
-        m_posTable->setItem(r, 1, ticketCell(p.id, p.ticket));
+        m_posTable->setItem(r, 1, ticketCell(p.id));
         m_posTable->setItem(r, 2, cell(shortTime(p.openedAt)));
         auto* typeItem = cell(typeText(p.side));
         typeItem->setForeground(p.side.compare("sell", Qt::CaseInsensitive) == 0
@@ -578,10 +1173,14 @@ void PositionsPanel::setPositions(const QVector<OpenPosition>& positions) {
         m_posTable->setItem(r, 7, bracketCell(p.tp, p.id, d));
         m_posTable->setItem(r, 8, cell(p.currentPrice > 0 ? fmt(p.currentPrice, d) : QString(), R));
         m_posTable->setItem(r, 9, cell(cash(p.swap), R));
+        m_posTable->setItem(r, 10, cell(cash(p.commission), R));
         auto* pnl = cell(cash(p.profit), R);
         pnl->setForeground(p.profit >= 0 ? QColor(c.up) : QColor(c.down));
         QFont bf = pnl->font(); bf.setBold(true); pnl->setFont(bf);
-        m_posTable->setItem(r, 10, pnl);
+        m_posTable->setItem(r, 11, pnl);
+        // Not masked in privacy mode: a comment is a label the trader wrote,
+        // not a balance.
+        m_posTable->setItem(r, 12, commentCell(p.comment, p.id));
 
         // A real ✕ icon rather than the glyph: several UI fonts render "✕" as a
         // hairline that all but disappears at this size.
@@ -623,6 +1222,22 @@ void PositionsPanel::setPositions(const QVector<OpenPosition>& positions) {
         connect(editBtn, &QPushButton::clicked, this,
                 [this, row]() { emit modifyBrackets(row); });
 
+        // Share, beside edit and close. The web platform has had this on every
+        // row for a while; on the desktop the only way to show a trade to
+        // anyone was a screenshot of this table.
+        auto* shareBtn = new QPushButton;
+        shareBtn->setFixedSize(24, 20);
+        shareBtn->setCursor(Qt::PointingHandCursor);
+        shareBtn->setToolTip(tr("Share this trade"));
+        shareBtn->setIcon(Icons::share(QColor(c.accent), 14));
+        shareBtn->setIconSize(QSize(14, 14));
+        shareBtn->setStyleSheet(QString(
+            "QPushButton{background:transparent; border:1px solid %1; border-radius:3px;}"
+            "QPushButton:hover{border-color:%2;}")
+            .arg(c.btnBorder, c.accent));
+        connect(shareBtn, &QPushButton::clicked, this,
+                [this, row]() { emit sharePosition(row); });
+
         // Centred in the cell — a fixed-size widget handed straight to
         // setCellWidget() sticks to the left edge.
         auto* cellWrap = new QWidget;
@@ -630,10 +1245,11 @@ void PositionsPanel::setPositions(const QVector<OpenPosition>& positions) {
         wrapLay->setContentsMargins(0, 0, 0, 0);
         wrapLay->setSpacing(3);
         wrapLay->addStretch();
+        wrapLay->addWidget(shareBtn);
         wrapLay->addWidget(editBtn);
         wrapLay->addWidget(closeBtn);
         wrapLay->addStretch();
-        m_posTable->setCellWidget(r, 11, cellWrap);
+        m_posTable->setCellWidget(r, 13, cellWrap);
         ++r;
     }
     m_populating = false;
@@ -652,7 +1268,7 @@ void PositionsPanel::setOrders(const QVector<PendingOrder>& orders) {
     const auto R = Qt::AlignRight | Qt::AlignVCenter;
     for (const PendingOrder& o : shown) {
         m_orderTable->setItem(r, 0, cell(o.symbol));
-        m_orderTable->setItem(r, 1, ticketCell(o.id, o.ticket));
+        m_orderTable->setItem(r, 1, ticketCell(o.id));
         m_orderTable->setItem(r, 2, cell(shortTime(o.createdAt)));
         // Pending orders carry both a side and an order type (limit / stop);
         // MT5 shows them as one "buy limit"-style string.
@@ -803,7 +1419,7 @@ void PositionsPanel::setHistory(const QVector<HistoryTrade>& history) {
     };
     for (const HistoryTrade& h : shown) {
         m_histTable->setItem(r, 0, cell(h.symbol));
-        m_histTable->setItem(r, 1, ticketCell(h.id, h.ticket));
+        m_histTable->setItem(r, 1, ticketCell(h.id));
         m_histTable->setItem(r, 2, cell(shortTime(h.closedAt)));
         auto* typeItem = cell(typeText(h.side));
         typeItem->setForeground(h.side.compare("sell", Qt::CaseInsensitive) == 0

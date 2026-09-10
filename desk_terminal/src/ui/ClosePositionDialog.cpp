@@ -58,7 +58,7 @@ ClosePositionDialog::ClosePositionDialog(const OpenPosition& pos, double lotStep
     row(0, tr("Symbol"),    m_pos.symbol,                          c.textStrong);
     row(1, tr("Side"),      m_pos.side.toUpper(),                  sell ? c.down : c.accent);
     row(2, tr("Open lots"), QString::number(m_pos.lots, 'f', 2),   c.textStrong);
-    row(3, tr("P&&L"),      money(m_pos.profit),                   m_pos.profit >= 0 ? c.up : c.down);
+    row(3, tr("P&L"),      money(m_pos.profit),                   m_pos.profit >= 0 ? c.up : c.down);
 
     // ── lots to close ──
     auto* lotsCap = new QLabel(tr("LOTS TO CLOSE"));
@@ -91,10 +91,17 @@ ClosePositionDialog::ClosePositionDialog(const OpenPosition& pos, double lotStep
     // also opens pre-filled (with the full position size), so it needs the
     // select-on-focus that makes a click-and-type actually replace the value.
     SpinInput::freeTyping({m_lots});
+    // BOTH signals. freeTyping() turns keyboardTracking off so a 5-digit price
+    // can be retyped without Qt reformatting after every keystroke — but that
+    // also means valueChanged only fires on the COMMIT (Enter, focus-out, or a
+    // step). Typing a new lot size therefore left the estimated P/L, the quick
+    // buttons and the confirm button all showing the previous size, which is
+    // what the desk reported as "manual lot changing not reflected".
     connect(m_lots, &QDoubleSpinBox::valueChanged, this, [this]() { refresh(); });
+    SpinInput::onTyping(m_lots, this, [this]() { refresh(); });
 
     auto* estRow = new QHBoxLayout;
-    auto* estCap = new QLabel(tr("EST. P&&L"));
+    auto* estCap = new QLabel(tr("EST. P&L"));
     estCap->setStyleSheet(QString("color:%1; font-size:11px; font-weight:700;").arg(c.muted));
     m_estPl = new QLabel;
     m_estPl->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
@@ -137,6 +144,17 @@ ClosePositionDialog::ClosePositionDialog(const OpenPosition& pos, double lotStep
     setPercent(100);   // FULL preselected, matching the web terminal
 }
 
+// What the box is showing RIGHT NOW, clamped to what the position can give.
+//
+// Read from the text rather than value(): with tracking off, value() lags a
+// field that is still being typed into. The clamp is this function's job too —
+// the spin box would apply its own range on commit, and reading round it means
+// taking that on here rather than sending 3 lots against a 0.05 position.
+double ClosePositionDialog::currentLots() const {
+    const double typed = SpinInput::typedValue(m_lots);
+    return qBound(m_lots->minimum(), typed, m_lots->maximum());
+}
+
 void ClosePositionDialog::setPercent(int pct) {
     double lots = m_pos.lots * pct / 100.0;
     if (pct < 100) {
@@ -152,7 +170,7 @@ void ClosePositionDialog::setPercent(int pct) {
 }
 
 void ClosePositionDialog::refresh() {
-    const double lots = m_lots->value();
+    const double lots = currentLots();
     // Proportional, which is exact for a linear P/L: closing half the lots
     // realises half the open profit. Labelled "est." because the fill happens
     // at the price the server sees, not the one on screen.
@@ -188,8 +206,13 @@ void ClosePositionDialog::refresh() {
     }
 }
 
-double ClosePositionDialog::lotsToClose() const { return m_lots->value(); }
+// These two are read after the dialog is accepted, and the trader may well
+// have pressed the button straight after typing — so they must read the text,
+// exactly as the estimate above does. Reading value() here sent the PREVIOUS
+// size to the server: type 0.02 over 0.05, press Close, and the whole position
+// went. That is the same bug as the stale estimate, with money attached.
+double ClosePositionDialog::lotsToClose() const { return currentLots(); }
 
 bool ClosePositionDialog::isFullClose() const {
-    return m_lots->value() >= m_pos.lots - m_step / 2.0;
+    return currentLots() >= m_pos.lots - m_step / 2.0;
 }

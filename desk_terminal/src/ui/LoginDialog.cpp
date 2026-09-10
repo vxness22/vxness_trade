@@ -59,28 +59,29 @@ QComboBox#input QAbstractItemView {
     background: %CARDBG%; color: %TEXTSTRONG%; border: 1px solid %BORDER%;
     border-radius: 8px; padding: 4px; selection-background-color: %MENUSEL%; outline: none;
 }
-/* The vxness green gradient, matching the brand panel beside it.
-   #primary (Sign in) and #success (Connect) are the two steps of one flow and
-   never appear together, so they share the brand ramp rather than competing —
-   the same action colour carries the user from one step to the next.
-   Green here does NOT collide with BUY: the trading UI takes Theme::p().up for
-   that, a flat forest green, while this is the logo's cyan-to-lime sweep. */
+/* Vxness green, to match the brand panel beside it. Safe here and only here:
+   #primary is the sign-in button and nothing else, so this does not bleed into
+   the trading UI, where green means BUY.
+
+   Deeper than #success below, which is the account step's Connect button. The
+   two are the same family on purpose and never share a screen — sign-in is
+   step one, Connect is step two. */
 QPushButton#primary {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0d9b6a, stop:1 #7fc41a);
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0f6234, stop:1 #17803f);
     color: #ffffff; border: none; border-radius: 10px;
     font-size: 13px; font-weight: 800; letter-spacing: 0.3px;
 }
 QPushButton#primary:hover {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #12b87e, stop:1 #93d827);
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #14783f, stop:1 #1c9a4c);
 }
 QPushButton#primary:disabled { background: %BTNBG%; color: %DIM%; }
 QPushButton#success {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0d9b6a, stop:1 #7fc41a);
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #15803d, stop:1 #22a95b);
     color: #ffffff; border: none; border-radius: 10px;
     font-size: 13px; font-weight: 800;
 }
 QPushButton#success:hover {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #12b87e, stop:1 #93d827);
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1a9549, stop:1 #2ec27e);
 }
 QPushButton#link {
     background: transparent; border: none; color: %MUTED%;
@@ -141,12 +142,12 @@ static QWidget* bullet(const QString& text) {
     tick->setAlignment(Qt::AlignCenter);
     tick->setStyleSheet(QString("background:%1; color:%2;"
                                 "border-radius:9px; font-size:11px; font-weight:800;")
-                        .arg(dark ? "rgba(47,191,113,0.22)" : "rgba(255,255,255,0.22)",
-                             dark ? "#6fe3ab" : "#ffffff"));
+                        .arg(dark ? "rgba(28,154,76,0.24)" : "rgba(255,255,255,0.22)",
+                             dark ? "#5fd48c" : "#ffffff"));
     auto* t = new QLabel(text);
     t->setWordWrap(true);
     t->setStyleSheet(QString("background:transparent; color:%1; font-size:12px;")
-                     .arg(dark ? "#a3b5ab" : "#eafaf1"));
+                     .arg(dark ? "#a3b5a8" : "#dff3e6"));
     h->addWidget(tick, 0, Qt::AlignTop);
     h->addWidget(t, 1);
     return w;
@@ -191,7 +192,7 @@ LoginDialog::LoginDialog(const Config& cfg, QWidget* parent)
     // Preselect the profile matching the saved endpoints.
     {
         QSignalBlocker b(m_profile);
-        if (m_cfg.restBase == VX_REST)         m_profile->setCurrentText(tr("Vxness"));
+        if (m_cfg.restBase == TX_REST)         m_profile->setCurrentText(tr("Vxness"));
         else if (m_cfg.restBase == LOCAL_REST) m_profile->setCurrentText(tr("Local dev"));
         else                                   m_profile->setCurrentText(tr("Custom"));
     }
@@ -202,13 +203,21 @@ QWidget* LoginDialog::buildBrandPanel() {
     auto* p = new QFrame;
     p->setObjectName("brand");
     p->setFixedWidth(290);
-    // The vxness green gradient: the logo's cyan-through-green-into-lime sweep,
-    // bleeding into the app's darkest surface in dark mode and carried at full
-    // saturation in light mode. Both keep the white/near-white brand type
-    // readable, which is why the dark variant lands so much deeper.
+    // Vxness green: the brand mark's own blue-green, running from its mid
+    // green down into a deep teal — the app's darkest surface in dark mode.
+    //
+    // Deliberately the DEEP end of that range, not the bright lime at the top
+    // of the logo. This panel carries white body text at 12px, and the lighter
+    // greens leave it around 2.5:1 against the ground — legible on a design
+    // mock and not on a real screen. Every stop here clears 5:1.
+    //
+    // Green is safe on this surface and only on this surface. Elsewhere green
+    // means BUY and red means SELL (Theme::p().up / .down), so the accent used
+    // by selections and focus rings stays blue — recolouring those would make
+    // every primary action read as a trade direction.
     const QString grad = Theme::isDark()
-        ? "stop:0 #0c5f4a, stop:0.55 #0a2a22, stop:1 #0f1116"
-        : "stop:0 #0d8fa8, stop:0.55 #12a05a, stop:1 #5f9f10";
+        ? "stop:0 #10402a, stop:0.55 #0a2619, stop:1 #0f1116"
+        : "stop:0 #17803f, stop:0.55 #0f6234, stop:1 #08452b";
     p->setStyleSheet(QString("#brand{background:qlineargradient(x1:0,y1:0,x2:0.7,y2:1,%1);"
                              "border-top-left-radius:16px;border-bottom-left-radius:16px;}")
                      .arg(grad));
@@ -236,7 +245,7 @@ QWidget* LoginDialog::buildBrandPanel() {
     auto* sub = new QLabel(tr("TERMINAL"));
     sub->setStyleSheet(QString("background:transparent; color:%1; font-size:11px;"
                                "font-weight:800; letter-spacing:3.4px;")
-                       .arg(dark ? "#6f9e86" : "#cdeedd"));
+                       .arg(dark ? "#6ba883" : "#c9ecd3"));
     v->addWidget(sub);
 
     v->addSpacing(26);
@@ -252,11 +261,9 @@ QWidget* LoginDialog::buildBrandPanel() {
     v->addSpacing(13);
     v->addWidget(bullet(tr("Positions, pending orders and full trade history")));
 
+    // The stretch stays with nothing under it: it is what holds the bullets up
+    // against the headline instead of letting them centre in the panel.
     v->addStretch();
-    // No endpoint footer here on purpose. It named the host in small print on
-    // the brand panel, which told a trader nothing they could act on and went
-    // stale the moment the endpoint was changed in Advanced settings — where
-    // the actual value is shown, editable, and correct.
     return p;
 }
 
@@ -496,7 +503,7 @@ void LoginDialog::mouseMoveEvent(QMouseEvent* e) {
 // --- behaviour --------------------------------------------------------------
 
 void LoginDialog::applyProfile(const QString& name) {
-    if (name == tr("Vxness"))        { m_rest->setText(VX_REST);    m_ws->setText(VX_WS); }
+    if (name == tr("Vxness"))        { m_rest->setText(TX_REST);    m_ws->setText(TX_WS); }
     else if (name == tr("Local dev")) { m_rest->setText(LOCAL_REST); m_ws->setText(LOCAL_WS); }
     else if (m_advanced->isHidden())  { m_advancedBtn->click(); }   // Custom → reveal
 }

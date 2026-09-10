@@ -105,6 +105,41 @@ private:
     QDoubleSpinBox* m_box;
 };
 
+// A price box that rests at "none" and lands on the MARKET price the first
+// time it is stepped.
+//
+// The resting state has to stay 0 / "none", because that is what tells the
+// order path there is no bracket on this trade — seeding the field with a
+// price on sight would put a stop loss at the current price on every one-click
+// order, which either bounces at the server or stops the trade out instantly.
+//
+// But "none" is a dead end for the mouse: stepping up from 0 gives 0.0001,
+// nowhere near the instrument, so the only way in was to type the whole price.
+// So the first nudge jumps to the market and every nudge after that steps from
+// there, which is the "start at the market price and drag it up and down" the
+// desk asked for. Typing still works exactly as before, and clearing the box
+// (or typing 0) puts it back to none.
+class PriceSpin : public QDoubleSpinBox {
+public:
+    using QDoubleSpinBox::QDoubleSpinBox;
+
+    // The live price the first step should land on. 0 disables the jump, so a
+    // symbol that has not quoted yet simply behaves as it used to.
+    void setMarketPrice(double px) { m_market = px; }
+    double marketPrice() const { return m_market; }
+
+    void stepBy(int steps) override {
+        if (value() <= 0.0 && m_market > 0.0) {
+            setValue(m_market);
+            return;             // the jump IS this step; do not also add one
+        }
+        QDoubleSpinBox::stepBy(steps);
+    }
+
+private:
+    double m_market = 0.0;
+};
+
 inline void freeTyping(std::initializer_list<QDoubleSpinBox*> boxes) {
     for (QDoubleSpinBox* b : boxes) {
         if (!b) continue;

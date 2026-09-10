@@ -8,6 +8,7 @@ class ApiClient;
 class PriceStream;
 class WebChartWidget;
 class QGridLayout;
+class QHBoxLayout;
 class QFrame;
 class QLabel;
 class QToolButton;
@@ -43,6 +44,19 @@ public:
     // QWebEngineView and its renderer process, only to pay to rebuild both.
     void closePane(int index);
 
+    // MT5 gives every chart window the three controls, and these are ours.
+    //
+    // Minimize docks the pane as a title bar in a strip along the bottom and
+    // hands its space to the charts still tiled — the point of it is the space,
+    // so a minimized pane leaving a hole in the grid would be no minimize at
+    // all. Maximize gives one pane the whole area until it is restored.
+    //
+    // Neither destroys anything: the pane keeps its symbol, timeframe and
+    // drawings throughout, exactly as closePane() does.
+    void minimizePane(int index);
+    void toggleMaximizePane(int index);
+    void restorePane(int index);
+
     WebChartWidget* activeChart() const;
 
     // The instrument the ACTIVE pane is showing. Not the same thing as the
@@ -64,7 +78,6 @@ public:
     // theme; only the active one follows the watchlist.
     void setSymbols(const QVector<SymbolSpec>& symbols);
     void setPositions(const QVector<OpenPosition>& positions);
-    void setOrders(const QVector<PendingOrder>& orders);
     void setTheme(const QString& theme);
     void showSymbol(const QString& symbol);
 
@@ -92,10 +105,18 @@ private:
         QFrame*         frame  = nullptr;
         QWidget*        header = nullptr;   // title + ✕, the pane's click target
         QLabel*         title  = nullptr;
+        QToolButton*    minBtn   = nullptr;
+        QToolButton*    maxBtn   = nullptr;
         QToolButton*    closeBtn = nullptr;
         WebChartWidget* chart  = nullptr;
         QString         symbol;
+        bool            minimized = false;
     };
+
+    // Places `order` (pane slots, in display order) into the grid using the
+    // 1 / 2 / 3 / 4 tiling. Split out because the set of TILED panes is no
+    // longer simply the first m_count of them once any can be minimized.
+    void tile(const QVector<int>& order);
 
     Pane& ensurePane(int index);          // builds it the first time it is shown
     void  relayout();
@@ -112,12 +133,18 @@ private:
 
     ApiClient*   m_api;
     PriceStream* m_stream;
+    QWidget*     m_gridHost = nullptr;   // holds the tiled panes
     QGridLayout* m_grid;
+    QWidget*     m_minStrip = nullptr;   // the row of minimized title bars
+    QHBoxLayout* m_minLay   = nullptr;
+    // Pane slot shown alone, or -1 for the normal grid. Cleared by anything
+    // that redefines the grid (a close, a layout change), because a stored
+    // slot number does not survive panes shifting under it.
+    int          m_maximized = -1;
     QVector<Pane> m_panes;
     QWidget* m_overlay = nullptr;
     int m_count  = 1;
     int m_active = 0;
     QVector<SymbolSpec> m_symbols;      // replayed into panes built later
     QVector<OpenPosition> m_positions;
-    QVector<PendingOrder> m_orders;
 };

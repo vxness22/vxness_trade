@@ -17,6 +17,38 @@ struct SymbolSpec {
     double  contractSize = 100000.0;
 };
 
+// Full contract specification for one instrument, from
+// GET /api/v1/trading/instruments/{symbol}.
+//
+// Separate from SymbolSpec because the two come from different gateways and
+// carry different things. SymbolSpec is what /api/algo/symbols returns for
+// every instrument at startup — enough to size an order and scale a price.
+// This is the per-instrument detail a trader opens on demand: pip size, the
+// configured spread, commission per lot and the overnight swaps. Asking for
+// all of it up front would be a round trip per instrument for a panel that is
+// usually never opened.
+struct InstrumentSpec {
+    QString symbol, displayName, segment;
+    int     digits       = 5;
+    double  pipSize      = 0.0;
+    double  minLot       = 0.0;
+    double  maxLot       = 0.0;
+    double  contractSize = 0.0;
+    QString spreadType;              // "pips" | "percentage" | …
+    double  spreadValue  = 0.0;
+    double  priceImpact  = 0.0;
+    double  commissionPerLot = 0.0;
+    // swap_long / swap_short are null until an admin configures them, and a
+    // missing swap is not a zero swap — one is "not set", the other is a real
+    // rate of nothing. The panel has to be able to tell them apart.
+    bool    hasSwaps     = false;
+    double  swapLong     = 0.0;
+    double  swapShort    = 0.0;
+    bool    swapFree     = false;
+    bool    valid        = false;
+    QString error;                   // why the lookup failed, when !valid
+};
+
 struct Quote {
     QString   symbol;
     double    bid    = 0.0;
@@ -67,10 +99,7 @@ struct TradeResult {
 
 // Open position with live floating P/L.
 struct OpenPosition {
-    // id is the API's handle for the trade (every write addresses it by that);
-    // ticket is what the platform itself calls it — the T-number admin, support
-    // and the web platform quote. Blank on a gateway too old to send it.
-    QString id, ticket, symbol, side;
+    QString id, symbol, side;
     double  lots = 0, openPrice = 0, currentPrice = 0, sl = 0, tp = 0;
     double  swap = 0, commission = 0, profit = 0;
     QString openedAt, comment;
@@ -78,7 +107,7 @@ struct OpenPosition {
 
 // Pending (not-yet-filled) order.
 struct PendingOrder {
-    QString id, ticket, symbol, type, side;
+    QString id, symbol, type, side;
     double  lots = 0, price = 0, sl = 0, tp = 0;
     QString createdAt, comment;
     // Carried so the blotter can drop anything already filled or cancelled.
@@ -99,7 +128,7 @@ struct Transaction {
 };
 
 struct HistoryTrade {
-    QString id, ticket, symbol, side;
+    QString id, symbol, side;
     double  lots = 0, openPrice = 0, closePrice = 0, profit = 0, swap = 0, commission = 0;
     QString openedAt, closedAt, closeReason;
 };

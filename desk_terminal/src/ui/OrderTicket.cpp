@@ -1,5 +1,6 @@
 #include "ui/OrderTicket.h"
 #include "ui/Theme.h"
+#include <QMouseEvent>
 #include "ui/SpinInput.h"
 #include <QDoubleSpinBox>
 #include <QPushButton>
@@ -103,14 +104,34 @@ OrderTicket::OrderTicket(QWidget* parent) : QWidget(parent) {
     // one never takes focus off a spin box, and with keyboardTracking disabled a
     // box only adopts its typed text on focus-out. Reading value() here would
     // send the volume from before the trader retyped it.
-    connect(m_sell.btn, &QPushButton::clicked, this, [this]() {
-        emit sell(m_spec.symbol, SpinInput::typedValue(m_volume),
-                  SpinInput::typedValue(m_sl), SpinInput::typedValue(m_tp));
-    });
-    connect(m_buy.btn, &QPushButton::clicked, this, [this]() {
-        emit buy(m_spec.symbol, SpinInput::typedValue(m_volume),
-                 SpinInput::typedValue(m_sl), SpinInput::typedValue(m_tp));
-    });
+    // The bracket row IS the switch. Collapsed — which is how the strip opens —
+    // an order goes out bare; open, it carries whatever the two boxes show.
+    // That is what lets the boxes always hold a real price without every
+    // one-click order suddenly acquiring a stop.
+    auto send = [this](const QString& side) {
+        const double reference = (side == "BUY") ? m_ask : m_bid;
+        const bool bracketed = m_bracketRow && !m_bracketRow->isHidden();
+        double sl = 0.0, tp = 0.0;
+        if (bracketed) {
+            QString why;
+            if (!bracketsValidFor(side, reference, &why)) {
+                emit rejected(why);
+                return;
+            }
+            sl = SpinInput::typedValue(m_sl);
+            tp = SpinInput::typedValue(m_tp);
+        }
+        // typedValue, not value(): the tiles are deliberately NoFocus, so
+        // clicking one never takes focus off a spin box, and with
+        // keyboardTracking disabled a box only adopts its typed text on
+        // focus-out. Reading value() here would send the volume from before
+        // the trader retyped it.
+        const double lots = SpinInput::typedValue(m_volume);
+        if (side == "BUY") emit buy(m_spec.symbol, lots, sl, tp);
+        else               emit sell(m_spec.symbol, lots, sl, tp);
+    };
+    connect(m_sell.btn, &QPushButton::clicked, this, [send]() { send(QStringLiteral("SELL")); });
+    connect(m_buy.btn,  &QPushButton::clicked, this, [send]() { send(QStringLiteral("BUY")); });
 
     m_volume = new QDoubleSpinBox;
     m_volume->setDecimals(2);
@@ -138,18 +159,28 @@ OrderTicket::OrderTicket(QWidget* parent) : QWidget(parent) {
     tiles->addWidget(m_buy.btn);
 
     // ── collapsible S/L + T/P row ──
-    m_sl = new QDoubleSpinBox;
-    m_tp = new QDoubleSpinBox;
+    m_sl = new SpinInput::PriceSpin;
+    m_tp = new SpinInput::PriceSpin;
     SpinInput::freeTyping({m_volume, m_sl, m_tp});
     for (QDoubleSpinBox* s : {m_sl, m_tp}) {
         s->setDecimals(5);
         // Capped at 1e6 so the box does not size itself for a 10-digit value it
         // will never hold — no instrument here comes near it.
         s->setRange(0.0, 1e6);
-        s->setSpecialValueText(tr("none"));   // 0 => none
+        // No "none" placeholder. An empty-looking box gave the mouse nothing
+        // to work with and told the trader nothing about where a level would
+        // go; these now always hold a real price, seeded from the market.
+        // Whether the brackets are USED is decided by the row being open,
+        // which is what the ⌄ toggle beside the volume box is for.
         s->setAlignment(Qt::AlignCenter);
-        s->setButtonSymbols(QAbstractSpinBox::NoButtons);
-        s->setFixedWidth(84);
+        // Arrows, unlike the volume box beside them. Volume steps in lots a
+        // trader knows by heart; a price does not, and without a control to
+        // drag there was no way to reach one except typing it in full.
+        s->setButtonSymbols(QAbstractSpinBox::UpDownArrows);
+        s->setFixedWidth(104);                // + the arrows' column
+        // Native steppers need vertical room to sit as two halves; squeezed
+        // into the strip's default row height they render as slivers.
+        s->setMinimumHeight(26);
     }
 
     m_closeBtn = new QPushButton(tr("Close all"));
@@ -220,6 +251,7 @@ void OrderTicket::applyTheme() {
     // visible: the strip read as a framed widget stuck onto the chart rather
     // than part of the toolbar. The fill alone separates it well enough in both
     // themes, since neither panel colour matches its chart background.
+    setToolTip(tr("Drag to move this panel. Double-click it to put it back."));
     setStyleSheet(QString("OrderTicket{background:%1; border:none; border-radius:4px;}")
                   .arg(c.panel));
     // The global sheet paints every QWidget opaque; the inner container must be
@@ -250,8 +282,12 @@ void OrderTicket::applyTheme() {
         "QDoubleSpinBox:focus{border-color:%4;}")
         .arg(c.inputBg, c.textStrong, c.inputBorder, c.accent);
     m_volume->setStyleSheet(input);
-    m_sl->setStyleSheet(input);
-    m_tp->setStyleSheet(input);
+
+    // The two price boxes carry steppers, and those come from the shared
+    // style — the same one the S/L / T/P dialog uses, so the arrows cannot
+    // drift apart between the two places a trader sets a level.
+    m_sl->setStyleSheet(Theme::spinStyle());
+    m_tp->setStyleSheet(Theme::spinStyle());
 
     // Destructive — stays a quiet ghost button and only tints on hover, so a
     // mis-click next to BUY/SELL never looks inviting.
@@ -264,6 +300,9 @@ void OrderTicket::applyTheme() {
 }
 
 void OrderTicket::setSymbolSpec(const SymbolSpec& spec) {
+    // Drop the old instrument's prices with it, so seedBrackets() cannot place
+    // a gold level around a EURUSD quote in the moment between the two.
+    if (spec.symbol != m_spec.symbol) { m_bid = 0.0; m_ask = 0.0; }
     m_spec   = spec;
     m_digits = spec.digits;
     m_volume->setRange(spec.minLot, spec.maxLot);
@@ -271,6 +310,12 @@ void OrderTicket::setSymbolSpec(const SymbolSpec& spec) {
     if (m_volume->value() < spec.minLot) m_volume->setValue(spec.minLot);
     m_sl->setDecimals(spec.digits);
     m_tp->setDecimals(spec.digits);
+    // One pip per step, from the instrument's own precision — a whole 1.0 of
+    // Qt's default is meaningless on a price and useless on every instrument
+    // here.
+    const double step = std::pow(10.0, -spec.digits + 1);
+    m_sl->setSingleStep(step);
+    m_tp->setSingleStep(step);
     // Clear the brackets. A level is only meaningful against the instrument it
     // was typed for, and carrying one across was actively dangerous: a trader
     // who set S/L 4255 on XAUUSD and then switched to AUDUSD had 4255 still
@@ -280,6 +325,11 @@ void OrderTicket::setSymbolSpec(const SymbolSpec& spec) {
     //
     // The row is collapsed too, so the next order starts bracket-free rather
     // than with two fields a trader has to remember to check.
+    // Cleared and marked unseeded: the next quote for the NEW instrument is
+    // what the levels get built from. Carrying the old ones over is the bug
+    // described above; seeding from a price this instrument has not quoted yet
+    // would be the same bug with extra steps.
+    m_seeded = false;
     m_sl->setValue(0.0);
     m_tp->setValue(0.0);
     if (m_bracketRow && !m_bracketRow->isHidden()) {
@@ -303,6 +353,102 @@ void OrderTicket::setSymbolSpec(const SymbolSpec& spec) {
     setEnabled(true);
 }
 
+// Stop below the market, target above it, each a short way out. 0.1% of the
+// price rather than a fixed number of pips: it lands sensibly on a 1.16 FX
+// pair and on gold at 4400 alike, where any fixed distance suits one and is
+// absurd for the other.
+void OrderTicket::seedBrackets(double price) {
+    if (!(price > 0.0)) return;
+    const double away = qMax(price * 0.001, std::pow(10.0, -m_digits + 1) * 5);
+    m_sl->setValue(price - away);
+    m_tp->setValue(price + away);
+    m_seeded = true;
+}
+
+// A stop loss on the wrong side of the market is not a stop loss — it fills or
+// is refused the moment it is sent. The strip is one click from a live order,
+// so it says so here rather than letting the server answer for it.
+bool OrderTicket::bracketsValidFor(const QString& side, double reference,
+                                   QString* why) const {
+    if (!(reference > 0.0)) return true;          // no quote yet; let it through
+    const double sl = SpinInput::typedValue(m_sl);
+    const double tp = SpinInput::typedValue(m_tp);
+    const bool buy = (side == "BUY");
+
+    if (sl > 0.0) {
+        const bool ok = buy ? (sl < reference) : (sl > reference);
+        if (!ok) {
+            if (why) *why = buy ? tr("Stop loss must be below the market for a BUY.")
+                                : tr("Stop loss must be above the market for a SELL.");
+            return false;
+        }
+    }
+    if (tp > 0.0) {
+        const bool ok = buy ? (tp > reference) : (tp < reference);
+        if (!ok) {
+            if (why) *why = buy ? tr("Take profit must be above the market for a BUY.")
+                                : tr("Take profit must be below the market for a SELL.");
+            return false;
+        }
+    }
+    return true;
+}
+
+// ── dragging ───────────────────────────────────────────────────────────────
+//
+// The strip floats over the chart rather than sitting in a layout, so moving
+// it is just a matter of moving the widget and remembering where. Everything
+// is clamped to the parent so it cannot be dragged off the edge and lost.
+
+void OrderTicket::setPositionRatio(const QPointF& r) {
+    m_posRatio = r;
+}
+
+void OrderTicket::mousePressEvent(QMouseEvent* e) {
+    if (e->button() != Qt::LeftButton) { QWidget::mousePressEvent(e); return; }
+    m_dragging = true;
+    m_dragFrom = e->position().toPoint();
+    setCursor(Qt::ClosedHandCursor);
+    e->accept();
+}
+
+void OrderTicket::mouseMoveEvent(QMouseEvent* e) {
+    if (!m_dragging || !parentWidget()) { QWidget::mouseMoveEvent(e); return; }
+
+    const QWidget* host = parentWidget();
+    QPoint p = mapToParent(e->position().toPoint()) - m_dragFrom;
+    // Fully inside the chart, always: a strip half off the pane is a strip
+    // whose BUY price cannot be read.
+    p.setX(qBound(0, p.x(), qMax(0, host->width()  - width())));
+    p.setY(qBound(0, p.y(), qMax(0, host->height() - height())));
+    move(p);
+    e->accept();
+}
+
+void OrderTicket::mouseReleaseEvent(QMouseEvent* e) {
+    if (!m_dragging) { QWidget::mouseReleaseEvent(e); return; }
+    m_dragging = false;
+    unsetCursor();
+
+    if (const QWidget* host = parentWidget()) {
+        const int roomX = qMax(1, host->width()  - width());
+        const int roomY = qMax(1, host->height() - height());
+        m_posRatio = QPointF(double(x()) / roomX, double(y()) / roomY);
+        emit movedTo(m_posRatio);
+    }
+    e->accept();
+}
+
+// Double-click puts it back where the chart wants it. A strip dragged into a
+// corner and forgotten is otherwise a nuisance with no obvious way out.
+void OrderTicket::mouseDoubleClickEvent(QMouseEvent* e) {
+    if (e->button() != Qt::LeftButton) { QWidget::mouseDoubleClickEvent(e); return; }
+    m_posRatio = QPointF(-1.0, -1.0);
+    emit movedTo(m_posRatio);
+    emit sizeHintChanged();          // the host re-places it on this
+    e->accept();
+}
+
 void OrderTicket::updateQuote(const Quote& q) {
     if (q.symbol != m_spec.symbol) return;
     // SELL fills at the bid, BUY at the ask — each tile shows the price you get.
@@ -310,6 +456,14 @@ void OrderTicket::updateQuote(const Quote& q) {
     m_buy.price->setText(QString::number(q.ask, 'f', m_digits));
     const double points = q.spread * std::pow(10.0, m_digits - 1);
     m_spreadLabel->setText(QString::number(points, 'f', 1));
+
+    m_bid = q.bid;
+    m_ask = q.ask;
+    m_sl->setMarketPrice(q.bid);
+    m_tp->setMarketPrice(q.bid);
+    // The first quote for an instrument is what the levels are built from —
+    // before it there is no price to place them around.
+    if (!m_seeded) seedBrackets(q.bid);
 
     // A price can outgrow the width the tiles were sized for — BTCUSD crossing
     // into six figures is the obvious case, and 64816.00 already clipped to
