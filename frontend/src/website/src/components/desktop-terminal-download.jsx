@@ -15,30 +15,24 @@ import { Monitor } from "lucide-react"
 // the worst kind of stale, because the download succeeds and looks correct.
 // The query string is part of Cloudflare's cache key, so bumping it forces a
 // MISS and pulls the new binary through. Same trick as tvchart.css?v=3.
-// The button hands out a ZIP, not the .exe, and that is not cosmetic.
 //
-// Chrome refuses an unsigned installer: "Unverified download blocked", or
-// "This file can't be verified" where the visitor has Safe Browsing off. It is
-// judging the SIGNATURE, and neither terminal.exe nor the setup has one; at
-// 109 MB the file is also over Chrome's deep-scan limit, so it cannot look
-// inside and decide for itself either. The build that was published in August
-// downloaded cleanly only because it had spent weeks accumulating reputation --
-// every new release starts that clock again at zero.
+// The setup .exe is the ONLY thing published here. A .zip of the same build
+// used to sit beside it and is deliberately gone — it is no longer on the
+// server either, so this cannot quietly start pointing at a missing file.
 //
-// A .zip is not treated as an executable, so it downloads without any of that.
-// The trader extracts one file and runs it, which is the same setup they were
-// going to run anyway.
+// Know the trade-off that removes. Chrome refuses an unsigned installer:
+// "Unverified download blocked", or "This file can't be verified" where the
+// visitor has Safe Browsing off. It judges the SIGNATURE, and neither
+// terminal.exe nor the setup has one; at 109 MB the file is also over Chrome's
+// deep-scan limit, so it cannot look inside and decide for itself either. A
+// build accumulates reputation over weeks, and every new release starts that
+// clock again at zero. A .zip is not treated as an executable and sidestepped
+// all of it.
 //
-// THIS IS A WORKAROUND, NOT THE FIX. The fix is an OV/EV code-signing
-// certificate: desk_terminal/sign.ps1 and make-installer.ps1 are already wired
-// for one, and the day it exists this can go back to handing out the .exe
-// directly -- see "Code signing" in desk_terminal/README.md.
+// So some visitors will hit that warning and have to click through. The fix is
+// not to bring the zip back, it is an OV/EV code-signing certificate — see
+// "Code signing" in desk_terminal/README.md.
 export const WINDOWS_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.exe?v=2.0"
-
-// The same build as a zip. Not linked from the panel - the button hands out the
-// installer - but it stays published for a visitor whose browser refuses the
-// .exe, and support can send this link.
-export const WINDOWS_ZIP_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.zip?v=2.0"
 
 // Flip to the .dmg URL once a macOS build has been produced and uploaded — the
 // installer can only be built and notarised on a Mac.
