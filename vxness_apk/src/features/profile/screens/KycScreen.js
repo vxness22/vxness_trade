@@ -147,7 +147,7 @@ export default function KycScreen({ navigation }) {
   const pickFromCamera = async (slot) => {
     if (!(await requestCameraPerm())) return;
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       quality: 0.85,
       allowsEditing: false,
     });
@@ -162,7 +162,7 @@ export default function KycScreen({ navigation }) {
   const pickFromGallery = async (slot) => {
     if (!(await requestGalleryPerm())) return;
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       quality: 0.85,
       allowsEditing: false,
     });

@@ -103,7 +103,7 @@ export default function ProfileMenuScreen() {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) { showToast({ kind: 'warn', message: 'Gallery permission chahiye' }); return; }
       const res = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true, aspect: [1, 1], quality: 0.4, base64: true,
       });
       if (!res.canceled && res.assets?.[0]) {

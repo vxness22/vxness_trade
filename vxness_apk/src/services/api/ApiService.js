@@ -2,6 +2,7 @@ import { API_URL } from '../../constants';
 import * as SecureStore from 'expo-secure-store';
 import { refreshAccessToken } from './authedFetch';
 import { toMessage } from '../../utils/errorMessage';
+import { filePart } from '../../utils/format';
 import logger from '../../utils/logger';
 
 class ApiService {
@@ -139,11 +140,9 @@ class ApiService {
     const fd = new FormData();
     fd.append('amount', String(amount));
     fd.append('transaction_id', String(transactionId || '').trim());
-    fd.append('file', {
-      uri: file.uri,
-      type: file.mimeType || 'image/jpeg',
-      name: file.fileName || 'proof.jpg',
-    });
+    // Same reason as the deposit screen: the asset's own mimeType can be HEIC
+    // or missing, and the server only accepts jpeg/png/gif/webp/pdf.
+    fd.append('file', filePart(file, 'proof'));
     const res = await fetch(`${this.baseUrl}/wallet/deposit/local-banking/${encodeURIComponent(depositId)}/confirm-payment`, {
       method: 'POST',
       headers: {

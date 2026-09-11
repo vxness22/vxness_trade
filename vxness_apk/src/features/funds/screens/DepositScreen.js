@@ -10,6 +10,7 @@ import { Screen, Card, PillButton, IconButton, SegmentedTabs, showToast } from '
 import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 import ApiService from '../../../services/api/ApiService';
+import { filePart } from '../../../utils/format';
 import LocalBankingPanel from '../components/LocalBankingPanel';
 
 const QUICK_AMOUNTS = [100, 500, 1000, 5000];
@@ -102,7 +103,7 @@ export default function DepositScreen() {
   const pickProof = useCallback(async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) { showToast({ kind: 'warn', message: 'Permission required to pick image' }); return; }
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7 });
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
     if (!res.canceled && res.assets?.[0]) setProof(res.assets[0]);
   }, []);
 
@@ -112,6 +113,12 @@ export default function DepositScreen() {
     // The screenshot is required by the server, so it is required here too —
     // better a warning now than a rejected submit after filling the form.
     if (!proof) { showToast({ kind: 'warn', message: 'Upload a screenshot of your payment' }); return; }
+    // The server caps uploads at 10 MB; say so here rather than after the whole
+    // file has been sent and rejected.
+    if (Number(proof.fileSize) > 10 * 1024 * 1024) {
+      showToast({ kind: 'warn', message: 'That image is over 10 MB — choose a smaller one' });
+      return;
+    }
 
     setSubmitting(true);
     const fd = new FormData();
@@ -122,11 +129,13 @@ export default function DepositScreen() {
     // Optional, exactly as on the website — plenty of rails give the payer no
     // reference to quote, and the screenshot is the proof that matters.
     fd.append('transaction_id', txId.trim());
-    fd.append('file', {
-      uri: proof.uri,
-      type: proof.mimeType || 'image/jpeg',
-      name: proof.fileName || 'proof.jpg',
-    });
+    // filePart decides the mime from the file's extension. Sending
+    // `proof.mimeType` straight through meant an iPhone screenshot — usually
+    // HEIC — was refused by the server with "Only images or PDF are accepted",
+    // which tells the user nothing they can act on.
+    const part = filePart(proof, 'proof');
+    if (!part) { showToast({ kind: 'warn', message: 'Could not read that image' }); setSubmitting(false); return; }
+    fd.append('file', part);
 
     try {
       const res = await ApiService.submitManualDeposit(fd);

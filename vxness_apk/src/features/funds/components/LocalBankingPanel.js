@@ -66,7 +66,7 @@ export default function LocalBankingPanel({ amount = '' }) {
   const pickProof = useCallback(async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) { showToast({ kind: 'warn', message: 'Permission required to pick image' }); return; }
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7 });
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
     if (!res.canceled && res.assets?.[0]) setCFile(res.assets[0]);
   }, []);
 

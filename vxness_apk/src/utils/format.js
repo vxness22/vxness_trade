@@ -87,3 +87,49 @@ export function pnlColor(value) {
   if (!Number.isFinite(n)) return vx.textMuted;
   return n >= 0 ? vx.up : vx.down;
 }
+
+/**
+ * Turns an expo-image-picker asset into the `{ uri, type, name }` part that
+ * React Native's FormData expects for a file upload.
+ *
+ * The mime type is the reason this exists. The server accepts jpeg, png, gif,
+ * webp and pdf and rejects anything else with "Only images or PDF are
+ * accepted". An asset does not always carry a usable `mimeType`: it can be
+ * missing entirely on Android, and on an iPhone a photo straight from the
+ * camera roll is often HEIC, which is not on that list — so a perfectly normal
+ * screenshot was refused with a message that gave the user nothing to act on.
+ * The extension decides, and anything unrecognised is sent as jpeg, which is
+ * what the picker has already transcoded it to.
+ *
+ * The file name is made to agree with the type, so the stored file does not end
+ * up with an extension that contradicts its contents.
+ */
+export function filePart(asset, fallbackBase = 'upload') {
+  if (!asset?.uri) return null;
+
+  const uri = String(asset.uri);
+  const fromName = String(asset.fileName || uri.split('/').pop() || '');
+  const ext = (fromName.split('.').pop() || '').toLowerCase();
+
+  const BY_EXT = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg',
+    png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+    pdf: 'application/pdf',
+  };
+  const ACCEPTED = new Set(Object.values(BY_EXT));
+
+  let type = BY_EXT[ext];
+  if (!type) {
+    const declared = String(asset.mimeType || '').toLowerCase();
+    type = ACCEPTED.has(declared) ? declared : 'image/jpeg';
+  }
+
+  const EXT_FOR = {
+    'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif',
+    'image/webp': 'webp', 'application/pdf': 'pdf',
+  };
+  const safeExt = EXT_FOR[type] || 'jpg';
+  const base = (fromName.replace(/\.[^.]*$/, '') || fallbackBase).replace(/[^A-Za-z0-9_-]/g, '') || fallbackBase;
+
+  return { uri, type, name: `${base}.${safeExt}` };
+}
