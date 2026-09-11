@@ -121,7 +121,7 @@ export default function PortfolioScreen({ navigation }) {
   const loadTrades = useCallback(async (page) => {
     setHistLoading(true);
     try {
-      const data = await ApiService.getTradeHistory(acctId, page, 40);
+      const data = await ApiService.getTradeHistory(acctId, page, 10);
       const items = data.items || [];
       setTrades((prev) => (page === 1 ? items : [...prev, ...items]));
       setHistPages(data.pages || 1);

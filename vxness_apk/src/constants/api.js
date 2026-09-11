@@ -25,17 +25,27 @@ const derivedWs = API_BASE_URL.startsWith('https')
 
 export const WS_URL = trimOrEmpty(ENV_WS_URL) || derivedWs;
 
-// Self-hosted TradingView Charting Library chart page — the shared /chart
-// route on the trader web app (fed by our /instruments/{symbol}/bars endpoint
-// + /ws/prices). The WebView loads it with ?symbol=&interval=&theme=. Requires
-// the charting_library/ static files to be present on the trader deploy.
-// When EMPTY, instrument charts fall back to the public TradingView widget.
-// The APK's OWN dedicated chart route (/app-chart), independent from the web
-// terminal's chart — a separate page + forked component, so web-terminal chart
-// changes never affect the app and vice-versa.
-export const CHART_URL = 'https://trade.vxness.in/app-chart';
+// NOTE: there is deliberately no CHART_URL here any more.
+//
+// The chart is not fetched from the web terminal and never should be. The
+// TradingView Charting Library and the app's own chart page ship INSIDE the
+// binary: assets/webchart is copied into android/app/src/main/assets by
+// plugins/withWebChart.js at build time, and NativeChart loads it from
+// file:///android_asset/webchart/index.html. The WebView makes no network
+// calls of its own — the React Native host does every fetch with the user's
+// token and feeds the chart over a bridge.
+//
+// Only Expo Go, which cannot carry 1,900 bundled files, falls back to loading
+// that same page over HTTPS, and it takes it from the API host (/app-chart,
+// served straight out of vxness_apk/assets/webchart) rather than from the
+// trader web app. One copy, no drift, and a change to the web terminal's chart
+// cannot affect the app.
+//
+// A CHART_URL constant pointing at https://trade.vxness.in/app-chart used to
+// live here. Nothing imported it — the app had already moved to the bundled
+// chart — but leaving it in place made it look like the app still borrowed the
+// web terminal's chart, which is exactly the confusion it caused.
 
-// Web-app origin derived from CHART_URL — single place the trader-web host
-// lives (used e.g. for brand assets in exported PDFs). Strips the last path
-// segment so it works regardless of the chart route name.
-export const TRADE_WEB_URL = CHART_URL.replace(/\/[^/]+\/?$/, '');
+// Trader-web origin, used only for brand assets in exported PDFs. Stated
+// directly rather than derived from a chart URL, so it is not mistaken for one.
+export const TRADE_WEB_URL = 'https://trade.vxness.in';

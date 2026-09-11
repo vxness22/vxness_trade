@@ -109,10 +109,14 @@ export default function WithdrawManual() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: BOTTOM_NAV_PILL_HEIGHT + space.huge }}>
+        {/* The website leads with the balance, because it is the number that
+            decides whether the rest of the form is worth filling in. */}
         {balance != null ? (
-          <View style={styles.balanceRow}>
-            <Text style={styles.balanceLabel}>Available</Text>
-            <Text style={styles.balanceVal}>${balance.toFixed(2)}</Text>
+          <View style={styles.balanceCard}>
+            <Text style={styles.balanceLabel}>Available Balance</Text>
+            <Text style={styles.balanceVal}>
+              ${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Text>
           </View>
         ) : null}
 
@@ -137,17 +141,32 @@ export default function WithdrawManual() {
               accessibilityRole="radio"
               accessibilityState={{ selected: selected === a.id }}
             >
+              {/* Icon by type and the destination spelled out in full, the way
+                  the website prints it. The row used to show a masked label
+                  ("HDFC Bank ••••6789") with the holder underneath, so the one
+                  thing a person checks before sending money — the account number
+                  they are sending it to — was the one thing not on screen. */}
               <Ionicons
-                name={selected === a.id ? 'radio-button-on' : 'radio-button-off'}
-                size={18}
-                color={selected === a.id ? vx.accent : vx.textMuted}
+                name={a.type === 'UPI' ? 'phone-portrait-outline' : 'business-outline'}
+                size={20}
+                color={selected === a.id ? vx.accent : vx.textSecondary}
               />
               <View style={{ flex: 1 }}>
-                <Text style={styles.acctLabel}>{a.label}</Text>
-                <Text style={styles.acctSub}>
-                  {a.type === 'UPI' ? 'UPI' : `${a.account_holder_name || ''}${a.ifsc_code ? ' · ' + a.ifsc_code : ''}`}
+                <Text style={styles.acctLabel}>
+                  {a.type === 'UPI' ? 'UPI' : (a.bank_name || 'Bank')}
                 </Text>
+                <Text style={styles.acctSub}>
+                  {a.type === 'UPI'
+                    ? (a.upi_id || '')
+                    : `A/C: ${a.account_number || '—'}${a.ifsc_code ? ` | IFSC: ${a.ifsc_code}` : ''}`}
+                </Text>
+                {a.type !== 'UPI' && a.account_holder_name ? (
+                  <Text style={styles.acctHolder}>{a.account_holder_name}</Text>
+                ) : null}
               </View>
+              {selected === a.id ? (
+                <Ionicons name="checkmark-circle" size={20} color={vx.accent} />
+              ) : null}
             </Pressable>
           ))
         )}
@@ -221,13 +240,17 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.xs },
   title: { flex: 1, color: vx.textPrimary, fontFamily, fontSize: sizes.h2, fontWeight: weights.heavy, textAlign: 'center' },
 
+  balanceCard: {
+    backgroundColor: vx.bgElevated, borderRadius: radius.md,
+    paddingHorizontal: space.md, paddingVertical: space.md, marginBottom: space.lg,
+  },
   balanceRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     backgroundColor: vx.bgElevated, borderRadius: radius.md,
     paddingHorizontal: space.md, paddingVertical: space.md, marginBottom: space.lg,
   },
   balanceLabel: { color: vx.textMuted, fontFamily, fontSize: sizes.label },
-  balanceVal: { color: vx.up, fontFamily, fontSize: sizes.h3, fontWeight: weights.bold },
+  balanceVal: { color: vx.textPrimary, fontFamily, fontSize: sizes.h1, fontWeight: weights.heavy, marginTop: 2 },
 
   label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
   input: { backgroundColor: vx.bgElevated, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.md, color: vx.textPrimary, fontFamily, fontSize: sizes.body },
@@ -244,9 +267,10 @@ const styles = StyleSheet.create({
     padding: space.md, marginBottom: space.sm,
     borderWidth: 1, borderColor: vx.border,
   },
-  acctOn: { borderColor: vx.accent },
+  acctOn: { borderColor: vx.accent, backgroundColor: vx.accent + '14' },
   acctLabel: { color: vx.textPrimary, fontFamily, fontSize: sizes.body, fontWeight: weights.bold },
-  acctSub: { color: vx.textMuted, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  acctSub: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginTop: 2 },
+  acctHolder: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, marginTop: 1 },
 
   addRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: space.sm },
   addTxt: { color: vx.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.bold },

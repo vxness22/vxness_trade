@@ -74,7 +74,9 @@ class ApiService {
     return this.request(`/portfolio/performance?period=${period}`);
   }
 
-  async getTradeHistory(accountId = null, page = 1, perPage = 50) {
+  // per_page defaults to 10 — the same page size the server uses. `page` is
+  // unbounded, so callers can walk back through the whole history.
+  async getTradeHistory(accountId = null, page = 1, perPage = 10) {
     const q = new URLSearchParams({ page: String(page), per_page: String(perPage) });
     if (accountId) q.append('account_id', accountId);
     return this.request(`/portfolio/trades?${q.toString()}`);

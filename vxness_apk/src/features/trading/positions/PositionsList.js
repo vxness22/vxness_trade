@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -10,7 +10,7 @@ import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vx
 import ApiService from '../../../services/api/ApiService';
 import { isSoftTradeError, handleTradeError } from '../../../utils/tradeErrors';
 import { TRADE_WEB_URL } from '../../../constants';
-import { formatMoney, formatSignedMoney } from '../../../utils/format';
+import { formatMoney, formatSignedMoney, formatPriceAt } from '../../../utils/format';
 import logger from '../../../utils/logger';
 
 // History date-range filter options and their cutoffs.
@@ -38,10 +38,10 @@ function closeTimeOf(trade) {
 
 /** Branded printable statement for the (filtered) closed trades. */
 function buildHistoryHtml(trades, rangeLabel, account) {
-  const netOf = (t) => {
-    const gross = Number(t.pnl ?? t.profit ?? t.realized_pnl ?? 0) || 0;
-    return gross - (Number(t.commission ?? 0) || 0) + (Number(t.swap ?? 0) || 0);
-  };
+  // Same figure the History rows show: the realised P&L the server booked to
+  // the balance, unadjusted. A statement that does not add up to the balance is
+  // worse than no statement.
+  const netOf = (t) => Number(t.pnl ?? t.profit ?? t.realized_pnl ?? 0) || 0;
   const totalNet = trades.reduce((s, t) => s + netOf(t), 0);
   const rows = trades.map((t) => {
     const ts = closeTimeOf(t);
@@ -87,9 +87,11 @@ function buildHistoryHtml(trades, rangeLabel, account) {
 </body></html>`;
 }
 
-const HISTORY_PAGE = 20;
+// Rows revealed per step, matching the server's page size so "Show more" and
+// "Load older trades" advance by the same amount and the list never jumps.
+const HISTORY_PAGE = 10;
 
-export default function PositionsList({ positions = [], orders = [], history = [], historyTotal = null, onLoadMoreHistory, account, accountSummary, onChange }) {
+export default function PositionsList({ positions = [], orders = [], history = [], historyTotal = null, onLoadMoreHistory, nearEnd = 0, account, accountSummary, onChange }) {
   const [view, setView] = useState('positions');
   // History pagination — render a page at a time instead of every closed trade.
   const [historyShown, setHistoryShown] = useState(HISTORY_PAGE);
@@ -100,6 +102,7 @@ export default function PositionsList({ positions = [], orders = [], history = [
   const closedCount = historyTotal != null ? historyTotal : history.length;
   // More rows exist on the server beyond what's been fetched so far.
   const serverHasMore = historyTotal != null && history.length < historyTotal;
+
 
   // History date filter + PDF export. 'custom' uses the From→To calendar.
   const [historyRange, setHistoryRange] = useState('all');
@@ -117,6 +120,36 @@ export default function PositionsList({ positions = [], orders = [], history = [
     if (cutoff == null) return history;
     return history.filter((h) => closeTimeOf(h) >= cutoff);
   }, [history, historyRange, historyCustom]);
+  // One step of "show me more history": reveal the next 10 already loaded, or
+  // fetch the next page from the server when everything loaded is on screen.
+  //
+  // Both used to be separate buttons, and with 11 rows loaded the first read
+  // "Show more (1 remaining)" — a tap that did almost nothing, followed by a
+  // second tap on a different button to actually fetch. One action, always
+  // advancing by the same 10, is what a reader expects.
+  const advanceHistory = useCallback(() => {
+    if (filteredHistory.length > historyShown) {
+      setHistoryShown((n) => n + HISTORY_PAGE);
+      return;
+    }
+    if (serverHasMore) {
+      onLoadMoreHistory?.();
+      setHistoryShown((n) => n + HISTORY_PAGE);
+    }
+  }, [filteredHistory.length, historyShown, serverHasMore, onLoadMoreHistory]);
+
+  // Infinite scroll: the parent bumps `nearEnd` each time the user reaches the
+  // bottom of the page, and one bump pulls in one more page. Reaching the end of
+  // the list is the request — no button hunt, and history that ran to 71 trades
+  // no longer sat at 11 because the user did not realise there was more.
+  const lastNearEndRef = useRef(0);
+  useEffect(() => {
+    if (!nearEnd || nearEnd === lastNearEndRef.current) return;
+    lastNearEndRef.current = nearEnd;
+    if (view !== 'history') return;
+    advanceHistory();
+  }, [nearEnd, view, advanceHistory]);
+
   const historyRangeLabel = historyRange === 'custom' && historyCustom
     ? formatRangeLabel(historyCustom.from, historyCustom.to)
     : HISTORY_RANGE_LABEL[historyRange];
@@ -324,31 +357,27 @@ export default function PositionsList({ positions = [], orders = [], history = [
                 {filteredHistory.slice(0, historyShown).map((h, i) => (
                   <HistoryRow key={h.id || h._id || i} trade={h} />
                 ))}
-                {filteredHistory.length > historyShown ? (
+                {/* Manual fallback for the scroll-driven load above — the
+                    remaining count is measured against the SERVER's total, not
+                    against how many happen to be loaded, so it tells the reader
+                    how much history is actually left. No cap: it stays until
+                    the account runs out of trades. */}
+                {(filteredHistory.length > historyShown || serverHasMore) ? (
                   <Pressable
-                    onPress={() => setHistoryShown((n) => n + HISTORY_PAGE)}
+                    onPress={advanceHistory}
                     style={styles.showMoreBtn}
                     accessibilityRole="button"
-                    accessibilityLabel="Show more trade history"
+                    accessibilityLabel="Show older trades"
                   >
                     <Text style={styles.showMoreTxt}>
-                      Show more ({filteredHistory.length - historyShown} remaining)
+                      {(() => {
+                        const left = historyTotal != null
+                          ? historyTotal - Math.min(historyShown, filteredHistory.length)
+                          : filteredHistory.length - historyShown;
+                        return left > 0 ? `Show older trades (${left} more)` : 'Show older trades';
+                      })()}
                     </Text>
                     <Ionicons name="chevron-down" size={16} color={vx.textSecondary} />
-                  </Pressable>
-                ) : serverHasMore ? (
-                  /* Everything fetched so far is on screen but the server has
-                     older pages — pull the next 50 and keep revealing. */
-                  <Pressable
-                    onPress={() => { onLoadMoreHistory?.(); setHistoryShown((n) => n + HISTORY_PAGE); }}
-                    style={styles.showMoreBtn}
-                    accessibilityRole="button"
-                    accessibilityLabel="Load older trades"
-                  >
-                    <Text style={styles.showMoreTxt}>
-                      Load older trades ({historyTotal - history.length} more)
-                    </Text>
-                    <Ionicons name="cloud-download-outline" size={16} color={vx.textSecondary} />
                   </Pressable>
                 ) : null}
               </>
@@ -382,16 +411,28 @@ export default function PositionsList({ positions = [], orders = [], history = [
 }
 
 // Helper — pull a position's live NET P&L regardless of which field the API
-// used. Net = profit − commission + swap so it matches the website terminal
-// exactly. The API returns swap negative for a charge, so adding it subtracts
-// the fee; commission is a positive cost.
+// used for it.
+//
+// The server's `profit` is ALREADY net: /api/v1/positions runs it through
+// tradeEngine.calculateFloatingPnl, which subtracts swap, and the open
+// commission is not in it because the account balance paid that the moment the
+// order filled. This used to apply `− commission + swap` on top, which charged
+// the commission a second time and cancelled the swap the server had correctly
+// deducted — so the app and the web terminal disagreed on every position, and
+// neither matched the account statement. Take the server's number as it stands;
+// commission and swap are still displayed on their own rows for transparency.
+// Display precision for a position / order / closed trade. The server sends
+// `digits` per symbol; 5 is the forex default and what every price on this
+// screen used to be formatted with regardless of instrument.
+function digitsOf(x) {
+  const d = Number(x?.digits);
+  return Number.isFinite(d) ? d : 5;
+}
+
 function plOf(p) {
   if (!p) return null;
   const v = p.profit ?? p.profit_loss ?? p.pl ?? p.pnl ?? null;
-  if (v == null) return null;
-  const commission = Number(p.commission ?? 0) || 0;
-  const swap = Number(p.swap ?? 0) || 0;
-  return Number(v) - commission + swap;
+  return v == null ? null : Number(v);
 }
 
 // Web-parity close sheet: position summary (symbol / side / open lots / live
@@ -402,6 +443,7 @@ function plOf(p) {
 // while the sheet is open.
 const CLOSE_PCTS = [0.25, 0.5, 0.75, 1];
 function CloseConfirmSheet({ position, positions = [], onCancel, onConfirm, onBulk }) {
+  const digits = digitsOf(position);
   const [closing, setClosing] = useState(false);
   const [pct, setPct] = useState(1);          // selected chip (null = custom-typed)
   const [lotsText, setLotsText] = useState('');
@@ -478,7 +520,7 @@ function CloseConfirmSheet({ position, positions = [], onCancel, onConfirm, onBu
             <SumRow label="Symbol" value={position.symbol} bold />
             <SumRow label="Side" value={side.toUpperCase()} color={side === 'buy' ? vx.up : vx.down} />
             <SumRow label="Open lots" value={openLots ? openLots.toFixed(2) : '—'} />
-            <SumRow label="Open price" value={open ? open.toFixed(5) : '—'} />
+            <SumRow label="Open price" value={formatPriceAt(open, digits)} />
             <SumRow
               label="P&L"
               value={pl != null ? `${plPositive ? '+' : '−'}$${Math.abs(pl).toFixed(2)}` : '—'}
@@ -718,6 +760,7 @@ const closeStyles = StyleSheet.create({
 });
 
 function SlTpSheet({ position, onClose, onSaved }) {
+  const digits = digitsOf(position);
   const [sl, setSl] = useState('');
   const [tp, setTp] = useState('');
   const [saving, setSaving] = useState(false);
@@ -759,7 +802,7 @@ function SlTpSheet({ position, onClose, onSaved }) {
             <Text style={styles.sym}>{position.symbol}</Text>
             <Text style={[styles.side, { color: side === 'buy' ? vx.up : vx.down }]}>
               {side.toUpperCase()} {position.volume ?? position.lots ?? '—'}
-              {current != null ? `  ·  ${Number(current).toFixed(5)}` : ''}
+              {current != null ? `  ·  ${formatPriceAt(current, digits)}` : ''}
             </Text>
           </View>
 
@@ -801,6 +844,7 @@ function SlTpSheet({ position, onClose, onSaved }) {
 }
 
 function PositionRow({ position, onClose, onSetSlTp }) {
+  const digits = digitsOf(position);
   const nav = useNavigation();
   // Tapping the card body opens that instrument's chart (cross-tab into the
   // Markets stack). The SL/TP and Close buttons keep their own actions.
@@ -811,10 +855,10 @@ function PositionRow({ position, onClose, onSetSlTp }) {
   const side = String(position.side || '').toLowerCase();
   const commission = position.commission ?? 0;
   const swap = position.swap ?? 0;
-  // NET P&L (profit − commission + swap; swap is negative for a charge) to
-  // match the website terminal. Fees are also shown on their own rows below.
-  const grossPl = position.profit ?? position.profit_loss ?? position.pl ?? position.pnl ?? null;
-  const pl = grossPl == null ? null : Number(grossPl) - (Number(commission) || 0) + (Number(swap) || 0);
+  // NET P&L straight from the server — already net of swap, and the open
+  // commission is already out of the balance (see plOf above). Fees stay on
+  // their own rows below so the trader can still see what was charged.
+  const pl = plOf(position);
   const plPositive = pl == null ? true : Number(pl) >= 0;
   const lots = position.volume ?? position.lots ?? position.quantity ?? '—';
   const open = Number(position.open_price ?? position.openPrice ?? 0);
@@ -833,7 +877,7 @@ function PositionRow({ position, onClose, onSetSlTp }) {
         <View style={{ flex: 1 }}>
           <Text style={styles.sym}>{position.symbol}</Text>
           <Text style={[styles.side, { color: side === 'buy' ? vx.up : vx.down, fontWeight: weights.bold }]}>
-            {side.toUpperCase()} {lots} @ {open ? open.toFixed(5) : '—'}
+            {side.toUpperCase()} {lots} @ {formatPriceAt(open, digits)}
           </Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
@@ -859,9 +903,9 @@ function PositionRow({ position, onClose, onSetSlTp }) {
       </View>
 
       <View style={styles.metaGrid}>
-        {current != null ? <Meta label="Current" value={Number(current).toFixed(5)} /> : null}
-        <Meta label="SL" value={hasSl ? slVal.toFixed(5) : '—'} valueColor={hasSl ? vx.down : vx.textMuted} />
-        <Meta label="TP" value={hasTp ? tpVal.toFixed(5) : '—'} valueColor={hasTp ? vx.up : vx.textMuted} />
+        {current != null ? <Meta label="Current" value={formatPriceAt(current, digits)} /> : null}
+        <Meta label="SL" value={hasSl ? formatPriceAt(slVal, digits) : '—'} valueColor={hasSl ? vx.down : vx.textMuted} />
+        <Meta label="TP" value={hasTp ? formatPriceAt(tpVal, digits) : '—'} valueColor={hasTp ? vx.up : vx.textMuted} />
         <Meta label="Commission" value={`${Number(commission).toFixed(2)} USD`} />
         <Meta label="Swap" value={`${Number(swap).toFixed(2)} USD`} />
       </View>
@@ -882,20 +926,26 @@ function PositionRow({ position, onClose, onSetSlTp }) {
 }
 
 function HistoryRow({ trade }) {
+  const digits = digitsOf(trade);
   const side = String(trade.side || '').toLowerCase();
-  // NET realized P&L (profit − commission + swap) to match the website.
-  const grossPnl = trade.pnl ?? trade.profit ?? trade.realized_pnl ?? null;
-  const pnl = grossPnl == null
-    ? null
-    : Number(grossPnl) - (Number(trade.commission ?? 0) || 0) + (Number(trade.swap ?? 0) || 0);
+  // Realised P&L exactly as booked. /portfolio/trades sends the stored
+  // realizedPnl, which closeTrade() computed as `rawPnl − swap − closeCommission`
+  // and then applied to the balance. Adjusting it again here made the app's
+  // history disagree with the balance it actually produced.
+  const raw = trade.pnl ?? trade.profit ?? trade.realized_pnl ?? null;
+  const pnl = raw == null ? null : Number(raw);
   const pnlPositive = pnl == null ? true : Number(pnl) >= 0;
   const lots = trade.lots ?? trade.volume ?? trade.quantity ?? '—';
   const open = Number(trade.open_price ?? 0);
   const close = Number(trade.close_price ?? 0);
   let dateStr = '';
   try {
-    if (trade.close_time) {
-      dateStr = new Date(trade.close_time).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    // closeTimeOf, not trade.close_time. /portfolio/trades sends `closed_at`
+    // and never `close_time`, so this row rendered a blank date on every
+    // closed trade while the sort above quietly worked off the right field.
+    const ts = closeTimeOf(trade);
+    if (ts) {
+      dateStr = new Date(ts).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
     }
   } catch (_) {}
 
@@ -905,7 +955,7 @@ function HistoryRow({ trade }) {
         <View style={{ flex: 1 }}>
           <Text style={styles.sym}>{trade.symbol}</Text>
           <Text style={[styles.side, { color: side === 'buy' ? vx.up : vx.down }]}>
-            {side.toUpperCase()} {lots} @ {open ? open.toFixed(5) : '—'}
+            {side.toUpperCase()} {lots} @ {formatPriceAt(open, digits)}
           </Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
@@ -916,7 +966,7 @@ function HistoryRow({ trade }) {
         </View>
       </View>
       <View style={styles.metaGrid}>
-        <Meta label="Close price" value={close ? close.toFixed(5) : '—'} />
+        <Meta label="Close price" value={formatPriceAt(close, digits)} />
         <Meta label="Commission" value={`${Number(trade.commission ?? 0).toFixed(2)} USD`} />
         <Meta label="Swap" value={`${Number(trade.swap ?? 0).toFixed(2)} USD`} />
         {dateStr ? <Meta label="Closed" value={dateStr} /> : null}
@@ -942,7 +992,7 @@ function OrderRow({ order, onCancel }) {
         <View style={{ flex: 1 }}>
           <Text style={styles.sym}>{order.symbol}</Text>
           <Text style={[styles.side, { color: side === 'buy' ? vx.up : vx.down }]}>
-            {(order.order_type || 'limit').toUpperCase()} {side.toUpperCase()} {order.volume ?? order.lots ?? '—'} @ {Number(order.price ?? 0).toFixed(5)}
+            {(order.order_type || 'limit').toUpperCase()} {side.toUpperCase()} {order.volume ?? order.lots ?? '—'} @ {formatPriceAt(order.price, order.digits)}
           </Text>
         </View>
         <Pressable onPress={onCancel} hitSlop={8} style={styles.actionBtn}>

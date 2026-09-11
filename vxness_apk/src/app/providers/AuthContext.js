@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useMemo } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { API_URL } from '../../constants';
 import { registerAuthFailureHandler } from '../../services/api/authedFetch';
+import { SELECTED_ACCOUNT_KEY } from './AccountContext';
 import { toMessage } from '../../utils/errorMessage';
 import logger from '../../utils/logger';
 
@@ -268,6 +269,10 @@ export const AuthProvider = ({ children }) => {
       await SecureStore.deleteItemAsync('token');
       await SecureStore.deleteItemAsync('refreshToken');
       await SecureStore.deleteItemAsync('user');
+      // The account selection belongs to the session that made it. Leaving it
+      // means the next person to sign in on this device starts by trying to
+      // restore an account id that is not theirs.
+      await SecureStore.deleteItemAsync(SELECTED_ACCOUNT_KEY);
       setToken(null);
       setUser(null);
     } catch (error) {

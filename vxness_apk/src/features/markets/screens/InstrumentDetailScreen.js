@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { ScrollView, View, Text, StyleSheet, Pressable, TextInput, Keyboard, Platform, Modal, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, Pressable, TextInput, Keyboard, Platform, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +21,7 @@ import ApiService from '../../../services/api/ApiService';
 import webSocketService from '../../../services/websocket/WebSocketService';
 import NativeChart from '../charts/NativeChart';
 import { describeTradeError } from '../../../utils/tradeErrors';
+import { spreadPoints } from '../../../utils/format';
 import { getInstruments } from '../../../utils/instrumentsCache';
 import { getWatchlist, addToWatchlist, removeFromWatchlist } from '../watchlist/watchlistStorage';
 
@@ -50,7 +51,11 @@ export default function InstrumentDetailScreen() {
   // Remember the last instrument viewed → the Trade tab defaults to it.
   useEffect(() => { if (symbol) SecureStore.setItemAsync('lastSymbol', symbol).catch(() => {}); }, [symbol]);
   const [tf, setTf] = useState('1m');
-  const [chartFull, setChartFull] = useState(false);   // fullscreen chart toggle
+  // Immersive = hide the header and the trade bar so the chart is the whole
+  // screen. The chart itself is ALWAYS full-bleed now (see styles.chartFill);
+  // this only controls the chrome laid over it, and toggling it never touches
+  // the WebView.
+  const [immersive, setImmersive] = useState(false);
   const [chartDragging, setChartDragging] = useState(false); // freeze page scroll during an on-chart SL/TP drag
   const [instrument, setInstrument] = useState(null);
   const [tick, setTick] = useState(null);
@@ -73,7 +78,6 @@ export default function InstrumentDetailScreen() {
   const [side, setSide] = useState('sell');
   const [lots, setLots] = useState(0.01);
   const [submitting, setSubmitting] = useState(false);
-  const [footerH, setFooterH] = useState(330);
   const [kbHeight, setKbHeight] = useState(0);
   // Advanced order sheet (limit / stop entry with TP/SL) — reachable from the
   // normal footer AND the fullscreen chart's bottom bar.
@@ -170,7 +174,12 @@ export default function InstrumentDetailScreen() {
   const ask = tick?.ask != null ? Number(tick.ask) : null;
   const change = tick?.change != null ? Number(tick.change) : null;
   const changePct = tick?.change_pct != null ? Number(tick.change_pct) : null;
-  const spread = bid != null && ask != null ? Math.round((ask - bid) * 100000) : null;
+  // Points at the instrument's own precision — see utils/format. The fixed
+  // 100000 here was the five-digit forex scale applied to gold, crypto and
+  // indices too, so their spreads read in the tens of thousands.
+  const spread = bid != null && ask != null
+    ? spreadPoints(ask - bid, { digits: tick?.digits, pointSize: tick?.point_size })
+    : null;
 
   const ohlc = useMemo(() => {
     if (!bars1D.length) return { open: null, high: null, low: null, close: null };
@@ -313,17 +322,17 @@ export default function InstrumentDetailScreen() {
     }
   }, [closePrompt, closing, refreshAccounts]);
 
-  // Confirm handler for the no-account prompt. Exits fullscreen first so the
-  // Accounts screen / account picker (both rendered at screen level) are
-  // actually visible, then routes to the right place.
+  // Confirm handler for the no-account prompt. Leaves immersive mode first so
+  // the header and trade bar are back when the user returns, then routes.
   const confirmAcctPrompt = useCallback(() => {
     const mode = acctPrompt;
     setAcctPrompt(null);
-    setChartFull(false);
+    setImmersive(false);
     if (mode === 'open') {
       nav.navigate('HomeTab', { screen: 'Accounts', params: { action: 'open' } });
     } else {
-      // Let the fullscreen Modal finish closing before opening the picker.
+      // The account picker is a sheet at screen level; open it on the next tick
+      // so it does not race the prompt's own dismissal animation.
       setTimeout(() => setAcctSheet(true), 250);
     }
   }, [acctPrompt, nav]);
@@ -344,11 +353,10 @@ export default function InstrumentDetailScreen() {
     : (activeAccount?.balance != null ? Number(activeAccount.balance) : null);
   const marginTight = marginReq != null && freeMargin != null && marginReq > freeMargin;
 
-  // Chart fills everything between the header and the trade footer (the old
-  // fixed 380px left dead space once the price hero + tab row were removed).
-  // ~96px covers the header + chart margins; never below the old 380px minimum.
+  // The chart no longer needs a computed height — styles.chartFill gives it
+  // flex:1 so it takes whatever is left under the header, and the trade footer
+  // overlays it. winH is still needed for the advanced-order sheet's max height.
   const { height: winH } = useWindowDimensions();
-  const chartH = Math.max(380, winH - insets.top - footerH - 96);
 
   const interval = (TIMEFRAMES.find((x) => x.key === tf) || TIMEFRAMES[1]).tv;
 
@@ -359,116 +367,68 @@ export default function InstrumentDetailScreen() {
           from the Markets list, and the chart legend shows it anyway. The
           Chart/Orders/Info tab row is gone too: positions live in the Trade
           tab, so this screen is purely chart + one-tap trading. */}
-      <Header
-        pinned={pinned}
-        onBack={() => nav.goBack()}
-        onPin={togglePin}
-        onFullscreen={() => setChartFull(true)}
-      />
+      {!immersive ? (
+        <Header
+          pinned={pinned}
+          onBack={() => nav.goBack()}
+          onPin={togglePin}
+          onFullscreen={() => setImmersive(true)}
+        />
+      ) : null}
 
-      {/* Chart rendered DIRECTLY (not inside a ScrollView) — a WebView inside a
-          ScrollView renders blank on many Android devices, which is why the
-          normal chart didn't show while the fullscreen (Modal, no ScrollView)
-          one did. No scroll content here anyway; the chart fills the area. */}
-      <View style={{ flex: 1 }}>
-        <View style={[styles.chartWrap, { height: chartH }]}>
-              {/* Direct in-APK chart (bundled library). Reliable-loading; the
-                  persistent-host optimization was reverted after it caused a
-                  stuck-spinner regression. Loads per open (a bit slower) but
-                  works — fast-load to be revisited carefully. */}
-              {/* No key={symbol} → the chart does NOT remount on a symbol change;
-                  it switches LIVE via window.VX.setSymbol() (no 26 MB reload =
-                  FundedZone-fast). The boot symbol is correct via the URL param,
-                  so the earlier 'frozen on first symbol' bug can't recur. Stays
-                  mounted across tabs; unmounts only while fullscreen is open so
-                  we never run two heavy WebViews at once. */}
-              {!chartFull ? (
-                <NativeChart symbol={symbol} interval={interval} theme={vx.isDark ? 'dark' : 'light'} accountId={activeAccount?.id || activeAccount?._id || activeAccount?.account_id} onDrag={setChartDragging} refreshTick={posRefresh} onClosePosition={(id) => setClosePrompt(id)} />
-              ) : null}
-            </View>
-
-            <Modal
-              visible={chartFull}
-              animationType="slide"
-              onRequestClose={() => setChartFull(false)}
-              supportedOrientations={['portrait', 'landscape']}
-            >
-              <View style={styles.fsContainer}>
-                {/* Safe-area padding so the chart's top toolbar isn't hidden
-                    behind the device status bar / notch. */}
-                <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom }}>
-                  <NativeChart symbol={symbol} interval={interval} theme={vx.isDark ? 'dark' : 'light'} accountId={activeAccount?.id || activeAccount?._id || activeAccount?.account_id} onDrag={setChartDragging} refreshTick={posRefresh} onClosePosition={(id) => setClosePrompt(id)} />
-                  {/* Trade bar in fullscreen too: Lots + advanced (limit/stop)
-                      opener + the same one-tap Sell/Buy split. Lift it above
-                      the keyboard when typing Lots (edge-to-edge breaks the
-                      OS auto-resize, so we push it up by the keyboard height —
-                      same trick as the normal footer, but via marginBottom
-                      since this bar is flex-positioned, not absolute). */}
-                  <View style={[styles.fsFooter, kbHeight > 0 && { marginBottom: kbHeight }]}>
-                    <View style={styles.fsLotsRow}>
-                      <Text style={styles.lotsLabel}>Lots</Text>
-                      <LotsField value={lots} onChange={setLots} />
-                      <View style={{ flex: 1 }} />
-                      <Pressable onPress={() => setAdvOpen(true)} style={styles.advBtn} accessibilityRole="button" accessibilityLabel="Advanced order — limit, stop, TP/SL">
-                        <Ionicons name="options-outline" size={14} color={vx.textSecondary} />
-                        <Text style={styles.advBtnTxt}>Limit / Stop</Text>
-                      </Pressable>
-                    </View>
-                    <View style={{ opacity: submitting ? 0.6 : 1 }} pointerEvents={submitting ? 'none' : 'auto'}>
-                      <BuySellSplit
-                        bid={bid}
-                        ask={ask}
-                        spreadPoints={spread}
-                        side={side}
-                        onChange={(s) => { void placeOrder(s); }}
-                      />
-                    </View>
-                  </View>
-                </View>
-                <Pressable
-                  onPress={() => setChartFull(false)}
-                  style={[styles.fsClose, { top: insets.top + 10 }]}
-                  hitSlop={12}
-                  accessibilityLabel="Exit fullscreen"
-                >
-                  <Ionicons name="close" size={22} color="#fff" />
-                </Pressable>
-                {/* The advanced-order sheet must be nested INSIDE this modal
-                    while the fullscreen chart is open, or it would open
-                    underneath it. */}
-                <AdvancedOrderSheet
-                  visible={advOpen && chartFull}
-                  onClose={() => setAdvOpen(false)}
-                  account={activeAccount}
-                  symbol={symbol}
-                  tick={tick}
-                  maxH={Math.round(winH * 0.7)}
-                />
-                {/* No-account prompt — nested here so it shows OVER the
-                    fullscreen chart (Alert.alert / screen-level overlays would
-                    render underneath this Modal). */}
-                {chartFull ? (
-                  <>
-                    <AccountPrompt
-                      mode={acctPrompt}
-                      onCancel={() => setAcctPrompt(null)}
-                      onConfirm={confirmAcctPrompt}
-                    />
-                    <MessagePopup data={tradeError} onClose={() => setTradeError(null)} />
-                    <MessagePopup data={tradeOk} onClose={() => setTradeOk(null)} />
-                    <ClosePositionPrompt visible={!!closePrompt} busy={closing} onCancel={() => setClosePrompt(null)} onConfirm={confirmClosePosition} />
-                  </>
-                ) : null}
-              </View>
-            </Modal>
+      {/* ONE chart, filling everything under the header, with the trade bar
+          overlaid on top of it.
+          
+          This used to be two NativeChart instances: a boxed one here and a
+          second one inside a fullscreen Modal, with `{!chartFull ? …}`
+          swapping between them. Because a Modal renders in its own native view
+          hierarchy, React could not move the mounted WebView into it — it
+          unmounted one chart and mounted another. So every tap of the expand
+          icon threw away a warm chart and re-parsed the whole bundled charting
+          library, and exiting fullscreen did it a second time. Toggling was the
+          slowest thing on the screen.
+          
+          Now there is a single instance that never unmounts. `immersive` only
+          hides the header and the trade bar, so going full-bleed and back is a
+          style change and costs nothing.
+          
+          Still rendered DIRECTLY and never inside a ScrollView — a WebView in a
+          ScrollView draws blank on a lot of Android devices, which is the bug
+          that made the boxed chart invisible while the Modal one worked. */}
+      <View style={styles.chartFill}>
+        {/* No key={symbol}: the chart does NOT remount on a symbol change, it
+            switches live via window.VX.setSymbol(). The boot symbol is right
+            from the URL param. */}
+        <NativeChart
+          symbol={symbol}
+          interval={interval}
+          theme={vx.isDark ? 'dark' : 'light'}
+          accountId={activeAccount?.id || activeAccount?._id || activeAccount?.account_id}
+          onDrag={setChartDragging}
+          refreshTick={posRefresh}
+          onClosePosition={(id) => setClosePrompt(id)}
+        />
       </View>
 
+      {/* Collapse button — only while immersive, since that is the one state
+          with no header to get back from. */}
+      {immersive ? (
+        <Pressable
+          onPress={() => setImmersive(false)}
+          style={styles.fsClose}
+          hitSlop={12}
+          accessibilityLabel="Show trade bar"
+        >
+          <Ionicons name="contract-outline" size={20} color="#fff" />
+        </Pressable>
+      ) : null}
+
+      {!immersive ? (
       <View
         style={[styles.footer, {
           bottom: kbHeight,
           paddingBottom: kbHeight > 0 ? space.md : BOTTOM_NAV_PILL_HEIGHT + insets.bottom + space.sm,
         }]}
-        onLayout={(e) => setFooterH(e.nativeEvent.layout.height)}
       >
         <Pressable onPress={() => setAcctSheet(true)} style={styles.acctRow} accessibilityRole="button" accessibilityLabel="Switch account">
           <Ionicons name="wallet-outline" size={14} color={vx.textSecondary} />
@@ -515,6 +475,7 @@ export default function InstrumentDetailScreen() {
           </Pressable>
         </View>
       </View>
+      ) : null}
 
       <AccountSwitcher
         visible={acctSheet}
@@ -524,24 +485,22 @@ export default function InstrumentDetailScreen() {
         onSelect={selectAccount}
       />
 
-      {/* No-account prompt for the normal (non-fullscreen) chart. The
-          fullscreen instance is nested inside the fullscreen Modal above. */}
-      {!chartFull ? (
-        <>
-          <AccountPrompt
-            mode={acctPrompt}
-            onCancel={() => setAcctPrompt(null)}
-            onConfirm={confirmAcctPrompt}
-          />
-          <MessagePopup data={tradeError} onClose={() => setTradeError(null)} />
-          <MessagePopup data={tradeOk} onClose={() => setTradeOk(null)} />
-          <ClosePositionPrompt visible={!!closePrompt} busy={closing} onCancel={() => setClosePrompt(null)} onConfirm={confirmClosePosition} />
-        </>
-      ) : null}
+      {/* One set of overlays. They used to be duplicated — once here and once
+          nested inside the fullscreen Modal — because an Alert or a screen-level
+          overlay renders UNDERNEATH a Modal on Android. With the Modal gone
+          there is nothing to render underneath. */}
+      <AccountPrompt
+        mode={acctPrompt}
+        onCancel={() => setAcctPrompt(null)}
+        onConfirm={confirmAcctPrompt}
+      />
+      <MessagePopup data={tradeError} onClose={() => setTradeError(null)} />
+      <MessagePopup data={tradeOk} onClose={() => setTradeOk(null)} />
+      <ClosePositionPrompt visible={!!closePrompt} busy={closing} onCancel={() => setClosePrompt(null)} onConfirm={confirmClosePosition} />
 
       {/* Advanced order sheet (normal, non-fullscreen instance). */}
       <AdvancedOrderSheet
-        visible={advOpen && !chartFull}
+        visible={advOpen}
         onClose={() => setAdvOpen(false)}
         account={activeAccount}
         symbol={symbol}
@@ -825,7 +784,10 @@ const styles = StyleSheet.create({
   tfTxt: { color: vx.textMuted, fontFamily, fontSize: sizes.body },
   tfMore: { marginLeft: 'auto' },
 
-  chartWrap: { height: 380, marginHorizontal: space.sm, backgroundColor: vx.bg, borderRadius: radius.md, overflow: 'hidden' },
+  // Fills every pixel between the header and the bottom of the screen. The
+  // trade footer is absolutely positioned and overlays the bottom of it, so
+  // the chart is full-bleed rather than a 380px box with dead space beneath.
+  chartFill: { flex: 1, backgroundColor: vx.bg },
   chartLoader: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: vx.bg },
   chart: { flex: 1, backgroundColor: vx.bg },
   fsBtn: {
@@ -836,10 +798,7 @@ const styles = StyleSheet.create({
     backgroundColor: vx.bgElevated, borderWidth: 1, borderColor: vx.border,
     alignItems: 'center', justifyContent: 'center',
   },
-  fsContainer: { flex: 1, backgroundColor: vx.bg },
   // Fullscreen-chart bottom trade bar.
-  fsFooter: { paddingHorizontal: space.lg, paddingTop: space.sm, gap: space.sm, backgroundColor: vx.bg },
-  fsLotsRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   // "Limit / Stop" advanced-order opener chip.
   advBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
@@ -847,8 +806,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.md, paddingVertical: 5, backgroundColor: vx.bgRaised,
   },
   advBtnTxt: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, fontWeight: weights.semibold },
+  // Screen applies the top safe-area inset already (edges={['top']}), so this
+  // only needs a small offset inside it.
   fsClose: {
-    position: 'absolute', right: 14,
+    position: 'absolute', right: 14, top: 10,
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center',
   },

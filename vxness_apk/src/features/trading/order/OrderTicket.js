@@ -12,6 +12,7 @@ import {
 } from '../../../components/vx';
 import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 import { handleTradeError } from '../../../utils/tradeErrors';
+import { spreadPoints } from '../../../utils/format';
 import ApiService from '../../../services/api/ApiService';
 import useReadOnly from '../../../hooks/useReadOnly';
 
@@ -41,7 +42,12 @@ export default function OrderTicket({ accountId, account, accountSummary, symbol
 
   const bid = tick?.bid != null ? Number(tick.bid) : null;
   const ask = tick?.ask != null ? Number(tick.ask) : null;
-  const spread = (bid != null && ask != null) ? Math.round((ask - bid) * 100000) : null;
+  // Points at the instrument's own precision. The fixed 100000 that used to be
+  // here is the five-digit forex scale: gold's 0.75 spread showed as 75000
+  // points instead of 75, and BTC's 0.01 as 1000 instead of 1.
+  const spread = (bid != null && ask != null)
+    ? spreadPoints(ask - bid, { digits: tick?.digits, pointSize: tick?.point_size })
+    : null;
   const change = tick?.change_points != null ? Number(tick.change_points) : null;
 
   // Account summary fields arrive as strings — coerce before maths/formatting.
@@ -49,7 +55,15 @@ export default function OrderTicket({ accountId, account, accountSummary, symbol
   const leverage = Number(account?.leverage || account?.leverage_ratio || 500);
   const equity = num(accountSummary?.equity ?? accountSummary?.balance);
   const px = ask ?? bid;
-  const margin = (px != null && leverage) ? (Number(volume) * px) / leverage : null;
+  // Margin needs the CONTRACT SIZE. Without it this was (lots * price) /
+  // leverage, so one lot of EURUSD at 1.16 previewed as $0.0023 of margin
+  // instead of ~$232 — the number a trader sizes their position against. The
+  // quote carries contract_size; 100000 is the forex default for an older
+  // backend that does not send it.
+  const contractSize = Number(tick?.contract_size) > 0 ? Number(tick.contract_size) : 100000;
+  const margin = (px != null && leverage)
+    ? (Number(volume) * contractSize * px) / leverage
+    : null;
   const freeMargin = num(accountSummary?.free_margin) ?? equity;
   const marginLevel = num(accountSummary?.margin_level) ?? ((margin && equity) ? (equity / margin) * 100 : null);
 
