@@ -105,7 +105,13 @@
     var suppressEvents = false;
     var lastFitSig = '';  // auto-fit the price scale once per SL/TP change
 
-    function netPnl(p) { return (+p.profit || 0) - (+p.commission || 0) + (+p.swap || 0); }
+    // The server's `profit` is ALREADY the net figure: /api/v1/positions runs it
+    // through calculateFloatingPnl, which nets swap, and the open commission is
+    // not in it because the balance paid that at fill time. This used to apply
+    // "- commission + swap" on top, charging the commission twice and cancelling
+    // the swap, so the number on the chart disagreed with the one on the
+    // positions list for the same trade.
+    function netPnl(p) { return (+p.profit || 0); }
     function fmtP(v, d) { return Number(v).toFixed(d); }
 
     // Draw / update / remove the entry + SL + TP lines for positions on the
@@ -265,10 +271,24 @@
         return g.top - (py / g.h) * (g.top - g.bottom);
       }
       function digitsFor() { var s = (CFG.symbol || '').toUpperCase(); return (INSTR[s] && INSTR[s].digits) || CFG.digits || 5; }
+      // What the position would realise if it closed at `price`.
+      //
+      // The last factor is the one that was missing. `Δprice * lots * contract`
+      // is denominated in the pair's QUOTE currency, not in dollars — on USDJPY
+      // that is yen, so the money preview shown while dragging a stop read about
+      // 150 times too large. The server sends the conversion per position
+      // (quote_to_usd) because this page cannot resolve a cross like EURGBP on
+      // its own; 1 is the right fallback, since every USD-quoted symbol converts
+      // by 1 and that is most of them.
       function pnlAt(p, price) {
         var s = String(p.symbol).toUpperCase();
         var cs = (INSTR[s] && INSTR[s].contract_size) || 100000;
-        return p.side === 'buy' ? (price - +p.open_price) * +p.lots * cs : (+p.open_price - price) * +p.lots * cs;
+        var q = +p.quote_to_usd;
+        if (!isFinite(q) || q <= 0) q = 1;
+        var raw = p.side === 'buy'
+          ? (price - +p.open_price) * +p.lots * cs
+          : (+p.open_price - price) * +p.lots * cs;
+        return raw * q;
       }
       try { var chm = chart.crossHairMoved && chart.crossHairMoved(); if (chm && chm.subscribe) chm.subscribe(null, function (params) {
         var price = params && params.price; if (price == null) return;
@@ -298,7 +318,10 @@
             var cy = ev.clientY - container.getBoundingClientRect().top;
             var price = priceForY(cy); line.style.top = cy + 'px'; lbl.style.top = cy + 'px';
             var t = (kind === 'sl' ? 'SL ' : 'TP ') + (price ? price.toFixed(digitsFor()) : '-');
-            if (price) { var rr = pnlAt(p, price) - (+p.commission || 0) + (+p.swap || 0); t += '  ' + (rr >= 0 ? '+' : '-') + '$' + Math.abs(rr).toFixed(2); }
+            // pnlAt is already the USD figure for closing at this level; the
+            // open commission is out of the balance and swap is not charged
+            // again here, so no further adjustment belongs on it.
+            if (price) { var rr = pnlAt(p, price); t += '  ' + (rr >= 0 ? '+' : '-') + '$' + Math.abs(rr).toFixed(2); }
             lbl.textContent = t;
           };
           function end(ev, cancelled) {

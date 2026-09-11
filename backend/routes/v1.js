@@ -28,7 +28,7 @@ import tradeEngine from '../services/tradeEngine.js'
 import { contractSize as symbolContractSize, quoteToUsd, notionalUsd, pipSize } from '../utils/symbolMeta.js'
 import { resolveTradeSegment } from '../utils/tradeSegment.js'
 import { jwtAuth, ownedAccount, signAccessToken, fail } from '../utils/terminalAuth.js'
-import { validateBrackets, validatePendingBrackets } from '../utils/bracketGuard.js'
+import { validateBrackets, validatePendingBrackets, bracketError, closingPrice } from '../utils/bracketGuard.js'
 import { isMarketOpen, marketClosedReason } from '../utils/marketHours.js'
 import Challenge from '../models/Challenge.js'
 import ChallengeAccount from '../models/ChallengeAccount.js'
@@ -377,35 +377,34 @@ router.put('/positions/:id', jwtAuth, async (req, res) => {
     if (!has('stop_loss') && !has('take_profit')) return fail(res, 400, 'Nothing to update')
 
     const q = liveQuote(trade.symbol)
+    const ref = closingPrice(trade.side, q)
 
     // Reject a bracket on the wrong side of the market — the server would
     // otherwise trigger it on the very next tick, which reads as an instant
     // unexplained close.
+    //
+    // Delegates to the shared guard rather than re-implementing the side test,
+    // which is what this used to do. The hand-rolled version checked the side
+    // and nothing else, so a level belonging to a different instrument (a gold
+    // price dragged onto a cable trade) was stored happily — and the sweep then
+    // refuses to act on it, leaving a position with a stop that cannot protect
+    // it. One rule, applied wherever a bracket is written.
     const check = (level, kind) => {
       if (level == null) return null
-      if (!(level > 0)) return `${kind} must be greater than 0`
-      if (!q) return null
-      const ref = trade.side === 'BUY' ? q.bid : q.ask
-      if (trade.side === 'BUY') {
-        if (kind === 'Stop loss' && level >= ref) return 'Stop loss must be below the current price for a BUY'
-        if (kind === 'Take profit' && level <= ref) return 'Take profit must be above the current price for a BUY'
-      } else {
-        if (kind === 'Stop loss' && level <= ref) return 'Stop loss must be above the current price for a SELL'
-        if (kind === 'Take profit' && level >= ref) return 'Take profit must be below the current price for a SELL'
-      }
-      return null
+      if (!(level > 0)) return `${kind === 'sl' ? 'Stop loss' : 'Take profit'} must be greater than 0`
+      return bracketError(trade.side, kind, level, ref)
     }
 
     if (has('stop_loss')) {
       const v = body.stop_loss === null ? null : Number(body.stop_loss)
-      const err = check(v, 'Stop loss')
+      const err = check(v, 'sl')
       if (err) return fail(res, 400, err)
       trade.stopLoss = v
       trade.sl = v
     }
     if (has('take_profit')) {
       const v = body.take_profit === null ? null : Number(body.take_profit)
-      const err = check(v, 'Take profit')
+      const err = check(v, 'tp')
       if (err) return fail(res, 400, err)
       trade.takeProfit = v
       trade.tp = v

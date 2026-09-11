@@ -6,6 +6,7 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 import { API_URL, API_BASE_URL } from '../../../constants';
 import { vx } from '../../../theme/vxTheme';
+import { showToast } from '../../../components/vx';
 import { getInstruments } from '../../../utils/instrumentsCache';
 import logger from '../../../utils/logger';
 
@@ -145,12 +146,31 @@ export default function NativeChart({ symbol = 'EURUSD', interval = '60', theme,
   const saveBracket = useCallback(async (positionId, kind, price) => {
     try {
       const body = kind === 'sl' ? { stop_loss: Number(price) } : { take_profit: Number(price) };
-      await fetch(`${API_URL}/positions/${encodeURIComponent(positionId)}`, {
+      const res = await fetch(`${API_URL}/positions/${encodeURIComponent(positionId)}`, {
         method: 'PUT',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-    } catch (e) { /* ignore — re-fetch reflects server state */ }
+
+      // Say WHY a drag did not stick.
+      //
+      // The response was never looked at. The server refuses a level on the
+      // wrong side of the market — it would fire on the next tick and close the
+      // position for no visible reason — and it answers with a plain sentence
+      // saying so. Dropping that on the floor meant the line simply sprang back
+      // to where it was on the next poll, which reads as the chart ignoring the
+      // drag rather than the platform rejecting the level.
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        showToast({
+          kind: 'warn',
+          message: data?.detail || data?.message || `Could not set ${kind === 'sl' ? 'stop loss' : 'take profit'}`,
+        });
+      }
+    } catch (e) {
+      showToast({ kind: 'error', message: 'Could not reach the server to save that level' });
+    }
+    // Either way, re-pull so the line sits where the server actually has it.
     fetchPositions();
   }, [authHeaders, fetchPositions]);
 

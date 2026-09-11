@@ -231,14 +231,20 @@ export default function InstrumentDetailScreen() {
   }, [bars1D, bid]);
 
   const togglePin = useCallback(async () => {
-    if (pinned) {
-      await removeFromWatchlist(symbol);
-      setPinned(false);
-      showToast({ kind: 'info', message: `${symbol} removed from watchlist` });
-    } else {
-      await addToWatchlist(symbol);
-      setPinned(true);
-      showToast({ kind: 'success', message: `${symbol} added to watchlist` });
+    // The star used to report success before knowing whether anything had been
+    // stored, so a device where the write failed still said "added".
+    try {
+      if (pinned) {
+        await removeFromWatchlist(symbol);
+        setPinned(false);
+        showToast({ kind: 'info', message: `${symbol} removed from watchlist` });
+      } else {
+        await addToWatchlist(symbol);
+        setPinned(true);
+        showToast({ kind: 'success', message: `${symbol} added to watchlist` });
+      }
+    } catch (e) {
+      showToast({ kind: 'error', message: 'Could not update your watchlist' });
     }
   }, [pinned, symbol]);
 

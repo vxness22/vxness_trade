@@ -3,7 +3,7 @@ import { View, Text, TextInput, FlatList, StyleSheet, Pressable } from 'react-na
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import { Screen, IconButton, SymbolIcon, CategoryTabs } from '../../../components/vx';
+import { Screen, IconButton, SymbolIcon, CategoryTabs, showToast } from '../../../components/vx';
 import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 import { getInstruments } from '../../../utils/instrumentsCache';
@@ -84,7 +84,14 @@ export default function WatchlistEditScreen() {
   }, []);
 
   const save = useCallback(async () => {
-    await setWatchlist(Array.from(pinned));
+    // setWatchlist reports whether it actually persisted. It used to swallow a
+    // failed write, so a symbol could look added, stay for the session, and be
+    // gone on the next launch with nothing ever saying so.
+    const saved = await setWatchlist(Array.from(pinned));
+    if (!saved) {
+      showToast({ kind: 'error', message: 'Could not save your watchlist on this device' });
+      return;
+    }
     nav.goBack();
   }, [pinned, nav]);
 
