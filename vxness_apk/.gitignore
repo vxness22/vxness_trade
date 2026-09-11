@@ -24,3 +24,6 @@ charting_library-master/
 
 # Local dev helper (QR for Expo Go)
 expo-qr.png
+
+# Local dev helper for USB-tethered testing (machine specific)
+connect-usb.ps1
