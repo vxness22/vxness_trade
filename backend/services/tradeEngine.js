@@ -202,17 +202,33 @@ class TradeEngine {
 
     let floatingPnl = 0
 
-
+    // Open trades this pass could not price at all. The margin level is only
+    // meaningful when the WHOLE book is priced, and the caller that liquidates
+    // an account reads it from here — see checkStopOut.
+    const unpriced = []
 
     for (const trade of openTrades) {
 
       usedMargin += trade.marginUsed
 
-      const prices = currentPrices[trade.symbol]
+      // Caller-supplied price first, then the engine's own feed.
+      //
+      // A symbol missing from `currentPrices` used to contribute NOTHING to
+      // floating P&L while its margin still counted, so a partly-priced book
+      // read as a smaller equity than the account really had. That matters far
+      // more than it sounds: /api/trade/check-stopout takes its price map from
+      // the caller, so a browser with a stale or incomplete instrument list
+      // could push an account's margin level under the stop-out threshold and
+      // have every position closed on data the server never agreed with.
+      const prices = currentPrices?.[trade.symbol] || infowayService.getPrice(trade.symbol)
 
-      if (prices) {
+      if (prices && prices.bid > 0 && prices.ask > 0) {
 
         floatingPnl += this.calculateFloatingPnl(trade, prices.bid, prices.ask)
+
+      } else {
+
+        unpriced.push(trade.symbol)
 
       }
 
@@ -240,7 +256,11 @@ class TradeEngine {
 
       floatingPnl,
 
-      marginLevel: usedMargin > 0 ? (equity / usedMargin) * 100 : 0
+      marginLevel: usedMargin > 0 ? (equity / usedMargin) * 100 : 0,
+
+      // Empty when every open position was priced. Anything in here means the
+      // figures above are incomplete and must not be acted on.
+      unpriced
 
     }
 
@@ -1016,6 +1036,23 @@ class TradeEngine {
     // Equity at or below zero stays: there is no margin left to run on, and the
 
     // account is past the point any level would protect.
+
+    // Never liquidate a book this pass could not fully price.
+    //
+    // A stop-out closes EVERY position on the account, so it is the one
+    // decision that must not run on partial data. With a symbol unpriced its
+    // margin still counts toward the denominator while its profit is missing
+    // from equity, which drags the margin level down and can trip the threshold
+    // on an account that was never actually in trouble. Skipping the pass costs
+    // nothing — the sweep runs again in five seconds, by which time the quote is
+    // almost always back.
+    if (summary.unpriced?.length) {
+      console.warn(
+        `[STOP-OUT] Skipping account ${tradingAccountId}: no price for ` +
+        `${summary.unpriced.join(', ')} — refusing to liquidate on an incomplete book`
+      )
+      return null
+    }
 
     const shouldStopOut = 
 

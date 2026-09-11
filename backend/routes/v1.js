@@ -28,7 +28,7 @@ import tradeEngine from '../services/tradeEngine.js'
 import { contractSize as symbolContractSize, quoteToUsd, notionalUsd, pipSize } from '../utils/symbolMeta.js'
 import { resolveTradeSegment } from '../utils/tradeSegment.js'
 import { jwtAuth, ownedAccount, signAccessToken, fail } from '../utils/terminalAuth.js'
-import { validatePendingBrackets } from '../utils/bracketGuard.js'
+import { validateBrackets, validatePendingBrackets } from '../utils/bracketGuard.js'
 import { isMarketOpen, marketClosedReason } from '../utils/marketHours.js'
 import Challenge from '../models/Challenge.js'
 import ChallengeAccount from '../models/ChallengeAccount.js'
@@ -625,6 +625,22 @@ router.post('/orders', jwtAuth, async (req, res) => {
         return fail(res, 400, `No live price for ${symbol} right now`)
       }
 
+      const sl = Number.isFinite(Number(body.stop_loss)) ? Number(body.stop_loss) : null
+      const tp = Number.isFinite(Number(body.take_profit)) ? Number(body.take_profit) : null
+
+      // A bracket already on the wrong side of the market is true the instant it
+      // is stored, so the SL/TP sweep fires it on its very next pass and the
+      // position closes on its own with nothing on screen to explain why. From
+      // the trader's side it reads as trades vanishing by themselves.
+      //
+      // The website's /api/trade/open has guarded this for a while; this path —
+      // the one the mobile app places every market order through — did not, so
+      // the app was the one client that could still open a position that was
+      // already dead. The order ticket offers SL and TP fields with no
+      // side-check of their own, which made it easy to do by accident.
+      const bracketErr = validateBrackets(side.toUpperCase(), sl, tp, quote)
+      if (bracketErr) return fail(res, 400, bracketErr)
+
       const trade = await tradeEngine.openTrade(
         req.user._id,
         String(account._id),
@@ -635,8 +651,8 @@ router.post('/orders', jwtAuth, async (req, res) => {
         lotsFor(body),
         quote.bid,
         quote.ask,
-        Number.isFinite(Number(body.stop_loss)) ? Number(body.stop_loss) : null,
-        Number.isFinite(Number(body.take_profit)) ? Number(body.take_profit) : null,
+        sl,
+        tp,
         body.leverage || null,
         null,
       )

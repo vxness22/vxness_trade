@@ -541,9 +541,11 @@ const MobileTradingApp = () => {
 
         method: 'POST',
 
-        headers: { 'Content-Type': 'application/json' },
+        // The server prices these sweeps from its own feed now; sending a price
+        // map let a stale browser list close trades that were never hit.
+        headers: authHeaders(),
 
-        body: JSON.stringify({ prices })
+        body: JSON.stringify({})
 
       })
 
@@ -573,9 +575,11 @@ const MobileTradingApp = () => {
 
         method: 'POST',
 
-        headers: { 'Content-Type': 'application/json' },
+        // The server prices these sweeps from its own feed now; sending a price
+        // map let a stale browser list close trades that were never hit.
+        headers: authHeaders(),
 
-        body: JSON.stringify({ prices })
+        body: JSON.stringify({})
 
       })
 

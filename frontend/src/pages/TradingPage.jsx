@@ -1267,9 +1267,11 @@ const TradingPage = () => {
 
               method: 'POST',
 
-              headers: { 'Content-Type': 'application/json' },
+              // The server prices these sweeps from its own feed now; sending a
+              // price map let a stale browser list close trades that were never hit.
+              headers: authHeaders(),
 
-              body: JSON.stringify({ prices: allPrices })
+              body: JSON.stringify({})
 
             })
 
@@ -1299,9 +1301,11 @@ const TradingPage = () => {
 
               method: 'POST',
 
-              headers: { 'Content-Type': 'application/json' },
+              // The server prices these sweeps from its own feed now; sending a
+              // price map let a stale browser list close trades that were never hit.
+              headers: authHeaders(),
 
-              body: JSON.stringify({ prices: allPrices })
+              body: JSON.stringify({})
 
             })
 
@@ -1711,33 +1715,20 @@ const TradingPage = () => {
 
     try {
 
-      const pricesObj = {}
-
-      instruments.forEach(inst => {
-
-        if (inst.bid && inst.ask) {
-
-          pricesObj[inst.symbol] = { bid: inst.bid, ask: inst.ask }
-
-        }
-
-      })
-
-
-
+      // No price map is sent any more.
+      //
+      // This used to post the browser's own instrument list as the prices the
+      // stop-out decision would be made on, so a stale or half-loaded list here
+      // could liquidate the account's entire book. The server prices every
+      // position from its own feed now and refuses to act when any of them
+      // cannot be priced, so this call only asks it to run the check early.
       const res = await fetch(`${API_URL}/trade/check-stopout`, {
 
         method: 'POST',
 
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
 
-        body: JSON.stringify({
-
-          tradingAccountId: accountId,
-
-          prices: pricesObj
-
-        })
+        body: JSON.stringify({ tradingAccountId: accountId })
 
       })
 

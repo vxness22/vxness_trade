@@ -23,6 +23,26 @@ function getFreshPrice(symbol) {
   return price || null
 }
 
+// Every quote the server currently holds, as the { symbol: {bid, ask} } map the
+// engines take.
+//
+// The sweep routes below used to take this map from the REQUEST BODY, and each
+// of them can close or fill a position. That let a caller decide the prices a
+// stop loss, a take profit or a pending order was judged against: a stale or
+// half-loaded list in a browser was enough to close trades that were never
+// actually hit — which is what "trades disappear by themselves" describes — and
+// a crafted one could fill a resting order at a price that never traded. The
+// market is not something a client gets a say in, so the body is ignored and
+// this is used instead.
+function serverPriceMap() {
+  const all = infowayService.getAllPrices() || {}
+  const map = {}
+  for (const [symbol, p] of Object.entries(all)) {
+    if (p && p.bid > 0 && p.ask > 0) map[symbol] = { bid: p.bid, ask: p.ask }
+  }
+  return map
+}
+
 const router = express.Router()
 
 async function assertKycApprovedForUserId(userId, res) {
@@ -917,22 +937,35 @@ router.get('/summary/:tradingAccountId', async (req, res) => {
 })
 
 // POST /api/trade/check-stopout - Check and execute stop out if needed
-router.post('/check-stopout', async (req, res) => {
+// POST /api/trade/check-stopout
+//
+// Two things this route used to get wrong, and together they could empty an
+// account's book on data the server never agreed with.
+//
+// It had NO authentication and took `tradingAccountId` straight from the body,
+// so anyone who knew an account id could aim it at that account. And it took
+// the PRICE MAP from the body too, handing a caller direct control over the
+// margin level that decides a liquidation — a browser with a stale or partial
+// instrument list was enough to trip it by accident, which is what "trades
+// disappear by themselves" describes.
+//
+// It is owner-only now, and the supplied prices are ignored: checkStopOut
+// prices the book from the server's own feed (see getAccountSummary) and
+// refuses to act at all when any position cannot be priced. The same sweep
+// already runs server-side every five seconds, so nothing is lost by declining
+// to take the client's word for the market.
+router.post('/check-stopout', webAuth, async (req, res) => {
   try {
-    const { tradingAccountId, prices } = req.body
+    const { tradingAccountId } = req.body
 
     if (!tradingAccountId) {
       return res.status(400).json({ success: false, message: 'Trading account ID required' })
     }
 
-    let currentPrices = {}
-    if (prices) {
-      try {
-        currentPrices = typeof prices === 'string' ? JSON.parse(prices) : prices
-      } catch (e) {
-        // Ignore parse errors
-      }
-    }
+    if (!(await ownedAccount(req, tradingAccountId))) return denyAccount(res)
+
+    // Deliberately empty — the engine prices every position from its own feed.
+    const currentPrices = {}
 
     // Check if this is a challenge account
     const challengeAccount = await ChallengeAccount.findById(tradingAccountId)
@@ -1149,38 +1182,13 @@ router.get('/debug-open', async (req, res) => {
 })
 
 // POST /api/trade/check-sltp - Check and trigger SL/TP for all trades
-router.post('/check-sltp', async (req, res) => {
+router.post('/check-sltp', webAuth, async (req, res) => {
   try {
-    const { prices } = req.body
-    if (!prices || typeof prices !== 'object') {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Prices object is required' 
-      })
-    }
-
-    // Find all open trades with SL/TP to get their symbols
-    const tradesWithSlTp = await Trade.find({
-      status: 'OPEN',
-      $or: [
-        { sl: { $ne: null } },
-        { stopLoss: { $ne: null } },
-        { tp: { $ne: null } },
-        { takeProfit: { $ne: null } }
-      ]
-    }).select('symbol')
-    
-    // Get unique symbols that need fresh prices
-    const symbolsNeedingFreshPrices = [...new Set(tradesWithSlTp.map(t => t.symbol))]
-    
-    // Fetch fresh prices for symbols with SL/TP trades
-    const freshPrices = { ...prices }
-    for (const symbol of symbolsNeedingFreshPrices) {
-      const freshPrice = getFreshPrice(symbol)
-      if (freshPrice) {
-        freshPrices[symbol] = freshPrice
-      }
-    }
+    // Server feed only. This used to seed its map with req.body.prices and
+    // overwrite just the symbols it could refresh, so a symbol the feed had no
+    // quote for kept whatever price the caller sent — and a bracket could be
+    // triggered against it.
+    const freshPrices = serverPriceMap()
 
     // Check SL/TP for all open challenge trades
     const closedChallengeTrades = await propTradingEngine.checkSlTpForAllTrades(freshPrices)
@@ -1210,19 +1218,11 @@ router.post('/check-sltp', async (req, res) => {
 })
 
 // POST /api/trade/check-pending - Check and execute pending orders when price is reached
-router.post('/check-pending', async (req, res) => {
+router.post('/check-pending', webAuth, async (req, res) => {
   try {
-    const { prices } = req.body
-
-    if (!prices || typeof prices !== 'object') {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Prices object is required' 
-      })
-    }
-
-    // Check pending orders for execution
-    const executedTrades = await tradeEngine.checkPendingOrders(prices)
+    // Server feed only. This handed req.body.prices straight to the executor,
+    // so a caller could name the price a resting order was filled at.
+    const executedTrades = await tradeEngine.checkPendingOrders(serverPriceMap())
 
     res.json({
       success: true,
