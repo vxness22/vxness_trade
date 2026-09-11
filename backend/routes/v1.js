@@ -866,20 +866,51 @@ router.get('/portfolio/trades', jwtAuth, async (req, res) => {
   }
 })
 
-// GET /api/v1/wallet/transactions?account_id= — the account's money movements.
+// GET /api/v1/wallet/transactions?account_id= — money movements.
+//
+// account_id is OPTIONAL. Without it this answers with the user's whole ledger
+// across every account they hold, which is what the app's Transaction History
+// screen needs: it shows the full list and narrows it on the client with its
+// own account, type and date chips.
+//
+// It used to be required, and the app has never sent it — so every call came
+// back 404, the screen's catch quietly set an empty list, and all three filters
+// looked broken because there was nothing loaded to filter. Each row now also
+// carries the account it belongs to, without which the account chips could
+// never match anything either.
 router.get('/wallet/transactions', jwtAuth, async (req, res) => {
   try {
-    const account = await ownedAccount(req.user._id, req.query.account_id)
-    if (!account) return fail(res, 404, 'Trading account not found for this user')
+    const query = { userId: req.user._id }
 
-    const txns = await Transaction.find({
-      userId: req.user._id,
-      $or: [
+    if (req.query.account_id) {
+      const account = await ownedAccount(req.user._id, req.query.account_id)
+      if (!account) return fail(res, 404, 'Trading account not found for this user')
+      query.$or = [
         { tradingAccountId: account._id },
         { toTradingAccountId: account._id },
         { fromTradingAccountId: account._id },
-      ],
-    }).sort({ createdAt: -1 }).limit(200)
+      ]
+    }
+
+    const perPage = Math.min(1000, Math.max(1, parseInt(req.query.per_page, 10) || 200))
+    const txns = await Transaction.find(query).sort({ createdAt: -1 }).limit(perPage)
+
+    // A debit is a debit whichever account is being looked at, so the sign comes
+    // from the transaction's own type. The one case that needs an account to
+    // decide is an internal transfer, which is a credit to one side and a debit
+    // to the other — handled first, when a specific account was asked for.
+    const scopedId = req.query.account_id ? String(req.query.account_id) : null
+    const DEBIT_TYPES = new Set([
+      'Withdrawal', 'Payout', 'Credit_Out',
+      'Transfer_From_Account', 'Account_Transfer_Out', 'Transfer_To_Account',
+    ])
+    const signed = (t) => {
+      const mag = Math.abs(t.amount)
+      if (scopedId && String(t.fromTradingAccountId) === scopedId) return -mag
+      if (scopedId && String(t.toTradingAccountId) === scopedId) return mag
+      // 'Transfer_To_Account' leaves the main wallet, so unscoped it is a debit.
+      return DEBIT_TYPES.has(t.type) ? -mag : mag
+    }
 
     res.json({
       items: txns.map(t => ({
@@ -888,13 +919,12 @@ router.get('/wallet/transactions', jwtAuth, async (req, res) => {
         method: t.paymentMethod || 'Internal',
         description: t.description || '',
         currency: 'USD',
-        // An outbound transfer is a debit on this account; the model stores
-        // every amount as a positive magnitude, so the sign is derived here.
-        amount: String(t.fromTradingAccountId) === String(account._id) ||
-                t.type === 'Transfer_From_Account' || t.type === 'Account_Transfer_Out' ||
-                t.type === 'Withdrawal' || t.type === 'Credit_Out'
-          ? -Math.abs(t.amount)
-          : Math.abs(t.amount),
+        amount: signed(t),
+        // Which trading account this row belongs to, so the client can scope by
+        // it. Absent for main-wallet movements, which belong to no account.
+        account_id: String(t.tradingAccountId || t.fromTradingAccountId || t.toTradingAccountId || ''),
+        account_name: t.tradingAccountName || '',
+        reference: t.transactionRef || '',
         created_at: t.createdAt?.toISOString?.() || '',
         status: t.status,
       })),

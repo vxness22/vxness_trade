@@ -48,26 +48,40 @@ export default function DepositScreen() {
   const [proof, setProof] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Whether the payment-method list failed to LOAD, as opposed to loading fine
+  // and being empty. They look identical on screen but mean opposite things:
+  // one is a connection this app could not make, the other is a destination the
+  // admin has not set up. Telling the user "contact support" when their phone
+  // simply could not reach the server sends them down the wrong path.
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const [pm, cur] = await Promise.all([
-        ApiService.getDepositMethods().catch(() => ({ items: [] })),
-        ApiService.getDepositCurrencies().catch(() => ({ items: [] })),
-      ]);
-      if (cancelled) return;
-      const ms = Array.isArray(pm?.items) ? pm.items : [];
+  const loadDepositOptions = useCallback(async () => {
+    setLoading(true);
+    setLoadFailed(false);
+    const [pm, cur] = await Promise.allSettled([
+      ApiService.getDepositMethods(),
+      ApiService.getDepositCurrencies(),
+    ]);
+
+    if (pm.status === 'fulfilled') {
+      const ms = Array.isArray(pm.value?.items) ? pm.value.items : [];
       setMethods(ms);
       // Pre-select when there is only one, so the common case is one tap fewer.
       // With several, the user picks — guessing would send money to the wrong
       // account with no visible sign it had been chosen for them.
-      setMethod(ms.length === 1 ? ms[0] : null);
-      setCurrencies(Array.isArray(cur?.items) ? cur.items : []);
-      setLoading(false);
-    })();
-    return () => { cancelled = true; };
+      setMethod((cur2) => cur2 || (ms.length === 1 ? ms[0] : null));
+    } else {
+      setMethods([]);
+      setLoadFailed(true);
+    }
+
+    if (cur.status === 'fulfilled') {
+      setCurrencies(Array.isArray(cur.value?.items) ? cur.value.items : []);
+    }
+    setLoading(false);
   }, []);
+
+  useEffect(() => { loadDepositOptions(); }, [loadDepositOptions]);
 
   const currencyOptions = useMemo(
     () => [USD, ...currencies.filter((c) => String(c.currency).toUpperCase() !== 'USD')],
@@ -98,7 +112,12 @@ export default function DepositScreen() {
   // Why the submit button cannot be pressed yet, or null when it can. Ordered
   // the way the form reads, so the message points at the next thing to do.
   const blockedReason = useMemo(() => {
-    if (loading) return null;
+    // Disabled while still loading — it used to return null here, which left
+    // the button pressable before the form knew what it was validating.
+    if (loading) return 'Loading payment methods…';
+    if (loadFailed) {
+      return 'Could not load payment methods — check your connection and pull to retry.';
+    }
     if (methods.length === 0) {
       return 'Deposits are not available right now — no payment method has been set up. Please contact support.';
     }
@@ -106,7 +125,7 @@ export default function DepositScreen() {
     if (!method) return 'Choose the payment method you paid to.';
     if (!proof) return 'Attach a screenshot of your payment.';
     return null;
-  }, [loading, methods.length, amount, method, proof]);
+  }, [loading, loadFailed, methods.length, amount, method, proof]);
 
   const copy = useCallback(async (value, what) => {
     await Clipboard.setStringAsync(String(value));
@@ -252,7 +271,12 @@ export default function DepositScreen() {
             {loading ? (
               <Text style={styles.empty}>Loading payment methods…</Text>
             ) : methods.length === 0 ? (
-              <Text style={styles.empty}>No payment methods available</Text>
+              <Pressable onPress={loadDepositOptions} style={styles.emptyBtn} accessibilityRole="button">
+                <Text style={styles.empty}>
+                  {loadFailed ? 'Could not load payment methods' : 'No payment methods available'}
+                </Text>
+                {loadFailed ? <Text style={styles.emptyRetry}>Tap to retry</Text> : null}
+              </Pressable>
             ) : (
               <View style={styles.grid}>
                 {methods.map((m) => {
@@ -394,6 +418,8 @@ const styles = StyleSheet.create({
   label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
   hint: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, lineHeight: 15, marginTop: space.xs },
   empty: { color: vx.textMuted, fontFamily, fontSize: sizes.label, textAlign: 'center', paddingVertical: space.lg },
+  emptyBtn: { alignItems: 'center' },
+  emptyRetry: { color: vx.accent, fontFamily, fontSize: sizes.label, fontWeight: weights.bold, marginTop: -space.md, paddingBottom: space.md },
   blockedBox: {
     flexDirection: 'row', alignItems: 'flex-start', gap: space.sm,
     marginTop: space.lg, padding: space.md,

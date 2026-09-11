@@ -17,8 +17,24 @@ const FILTER_OPTIONS = [
   { value: 'deposit',     label: 'Deposits' },
   { value: 'withdraw',    label: 'Withdrawals' },
   { value: 'transfer',    label: 'Transfers' },
-  { value: 'trading',     label: 'Trading' },
 ];
+
+// Which ledger types each chip covers.
+//
+// Matching was `type.toLowerCase().includes(filter)`, which is fragile and got
+// two things wrong. 'Payout' does not contain 'withdraw', so payouts were
+// missing from Withdrawals even though the rest of the API groups them there.
+// And a 'trading' chip tested for types 'profit' and 'loss' that the ledger has
+// no enum values for — closing a trade adjusts the account balance directly and
+// writes no Transaction at all — so selecting it could only ever show an empty
+// list. Closed trades live in Trade → History; the chip is gone rather than
+// sitting there showing nothing.
+const FILTER_TYPES = {
+  deposit:  ['deposit', 'challenge_purchase', 'credit', 'demo_credit'],
+  withdraw: ['withdrawal', 'payout', 'credit_out'],
+  transfer: ['transfer_to_account', 'transfer_from_account',
+             'account_transfer_out', 'account_transfer_in'],
+};
 
 const TX_PAGE = 50;
 
@@ -108,9 +124,8 @@ export default function TransactionHistoryScreen() {
       }
       if (filter === 'all') return true;
       const t = String(tx.type || tx.kind || '').toLowerCase();
-      // Trade-close ledger rows are typed profit/loss by the backend.
-      if (filter === 'trading') return t === 'profit' || t === 'loss';
-      return t.includes(filter);
+      const allowed = FILTER_TYPES[filter];
+      return allowed ? allowed.includes(t) : t.includes(filter);
     });
   }, [allItems, filter, range, customRange, acctId]);
 
