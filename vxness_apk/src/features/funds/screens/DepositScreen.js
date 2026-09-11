@@ -10,7 +10,6 @@ import { Screen, Card, PillButton, IconButton, SegmentedTabs, showToast } from '
 import { vx, space, sizes, weights, fontFamily, radius } from '../../../theme/vxTheme';
 import { BOTTOM_NAV_PILL_HEIGHT } from '../../../components/vx/BottomNavPill';
 import ApiService from '../../../services/api/ApiService';
-import { filePart } from '../../../utils/format';
 import LocalBankingPanel from '../components/LocalBankingPanel';
 
 const QUICK_AMOUNTS = [100, 500, 1000, 5000];
@@ -153,24 +152,22 @@ export default function DepositScreen() {
     }
 
     setSubmitting(true);
-    const fd = new FormData();
-    fd.append('local_amount', String(amount));
-    fd.append('amount', String(amount));          // older builds of the API read this name
-    fd.append('currency', currency?.currency || 'USD');
-    fd.append('payment_method', method.type || 'Manual');
-    // Optional, exactly as on the website — plenty of rails give the payer no
-    // reference to quote, and the screenshot is the proof that matters.
-    fd.append('transaction_id', txId.trim());
-    // filePart decides the mime from the file's extension. Sending
-    // `proof.mimeType` straight through meant an iPhone screenshot — usually
-    // HEIC — was refused by the server with "Only images or PDF are accepted",
-    // which tells the user nothing they can act on.
-    const part = filePart(proof, 'proof');
-    if (!part) { showToast({ kind: 'warn', message: 'Could not read that image' }); setSubmitting(false); return; }
-    fd.append('file', part);
 
     try {
-      const res = await ApiService.submitManualDeposit(fd);
+      // One file plus plain fields, uploaded natively — see ApiService.uploadFile
+      // for why this does not go through FormData.
+      const res = await ApiService.uploadFile('/wallet/deposit/manual', {
+        file: proof,
+        fields: {
+          local_amount: amount,
+          amount,                                   // older builds read this name
+          currency: currency?.currency || 'USD',
+          payment_method: method.type || 'Manual',
+          // Optional, as on the website — plenty of rails give the payer no
+          // reference to quote, and the screenshot is the proof that matters.
+          transaction_id: txId.trim(),
+        },
+      });
       const credited = Number(res?.amount);
       showToast({
         kind: 'success',

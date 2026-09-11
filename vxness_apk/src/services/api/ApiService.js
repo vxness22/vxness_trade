@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { refreshAccessToken } from './authedFetch';
 import { toMessage } from '../../utils/errorMessage';
 import { filePart } from '../../utils/format';
+import * as FileSystem from 'expo-file-system/legacy';
 import logger from '../../utils/logger';
 
 class ApiService {
@@ -136,26 +137,62 @@ class ApiService {
 
   // Local banking — Stage 3: user paid via admin's link, uploads proof.
   async confirmLocalBankingPayment(depositId, { amount, transactionId, file }) {
-    const token = await SecureStore.getItemAsync('token');
-    const fd = new FormData();
-    fd.append('amount', String(amount));
-    fd.append('transaction_id', String(transactionId || '').trim());
-    // Same reason as the deposit screen: the asset's own mimeType can be HEIC
-    // or missing, and the server only accepts jpeg/png/gif/webp/pdf.
-    fd.append('file', filePart(file, 'proof'));
-    const res = await fetch(`${this.baseUrl}/wallet/deposit/local-banking/${encodeURIComponent(depositId)}/confirm-payment`, {
-      method: 'POST',
-      headers: {
-        ...(token && { 'Authorization': `Bearer ${token}` }),
-        'Accept': 'application/json',
+    return this.uploadFile(
+      `/wallet/deposit/local-banking/${encodeURIComponent(depositId)}/confirm-payment`,
+      {
+        file,
+        fields: { amount, transaction_id: String(transactionId || '').trim() },
       },
-      body: fd,
-    });
-    const data = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(toMessage(data, `Submit failed (${res.status})`));
-    return data;
+    );
   }
 
+
+  /**
+   * Multipart upload of one file plus some plain text fields.
+   *
+   * Uses Expo's native uploader rather than fetch + FormData. React Native
+   * assembles FormData parts in JS and hands them to the native networking
+   * module, which refuses anything it cannot resolve to a string or a uri with
+   * "Unsupported FormDataPart implementation" — an error the trader can do
+   * nothing about, and which says nothing about which part was at fault. That
+   * is what a deposit submit was failing with. uploadAsync builds the body
+   * natively from the file's own path, so none of that encoding happens.
+   *
+   * `fields` must be flat strings; anything else is coerced, since the native
+   * side only accepts a string map.
+   */
+  async uploadFile(endpoint, { file, fields = {}, fieldName = 'file' } = {}) {
+    const part = filePart(file, fieldName);
+    if (!part) throw new Error('Could not read that file');
+
+    const token = await SecureStore.getItemAsync('token');
+    const parameters = {};
+    for (const [k, v] of Object.entries(fields || {})) {
+      if (v === undefined || v === null) continue;
+      parameters[k] = String(v);
+    }
+
+    const res = await FileSystem.uploadAsync(`${this.baseUrl}${endpoint}`, part.uri, {
+      httpMethod: 'POST',
+      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+      fieldName,
+      mimeType: part.type,
+      parameters,
+      headers: {
+        Accept: 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    });
+
+    let data = null;
+    try { data = JSON.parse(res.body || 'null'); } catch (_) { data = null; }
+    if (res.status < 200 || res.status >= 300) {
+      const err = new Error(toMessage(data, `Upload failed (${res.status})`));
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }
 
   async submitManualDeposit(formData) {
     const token = await SecureStore.getItemAsync('token');
