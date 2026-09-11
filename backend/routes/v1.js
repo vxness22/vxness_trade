@@ -19,12 +19,13 @@ import MasterTrader from '../models/MasterTrader.js'
 import CopyFollower from '../models/CopyFollower.js'
 import AccountType from '../models/AccountType.js'
 import KYC from '../models/KYC.js'
+import SupportTicket from '../models/SupportTicket.js'
 import { instrumentCatalogue } from './prices.js'
 import AlgoKey from '../models/AlgoKey.js'
 import TerminalRefreshToken, { REFRESH_TTL_DAYS } from '../models/TerminalRefreshToken.js'
 import infowayService, { SUPPORTED_SYMBOLS } from '../services/infowayService.js'
 import tradeEngine from '../services/tradeEngine.js'
-import { contractSize as symbolContractSize } from '../utils/symbolMeta.js'
+import { contractSize as symbolContractSize, quoteToUsd, notionalUsd, pipSize } from '../utils/symbolMeta.js'
 import { resolveTradeSegment } from '../utils/tradeSegment.js'
 import { jwtAuth, ownedAccount, signAccessToken, fail } from '../utils/terminalAuth.js'
 import { validatePendingBrackets } from '../utils/bracketGuard.js'
@@ -64,6 +65,31 @@ function setRefreshCookie(res, token) {
     path: '/',
     maxAge: REFRESH_TTL_DAYS * 24 * 60 * 60 * 1000,
   })
+}
+
+// A native app has no usable cookie jar for us to rely on, so it asks for the
+// refresh token in the JSON body with `X-Token-Delivery: json` and stores it in
+// SecureStore itself.
+//
+// Until this existed, /auth/login set the refresh token ONLY as a cookie and
+// ignored the header, so the app never received one. Its refreshAccessToken()
+// reads the stored token first and returns null when there is none, so it never
+// even attempted a refresh: roughly 45 minutes after signing in — the access
+// token's lifetime — the next request 401'd, the auth-failure handler fired and
+// the user was dumped back on the login screen. Every session, all day.
+//
+// The cookie is still set for the desktop terminal and the browser; this only
+// adds a second delivery channel for clients that ask for one.
+function wantsJsonTokens(req) {
+  return String(req.headers['x-token-delivery'] || '').toLowerCase() === 'json'
+}
+
+// The refresh token as presented by either kind of client: the cookie for
+// browser/desktop, the JSON body for the mobile app.
+function presentedRefreshToken(req) {
+  const fromBody = req.body?.refresh_token
+  if (typeof fromBody === 'string' && fromBody.trim()) return fromBody.trim()
+  return readCookie(req, REFRESH_COOKIE)
 }
 
 // cookie-parser is not a dependency of this backend, and adding one for a
@@ -107,6 +133,9 @@ router.post('/auth/login', async (req, res) => {
       access_token: accessToken,
       token: accessToken,          // the terminal reads either key
       token_type: 'bearer',
+      // Only for a client that asked for it. A browser keeps using the cookie
+      // and never sees the value.
+      ...(wantsJsonTokens(req) ? { refresh_token: refreshToken } : {}),
       name: user.firstName,
       user: {
         id: String(user._id),
@@ -125,8 +154,8 @@ router.post('/auth/login', async (req, res) => {
 // access token plus a replacement cookie. The presented token is burned.
 router.post('/auth/refresh', async (req, res) => {
   try {
-    const presented = readCookie(req, REFRESH_COOKIE)
-    if (!presented) return fail(res, 401, 'No refresh cookie presented')
+    const presented = presentedRefreshToken(req)
+    if (!presented) return fail(res, 401, 'No refresh token presented')
 
     const rotated = await TerminalRefreshToken.rotate(presented)
     if (!rotated) return fail(res, 401, 'Refresh token is invalid, expired or already used')
@@ -136,7 +165,14 @@ router.post('/auth/refresh', async (req, res) => {
     if (user.isBanned || user.isBlocked) return fail(res, 403, 'Account is not active')
 
     setRefreshCookie(res, rotated.token)
-    res.json({ access_token: signAccessToken(rotated.userId), token_type: 'bearer' })
+    res.json({
+      access_token: signAccessToken(rotated.userId),
+      token_type: 'bearer',
+      // Rotation: the presented token is now burned, so a client holding its
+      // own copy must be handed the replacement or its NEXT refresh fails and
+      // the session ends anyway.
+      ...(wantsJsonTokens(req) ? { refresh_token: rotated.token } : {}),
+    })
   } catch (e) {
     fail(res, 500, e.message)
   }
@@ -171,6 +207,20 @@ router.get('/accounts', jwtAuth, async (req, res) => {
         account_id: String(a._id),
         account_number: a.accountId,
         is_demo: !!(a.isDemo || a.accountTypeId?.isDemo),
+        // The mobile app picks its default account with `list.find(a =>
+        // a.is_active)` and this route never sent the field, so that lookup
+        // always missed and the app fell through to list[0] — the NEWEST
+        // account, demo included. A trader would then place orders from the app
+        // on one account while watching another on the web and report that
+        // their trades had vanished. Builds already in people's hands read this
+        // key, so sending it fixes them without an app update.
+        is_active: a.status === 'Active',
+        // Needed to pick a sane default account. This route sorts newest-first
+        // for display, and the app was taking the first row — which is the
+        // account the trader opened most RECENTLY, not the one they actually
+        // use. Sending the timestamp lets the client order by age itself
+        // instead of depending on this route's display sort.
+        created_at: a.createdAt?.toISOString?.() || '',
         currency: 'USD',
         balance: a.balance,
         credit: a.credit,
@@ -208,6 +258,37 @@ function liveQuote(symbol) {
   return p && p.bid > 0 ? p : null
 }
 
+// Spread as a POINT COUNT, where a point is pipSize(symbol) — the platform's
+// single definition of one, shared with spread/commission pricing.
+//
+// NOT 10^-digits. Those agree for forex, metals and crypto but not for an
+// index: pipSize says one US30 point is a whole index point, while the digits
+// say 0.01, which would have reported a 3-point spread as 300.
+function spreadPoints(symbol, bid, ask) {
+  if (!(bid > 0) || !(ask > 0)) return null
+  const step = pipSize(symbol)
+  return step > 0 ? Math.round((ask - bid) / step) : null
+}
+
+// Today's move for a symbol, as the two keys every client already reads.
+// Null when the session's opening price is not known yet — better an empty
+// cell than a percentage measured from the wrong starting point.
+function changeFields(symbol) {
+  const { change, changePercent } = infowayService.getChange(String(symbol || '').toUpperCase())
+  return {
+    change: change == null ? null : Number(change.toFixed(8)),
+    change_pct: changePercent == null ? null : Number(changePercent.toFixed(4)),
+  }
+}
+
+// Display precision for a symbol, from the same catalogue /instruments serves.
+// 5 is the forex default and the value every caller used to assume.
+function instrumentDigits(symbol) {
+  const s = String(symbol || '').toUpperCase()
+  const meta = instrumentCatalogue().find(i => i.symbol === s)
+  return meta?.digits ?? 5
+}
+
 function positionJson(t) {
   const q = liveQuote(t.symbol)
   const current = q ? (t.side === 'BUY' ? q.bid : q.ask) : t.openPrice
@@ -230,6 +311,24 @@ function positionJson(t) {
     swap: t.swap || 0,
     commission: t.commission || 0,
     profit: Math.round(profit * 100) / 100,
+    // USD value of one unit of this symbol's QUOTE currency, and the position's
+    // notional in USD.
+    //
+    // Both exist for the chart overlay (desk_terminal/web/tx_positions.js). It
+    // previews what a stop or target is worth by multiplying the price delta by
+    // lots and contract size, and it smooths P&L between polls the same way —
+    // but a raw delta is denominated in the pair's quote currency, not dollars.
+    // On USDJPY that read about 150x too high, so a trader dragging a stop line
+    // saw a loss preview in the thousands for a position that risked tens. The
+    // browser cannot work the rate out for a cross like EURGBP (it only holds
+    // ticks for the charted symbol), so the server sends it.
+    quote_to_usd: quoteToUsd(t.symbol, current, (s) => infowayService.getPrice(s)),
+    // Display precision. Without it the app formatted every price with
+    // toFixed(5), so gold showed as 4372.63000 and USDJPY as 154.17000.
+    digits: instrumentDigits(t.symbol),
+    notional_usd: Math.round(
+      notionalUsd(t.symbol, t.quantity, t.openPrice, (s) => infowayService.getPrice(s)) * 100
+    ) / 100,
     opened_at: (t.openedAt || t.createdAt)?.toISOString?.() || '',
     comment: '',
   }
@@ -466,6 +565,7 @@ function orderJson(t) {
     side: t.side.toLowerCase(),
     lots: t.quantity,
     price: t.pendingPrice ?? t.openPrice,
+    digits: instrumentDigits(t.symbol),
     stop_loss: t.sl ?? t.stopLoss ?? 0,
     take_profit: t.tp ?? t.takeProfit ?? 0,
     created_at: (t.createdAt)?.toISOString?.() || '',
@@ -691,12 +791,40 @@ router.get('/portfolio/trades', jwtAuth, async (req, res) => {
     const account = await ownedAccount(req.user._id, req.query.account_id)
     if (!account) return fail(res, 404, 'Trading account not found for this user')
 
-    const perPage = Math.min(500, Math.max(1, parseInt(req.query.per_page, 10) || 100))
-    const trades = await Trade.find({ tradingAccountId: account._id, status: 'CLOSED' })
-      .sort({ closedAt: -1 })
-      .limit(perPage)
+    // Paged, and it says how many there are in total.
+    //
+    // This used to read per_page, ignore `page` entirely and answer with just
+    // {items}. Two things broke off the back of that. The app asks for 50 at a
+    // time and shows a "Load older trades" button only when the server's total
+    // is bigger than what it holds — with no total it could never show that
+    // button, so an account with 70 closed trades displayed 50 and the tab
+    // header read "History (50)" while the web terminal listed all 70. And had
+    // the button appeared, page 2 returned the SAME 50 rows, because nothing
+    // skipped: the offset was never applied.
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1)
+    // Default 10 per page, matching what the app asks for. There is no limit on
+    // how far back a caller can page — `page` may be any positive number — so
+    // the whole history is always reachable.
+    //
+    // per_page itself stays bounded at 1000. That is not a cap on the history,
+    // only on how much one response may carry: an unbounded value would let a
+    // single request pull an entire collection into memory and serialise it,
+    // which is a way to take this server down rather than a feature.
+    const perPage = Math.min(1000, Math.max(1, parseInt(req.query.per_page, 10) || 10))
+    const query = { tradingAccountId: account._id, status: 'CLOSED' }
+    const [trades, total] = await Promise.all([
+      Trade.find(query).sort({ closedAt: -1 }).skip((page - 1) * perPage).limit(perPage),
+      Trade.countDocuments(query),
+    ])
 
     res.json({
+      total,
+      page,
+      per_page: perPage,
+      // Portfolio's history list pages with `data.pages` and stops as soon as it
+      // reads 1. This route never sent the field, so that list was stuck on its
+      // first page too — a second symptom of the same missing pagination.
+      pages: Math.max(1, Math.ceil(total / perPage)),
       items: trades.map(t => ({
         id: String(t._id),
         ticket: t.tradeId || '',
@@ -708,8 +836,13 @@ router.get('/portfolio/trades', jwtAuth, async (req, res) => {
         profit: t.realizedPnl ?? 0,
         swap: t.swap || 0,
         commission: t.commission || 0,
+        digits: instrumentDigits(t.symbol),
         opened_at: (t.openedAt || t.createdAt)?.toISOString?.() || '',
         closed_at: t.closedAt?.toISOString?.() || '',
+        // Alias. The app keeps a closed trade only if `close_time || close_price`
+        // is set and sorts the list by `close_time` first, so a trade that
+        // closed at a price of 0 would have been dropped from the list outright.
+        close_time: t.closedAt?.toISOString?.() || '',
         close_reason: t.closedBy || 'USER',
       })),
     })
@@ -1351,6 +1484,148 @@ router.delete('/profile/push-token', jwtAuth, async (req, res) => {
 // website does not have these features, so there is nothing to mirror. They
 // answer empty rather than 404 so the screens render "nothing here" instead of
 // a red error, and so the day either feature exists the app needs no change.
+/* ─────────────────────────  support  ───────────────────────── */
+//
+// The app's Support screen has always called these four paths and /api/v1 never
+// served any of them, so every request fell through to Express's HTML 404 page.
+// The screen could not even show a useful error: it parses the body as JSON,
+// which fails on HTML, so a user tapping Support saw an empty list forever and
+// creating a ticket failed with "Failed to create ticket (404)".
+//
+// The website's equivalents live in routes/support.js and take userId from the
+// request body with no auth at all. These take it from the verified JWT and
+// scope every read and write to the caller's own tickets, which is the rule
+// everywhere else in this file.
+
+// The app renders ticket.priority/status straight into a badge, and posts
+// priority lower-cased ('medium'). The schema enum is upper-case.
+const TICKET_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT']
+const TICKET_CATEGORIES = ['GENERAL', 'DEPOSIT', 'WITHDRAWAL', 'TRADING', 'ACCOUNT', 'TECHNICAL', 'OTHER']
+
+function ticketJson(t) {
+  return {
+    // Both keys: the screen normalises with `t._id || t.id`, and other callers
+    // address a ticket by whichever one they kept.
+    id: String(t._id),
+    _id: String(t._id),
+    ticket_id: t.ticketId || '',
+    ticketId: t.ticketId || '',
+    subject: t.subject || '',
+    category: t.category || 'GENERAL',
+    priority: t.priority || 'MEDIUM',
+    status: t.status || 'OPEN',
+    messages: (t.messages || []).map(m => ({
+      sender: m.sender,
+      sender_name: m.senderName || '',
+      senderName: m.senderName || '',
+      message: m.message || '',
+      createdAt: m.createdAt?.toISOString?.() || '',
+      created_at: m.createdAt?.toISOString?.() || '',
+    })),
+    createdAt: t.createdAt?.toISOString?.() || '',
+    created_at: t.createdAt?.toISOString?.() || '',
+    updatedAt: t.updatedAt?.toISOString?.() || '',
+  }
+}
+
+// Accepts the Mongo _id or the human TKT###### ticket number, and only ever
+// returns a ticket the caller owns.
+async function ownedTicket(userId, id) {
+  const key = String(id || '')
+  let ticket = null
+  if (/^[0-9a-fA-F]{24}$/.test(key)) ticket = await SupportTicket.findById(key)
+  if (!ticket) ticket = await SupportTicket.findOne({ ticketId: key })
+  if (!ticket) return null
+  return String(ticket.userId) === String(userId) ? ticket : null
+}
+
+// GET /api/v1/support/tickets?page=&per_page=
+router.get('/support/tickets', jwtAuth, async (req, res) => {
+  try {
+    const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page, 10) || 20))
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1)
+    const query = { userId: req.user._id }
+    const [tickets, total] = await Promise.all([
+      SupportTicket.find(query).sort({ createdAt: -1 }).skip((page - 1) * perPage).limit(perPage),
+      SupportTicket.countDocuments(query),
+    ])
+    res.json({ items: tickets.map(ticketJson), total, page, per_page: perPage })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// POST /api/v1/support/tickets — {subject, message, priority?, category?}
+router.post('/support/tickets', jwtAuth, async (req, res) => {
+  try {
+    if (req.readOnly) return fail(res, 403, 'This is a read-only investor session')
+    const body = req.body || {}
+    const subject = String(body.subject || '').trim()
+    const message = String(body.message || '').trim()
+    if (!subject) return fail(res, 400, 'Subject is required')
+    if (!message) return fail(res, 400, 'Message is required')
+
+    const priority = String(body.priority || 'MEDIUM').toUpperCase()
+    const category = String(body.category || 'GENERAL').toUpperCase()
+
+    const ticket = await SupportTicket.create({
+      userId: req.user._id,
+      subject: subject.slice(0, 200),
+      category: TICKET_CATEGORIES.includes(category) ? category : 'GENERAL',
+      priority: TICKET_PRIORITIES.includes(priority) ? priority : 'MEDIUM',
+      messages: [{
+        sender: 'USER',
+        senderId: req.user._id,
+        senderName: req.user.firstName || req.user.email,
+        message,
+      }],
+    })
+
+    res.json({ message: 'Support ticket created', ticket: ticketJson(ticket), ...ticketJson(ticket) })
+  } catch (e) {
+    fail(res, 400, e.message)
+  }
+})
+
+// GET /api/v1/support/tickets/:id
+router.get('/support/tickets/:id', jwtAuth, async (req, res) => {
+  try {
+    const ticket = await ownedTicket(req.user._id, req.params.id)
+    if (!ticket) return fail(res, 404, 'Ticket not found')
+    res.json({ ticket: ticketJson(ticket), ...ticketJson(ticket) })
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+// POST /api/v1/support/tickets/:id/reply — {message}
+router.post('/support/tickets/:id/reply', jwtAuth, async (req, res) => {
+  try {
+    if (req.readOnly) return fail(res, 403, 'This is a read-only investor session')
+    const message = String(req.body?.message || '').trim()
+    if (!message) return fail(res, 400, 'Message is required')
+
+    const ticket = await ownedTicket(req.user._id, req.params.id)
+    if (!ticket) return fail(res, 404, 'Ticket not found')
+    if (ticket.status === 'CLOSED') return fail(res, 400, 'This ticket is closed')
+
+    ticket.messages.push({
+      sender: 'USER',
+      senderId: req.user._id,
+      senderName: req.user.firstName || req.user.email,
+      message,
+    })
+    // A user reply reopens the conversation — otherwise a ticket the agent had
+    // marked resolved keeps that badge while the trader is still writing in it.
+    if (ticket.status === 'RESOLVED' || ticket.status === 'WAITING_USER') ticket.status = 'IN_PROGRESS'
+    await ticket.save()
+
+    res.json({ message: 'Reply sent', ticket: ticketJson(ticket), ...ticketJson(ticket) })
+  } catch (e) {
+    fail(res, 400, e.message)
+  }
+})
+
 router.get('/notifications', jwtAuth, (_req, res) => res.json({ items: [], unread: 0, page: 1, pages: 1 }))
 router.post('/notifications/:id/read', jwtAuth, (_req, res) => res.json({ message: 'ok' }))
 router.post('/notifications/read-all', jwtAuth, (_req, res) => res.json({ message: 'ok' }))
@@ -1484,13 +1759,17 @@ async function createSignupUser(payload) {
   return user
 }
 
-async function issueSession(res, user) {
+async function issueSession(res, user, req = null) {
   const accessToken = signAccessToken(user._id)
-  setRefreshCookie(res, await TerminalRefreshToken.issue(user._id))
+  const refreshToken = await TerminalRefreshToken.issue(user._id)
+  setRefreshCookie(res, refreshToken)
   return {
     access_token: accessToken,
     token: accessToken,
     token_type: 'bearer',
+    // Same reason as /auth/login: a user who signs up IN THE APP needs the
+    // refresh token in the body or their brand-new session dies in 45 minutes.
+    ...(req && wantsJsonTokens(req) ? { refresh_token: refreshToken } : {}),
     user_id: String(user._id),
     name: user.firstName,
     user: {
@@ -1517,7 +1796,7 @@ router.post('/auth/register/start', async (req, res) => {
     // session, so the app's verify step has nothing left to do.
     if (!(await isOTPEnabled())) {
       const user = await createSignupUser({ ...body, email, password })
-      return res.json({ ...(await issueSession(res, user)), otp_required: false, message: 'Account created' })
+      return res.json({ ...(await issueSession(res, user, req)), otp_required: false, message: 'Account created' })
     }
 
     const otp = generateOTP()
@@ -1575,7 +1854,7 @@ router.post('/auth/register/verify', async (req, res) => {
     const user = await createSignupUser(payload)
     await OTP.deleteOne({ _id: record._id })
 
-    res.json(await issueSession(res, user))
+    res.json(await issueSession(res, user, req))
   } catch (e) {
     fail(res, 500, e.message)
   }
@@ -1622,7 +1901,7 @@ router.post('/auth/register', async (req, res) => {
     if (await User.findOne({ email })) return fail(res, 400, 'An account with this email already exists')
 
     const user = await createSignupUser({ ...body, email })
-    res.json(await issueSession(res, user))
+    res.json(await issueSession(res, user, req))
   } catch (e) {
     fail(res, 500, e.message)
   }
@@ -1645,10 +1924,21 @@ router.get('/instruments/:symbol/price', jwtAuth, (req, res) => {
       name: meta?.name || symbol,
       bid: q.bid,
       ask: q.ask,
-      spread: q.ask != null && q.bid != null ? Number((q.ask - q.bid).toFixed(8)) : null,
-      change: q.change ?? null,
-      change_pct: q.changePercent ?? q.change_pct ?? null,
+      // Point count, matching /instruments/prices/all. This used to send the raw
+      // price difference under the same name, so the same field meant two
+      // different things depending on which route a screen had called.
+      spread: spreadPoints(symbol, q.bid, q.ask),
+      spread_raw: q.ask != null && q.bid != null ? Number((q.ask - q.bid).toFixed(8)) : null,
+      point_size: pipSize(symbol),
+      // q.change never existed on a quote — the feed carries only bid/ask/time —
+      // so this pair was hard-wired to null on every response.
+      ...changeFields(symbol),
       digits: meta?.digits ?? 5,
+      // The order ticket previews required margin as (lots * price) / leverage
+      // with no contract size at all, so one lot of EURUSD read as a fifth of a
+      // cent instead of ~$232. It has this quote and nothing else to work from,
+      // so the size ships with the quote.
+      contract_size: meta?.contract_size ?? symbolContractSize(symbol),
       time: q.time || Date.now(),
     })
   } catch (e) {
@@ -2768,8 +3058,19 @@ router.get('/instruments/prices/all', jwtAuth, (_req, res) => {
       digits: i.digits,
       bid: q.bid,
       ask: q.ask,
-      // Spread in points, the unit the platform quotes it in everywhere else.
-      spread: money((q.ask - q.bid) * Math.pow(10, (i.digits || 5) - 1)),
+      // Spread as a point count. The scale used to be 10^(digits-1), so every
+      // spread came back ten times too small and as a fraction: EURUSD's three
+      // points read 0.3, gold's fifty-nine read 5.9. It also disagreed with
+      // /instruments/{symbol}/price, which sent the raw price difference under
+      // this same field name — two meanings for one key.
+      spread: spreadPoints(i.symbol, q.bid, q.ask),
+      // The raw difference and the price value of one point, so a client can
+      // scale a live tick itself without having to classify the symbol.
+      spread_raw: money(q.ask - q.bid),
+      point_size: pipSize(i.symbol),
+      // Move since today's open. Absent until now, which is why every row on
+      // the instruments list showed "+0.00%" and Market Movers ranked nothing.
+      ...changeFields(i.symbol),
       time: q.timestamp || q.time || null,
       market_open: isMarketOpen(i.symbol),
     })
