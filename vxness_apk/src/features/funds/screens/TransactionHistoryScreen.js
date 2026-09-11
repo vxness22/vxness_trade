@@ -115,7 +115,16 @@ export default function TransactionHistoryScreen() {
     const cutoff = range === 'custom' ? null : rangeCutoff(range);
     const win = range === 'custom' ? customRange : null;
     return allItems.filter((tx) => {
-      if (acctId && String(tx.account_id || '') !== acctId) return false;
+      // Scope by account, but never hide a MAIN WALLET movement.
+      //
+      // A deposit or a withdrawal belongs to the wallet, not to any trading
+      // account — the server has no account to attribute it to and sends an
+      // empty account_id. Filtering those out whenever an account was selected
+      // is what made this screen read "No transactions" under Deposits and
+      // Withdrawals: the rows were loaded, they just did not carry the id being
+      // matched against. Transfers do carry one and stay scoped.
+      const rowAcct = String(tx.account_id || '');
+      if (acctId && rowAcct && rowAcct !== acctId) return false;
       if (cutoff != null || win) {
         const ts = Date.parse(tx.created_at || tx.createdAt || '');
         if (!Number.isFinite(ts)) return false;
