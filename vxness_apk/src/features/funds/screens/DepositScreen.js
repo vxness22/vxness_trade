@@ -95,6 +95,19 @@ export default function DepositScreen() {
     return eff > 0 ? eff : null;
   }, [currency, isUsd]);
 
+  // Why the submit button cannot be pressed yet, or null when it can. Ordered
+  // the way the form reads, so the message points at the next thing to do.
+  const blockedReason = useMemo(() => {
+    if (loading) return null;
+    if (methods.length === 0) {
+      return 'Deposits are not available right now — no payment method has been set up. Please contact support.';
+    }
+    if (!(Number(amount) > 0)) return 'Enter the amount you are depositing.';
+    if (!method) return 'Choose the payment method you paid to.';
+    if (!proof) return 'Attach a screenshot of your payment.';
+    return null;
+  }, [loading, methods.length, amount, method, proof]);
+
   const copy = useCallback(async (value, what) => {
     await Clipboard.setStringAsync(String(value));
     showToast({ kind: 'success', message: `${what} copied` });
@@ -327,14 +340,26 @@ export default function DepositScreen() {
               </Pressable>
             ) : null}
 
+            {/* A disabled button with no explanation is the worst of both: the
+                user cannot proceed and cannot tell why. Say which step is still
+                outstanding — and when the admin has configured no destination at
+                all, say that plainly rather than leaving a dead control on a
+                form the user has just filled in. */}
+            {blockedReason ? (
+              <View style={styles.blockedBox}>
+                <Ionicons name="information-circle-outline" size={16} color={vx.textSecondary} />
+                <Text style={styles.blockedTxt}>{blockedReason}</Text>
+              </View>
+            ) : null}
+
             <PillButton
               label={submitting ? 'Submitting…' : 'Submit deposit'}
               variant="primary"
               size="lg"
               loading={submitting}
-              disabled={submitting || !(Number(amount) > 0) || !method || !proof}
+              disabled={submitting || !!blockedReason}
               onPress={submit}
-              style={{ marginTop: space.xl }}
+              style={{ marginTop: space.md }}
             />
           </>
         )}
@@ -369,6 +394,13 @@ const styles = StyleSheet.create({
   label: { color: vx.textSecondary, fontFamily, fontSize: sizes.label, marginBottom: space.sm },
   hint: { color: vx.textMuted, fontFamily, fontSize: sizes.micro, lineHeight: 15, marginTop: space.xs },
   empty: { color: vx.textMuted, fontFamily, fontSize: sizes.label, textAlign: 'center', paddingVertical: space.lg },
+  blockedBox: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: space.sm,
+    marginTop: space.lg, padding: space.md,
+    backgroundColor: vx.bgElevated, borderRadius: radius.md,
+    borderWidth: 1, borderColor: vx.border,
+  },
+  blockedTxt: { flex: 1, color: vx.textSecondary, fontFamily, fontSize: sizes.label, lineHeight: 18 },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   tileOn: { borderColor: vx.accent, backgroundColor: vx.accent + '18' },
