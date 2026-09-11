@@ -35,7 +35,7 @@ import KycTradeRequiredModal from '../components/KycTradeRequiredModal'
 import { formatPrice } from '../utils/formatPrice'
 import { authHeaders } from '../utils/authFetch'
 
-import { pnlUsd } from '../utils/margin'
+import { floatingPnlUsd } from '../utils/margin'
 
 import { isMarketOpen, marketClosedReason } from '../utils/marketHours'
 
@@ -1249,8 +1249,10 @@ const MobileTradingApp = () => {
 
     if (!currentPrice || currentPrice <= 0) return trade._lastPnl || 0
 
-    const pnl = pnlUsd(trade.symbol, trade.side, trade.openPrice, currentPrice,
-      trade.quantity, trade.contractSize || 100000, getPrice)
+    // Shared definition (nets swap, not the already-paid open commission). The
+    // `|| 100000` fallback that used to be here was the forex contract size
+    // applied to every symbol — 1000x too big on gold, 100000x on crypto.
+    const pnl = floatingPnlUsd(trade, currentPrice, getPrice)
 
     trade._lastPnl = pnl // Cache for fallback
 

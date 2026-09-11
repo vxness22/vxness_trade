@@ -1,7 +1,7 @@
 // Institutional-grade real-time price streaming service using Socket.IO
 import { io } from 'socket.io-client'
 import { API_BASE_URL } from '../config/api'
-import { pnlUsd } from '../utils/margin'
+import { floatingPnlUsd } from '../utils/margin'
 
 const SOCKET_URL = API_BASE_URL
 
@@ -132,14 +132,12 @@ class PriceStreamService {
     if (!prices) return 0
     
     const currentPrice = trade.side === 'BUY' ? prices.bid : prices.ask
-    const contractSize = trade.contractSize || 100
 
-    // pnlUsd converts out of the pair's quote currency — the bare price delta is
-    // only dollars for USD-quoted symbols (USDJPY would read ~150x too high).
-    return pnlUsd(
-      trade.symbol, trade.side, trade.openPrice, currentPrice,
-      trade.quantity, contractSize, (s) => this.prices[s] || null
-    )
+    // floatingPnlUsd is the app-wide definition: converts out of the pair's
+    // quote currency, nets swap, and leaves the open commission alone because
+    // the balance already paid it. The `|| 100` contract-size fallback that
+    // used to sit here was the gold contract applied to every symbol.
+    return floatingPnlUsd(trade, currentPrice, (s) => this.prices[s] || null)
   }
 }
 

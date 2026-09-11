@@ -14,7 +14,7 @@ import {
 import { API_URL } from '../config/api'
 import priceStreamService from '../services/priceStream'
 import { formatPrice } from '../utils/formatPrice'
-import { pnlUsd } from '../utils/margin'
+import { floatingPnlUsd } from '../utils/margin'
 
 const InvestorDashboard = () => {
   const { accountId } = useParams()
@@ -90,11 +90,11 @@ const InvestorDashboard = () => {
     if (!prices || !prices.bid) return 0
     
     const currentPrice = trade.side === 'BUY' ? prices.bid : prices.ask
-    const contractSize = trade.contractSize || 1
-    const pnl = pnlUsd(trade.symbol, trade.side, trade.openPrice, currentPrice,
-      trade.quantity, contractSize, (s) => livePrices[s] || null)
-
-    return pnl - (trade.commission || 0) - (trade.swap || 0)
+    // Shared definition: nets swap, leaves the open commission alone (the
+    // balance already paid it). It also falls back to the symbol's real
+    // contract size rather than the `|| 1` that used to sit here, which zeroed
+    // the P&L of any trade stored without one.
+    return floatingPnlUsd(trade, currentPrice, (s) => livePrices[s] || null)
   }
 
   const openTrades = trades.filter(t => t.status === 'OPEN')

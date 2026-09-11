@@ -71,7 +71,7 @@ import logoImage from '../assets/logo.png'
 
 import { formatPrice } from '../utils/formatPrice'
 import { authHeaders } from '../utils/authFetch'
-import { pnlUsd } from '../utils/margin'
+import { floatingPnlUsd } from '../utils/margin'
 
 
 
@@ -453,14 +453,10 @@ const OrderBook = () => {
 
     
 
-    const contractSize = trade.contractSize || getContractSize(trade.symbol)
-
-    const pnl = pnlUsd(trade.symbol, trade.side, trade.openPrice, currentPrice,
-      trade.quantity, contractSize, (s) => livePrices[s] || null)
-
-
-
-    return pnl - (trade.commission || 0) - (trade.swap || 0)
+    // One definition of floating P&L for the whole app — nets swap, leaves the
+    // open commission alone because the balance already paid it. Subtracting
+    // the commission here charged it twice.
+    return floatingPnlUsd(trade, currentPrice, (s) => livePrices[s] || null)
 
   }
 

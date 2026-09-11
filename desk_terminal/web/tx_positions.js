@@ -162,11 +162,25 @@
   Overlay.prototype._isBuy = function (p) {
     return String(p.side).toLowerCase() !== "sell";
   };
+  // USD value of one unit of the symbol's quote currency.
+  //
+  // `Δprice * lots * contract_size` is denominated in the pair's QUOTE currency,
+  // not in dollars — on USDJPY that is yen, so booking it as dollars overstated
+  // every preview below by roughly 150x. The server sends the factor on each
+  // position (quote_to_usd) because a cross like EURGBP needs GBPUSD to resolve
+  // and this page only holds ticks for the charted symbol. 1 is the right
+  // fallback: every USD-quoted symbol, which is most of them, converts by 1.
+  Overlay.prototype._qUsd = function (p) {
+    var f = Number(p && p.quote_to_usd);
+    return isFinite(f) && f > 0 ? f : 1;
+  };
+
   // What the position would realise if it closed at `level`. The server stays
   // authoritative — this only previews a level before it is committed.
   Overlay.prototype._pnlAt = function (p, level) {
     var dir = this._isBuy(p) ? 1 : -1;
-    return (level - Number(p.open_price)) * dir * Number(p.lots) * this._contract(p.symbol);
+    return (level - Number(p.open_price)) * dir * Number(p.lots) *
+           this._contract(p.symbol) * this._qUsd(p);
   };
   // Live P&L for the entry pill: anchor on the server's authoritative profit and
   // add only the move since the price that profit was computed at. Exact at each
@@ -180,7 +194,8 @@
     var cur = this._isBuy(p) ? q.bid : q.ask;
     if (!(cur > 0)) return base;
     var dir = this._isBuy(p) ? 1 : -1;
-    return base + (cur - ref) * dir * Number(p.lots) * this._contract(p.symbol);
+    return base + (cur - ref) * dir * Number(p.lots) *
+                  this._contract(p.symbol) * this._qUsd(p);
   };
 
   // A bracket may only sit on the side of the entry that its purpose implies:
@@ -387,7 +402,14 @@
 
       var isBuy = self._isBuy(p);
       var pnl = Number(p.profit) || 0;
-      var notional = Number(p.open_price) * Number(p.lots) * self._contract(p.symbol);
+      // notional_usd from the server. Computing it here as price * lots * cs
+      // gave a figure in the quote currency, so the percentage on a USDJPY or
+      // EURGBP pill was scaled by the same factor the P&L above was.
+      var notional = Number(p.notional_usd);
+      if (!(isFinite(notional) && notional > 0)) {
+        notional = Number(p.open_price) * Number(p.lots) *
+                   self._contract(p.symbol) * self._qUsd(p);
+      }
       var pct = notional > 0 ? (pnl / notional) * 100 : 0;
       var entryText = (isBuy ? "BUY " : "SELL ") + Number(p.lots).toFixed(2) + "  " +
                       fmtProfit(pnl) + " (" + (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%)";

@@ -15,9 +15,13 @@ const CRYPTO = new Set([
   'PEPEUSD','ATOMUSD','UNIUSD',
 ])
 const COMMODITY = new Set(['USOIL','UKOIL','BRENT','WTI','NGAS','COPPER'])
+// Must stay identical to INDEX_SYMBOLS in backend utils/symbolMeta.js. ESP35
+// was missing here after the backend list was corrected, so this file priced it
+// as a forex pair with a contract size of 100,000 — a 0.01 lot previewed ~$23m
+// of notional instead of ~$233.
 const INDEX = new Set([
   'US30','US500','NAS100','US100','GER40','UK100','DJ30','DAX','FTSE','SPX','NDX',
-  'JPN225','AUS200','HK50','FRA40','EU50','USTEC','DE30','SPX500',
+  'JPN225','AUS200','HK50','FRA40','ESP35','EU50','USTEC','DE30','SPX500',
 ])
 
 export function contractSize(symbol) {
@@ -77,6 +81,29 @@ export function pnlUsd(symbol, side, openPrice, currentPrice, quantity, cs, getQ
     ? (currentPrice - openPrice) * quantity * size
     : (openPrice - currentPrice) * quantity * size
   return raw * quoteToUsd(symbol, currentPrice, getQuote)
+}
+
+// Floating P&L of an OPEN position, matching what the server reports for the
+// same trade — the ONE definition every view in this app should display.
+//
+// It is `pnlUsd − swap`. Swap is a charge that has not been taken yet, so it
+// belongs in the floating figure. The OPEN commission does NOT: tradeEngine's
+// openTrade() deducts it from the account balance the moment the order fills,
+// so subtracting it here would charge it twice and understate equity.
+//
+// Before this existed, five call sites in TradingPage each made their own
+// choice: the status-bar total and the blotter total subtracted nothing, while
+// the account summary subtracted both commission and swap. Two totals for the
+// same positions on the same screen, and neither agreed with the mobile app.
+//
+// Mirrors backend services/tradeEngine.js `calculateFloatingPnl`. Change both
+// or neither.
+export function floatingPnlUsd(trade, currentPrice, getQuote) {
+  const gross = pnlUsd(
+    trade.symbol, trade.side, trade.openPrice, currentPrice,
+    trade.quantity, trade.contractSize, getQuote,
+  )
+  return gross - (Number(trade.swap) || 0)
 }
 
 // Position value in USD — the base for margin and any percentage-of-value figure.

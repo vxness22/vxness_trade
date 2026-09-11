@@ -865,16 +865,25 @@ router.get('/summary/:tradingAccountId', async (req, res) => {
     // Calculate used margin from open trades
     const usedMargin = openTrades.reduce((sum, t) => sum + (t.marginUsed || 0), 0)
     
-    // Calculate floating PnL from current prices
+    // Floating P&L, from the SERVER's feed.
+    //
+    // This used to price the book purely from the `prices` query parameter —
+    // whatever the browser happened to have in memory. Two problems with that.
+    // A symbol missing from the browser's map contributed nothing at all, so
+    // equity silently dropped a position's P&L; and the mobile app prices the
+    // same book from infowayService, so the two clients showed different equity
+    // for the same account at the same moment. The client map is still honoured
+    // as a fallback for a symbol the feed has no quote for, but it can no
+    // longer override a price the server does have.
+    //
+    // calculateFloatingPnl (not a bare pnlUsd) so this matches /api/v1 exactly:
+    // net of swap, and NOT of the open commission, which the balance already
+    // paid at fill time.
     let floatingPnl = 0
     for (const trade of openTrades) {
-      const priceData = currentPrices[trade.symbol]
-      if (priceData) {
-        const currentPrice = trade.side === 'BUY' ? priceData.bid : priceData.ask
-        floatingPnl += pnlUsd(
-          trade.symbol, trade.side, trade.openPrice, currentPrice,
-          trade.quantity, trade.contractSize, getFreshPrice
-        )
+      const priceData = getFreshPrice(trade.symbol) || currentPrices[trade.symbol]
+      if (priceData && priceData.bid > 0 && priceData.ask > 0) {
+        floatingPnl += tradeEngine.calculateFloatingPnl(trade, priceData.bid, priceData.ask)
       }
     }
 

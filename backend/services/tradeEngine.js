@@ -160,7 +160,21 @@ class TradeEngine {
 
 
 
-  // Calculate floating PnL including charges
+  // Floating P&L of an OPEN position, in USD, net of the charges that have not
+  // been taken yet.
+  //
+  // Swap is subtracted; the OPEN commission is NOT. openTrade() already does
+  // `account.balance -= commission` the moment a market order fills, so the
+  // money is out of the balance before this ever runs. Subtracting it here too
+  // charged it twice: every equity figure on the platform read low by the
+  // commission of every open position, and because the stop-out check below
+  // reads its equity from getAccountSummary(), accounts were being liquidated
+  // earlier than their configured stop-out level.
+  //
+  // The matching realised figure in closeTrade() has always been
+  // `rawPnl - swap - closeCommission` — it does not re-subtract the open
+  // commission either, so this now agrees with it and a position's P&L no
+  // longer jumps at the moment it closes.
 
   calculateFloatingPnl(trade, currentBid, currentAsk) {
 
@@ -168,7 +182,7 @@ class TradeEngine {
 
     const rawPnl = this.calculatePnl(trade.side, trade.openPrice, currentPrice, trade.quantity, trade.contractSize, trade.symbol)
 
-    return rawPnl - trade.commission - trade.swap
+    return rawPnl - (trade.swap || 0)
 
   }
 
