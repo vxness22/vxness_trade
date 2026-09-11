@@ -18,6 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import ApiService from '../../../services/api/ApiService';
 import useReadOnly from '../../../hooks/useReadOnly';
 import logger from '../../../utils/logger';
+import { blobPart } from '../../../utils/format';
 import { vx } from '../../../theme/vxTheme';
 import ScreenGlow from '../../../components/vx/ScreenGlow';
 
@@ -192,10 +193,17 @@ export default function KycScreen({ navigation }) {
       const fd = new FormData();
       fd.append('document_type', docType);
       fd.append('document_number', docNumber.trim());
-      fd.append('file', { uri: file.uri, name: file.name, type: file.type });
+      // Expo's fetch cannot encode a `{ uri, name, type }` part — see blobPart.
+      // KYC can carry two documents in one request, which the native single-file
+      // uploader cannot do, so the files are wrapped as Blobs instead.
+      const part1 = blobPart(file);
+      if (!part1) throw new Error('Could not read the attached document');
+      fd.append('file', part1);
       if (docType2 && file2) {
+        const part2 = blobPart(file2);
+        if (!part2) throw new Error('Could not read the second document');
         fd.append('document_type_2', docType2);
-        fd.append('file_2', { uri: file2.uri, name: file2.name, type: file2.type });
+        fd.append('file_2', part2);
       }
       if (address) fd.append('residential_address', address);
       if (city) fd.append('city', city);

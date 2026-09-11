@@ -89,8 +89,11 @@ export function pnlColor(value) {
 }
 
 /**
- * Turns an expo-image-picker asset into the `{ uri, type, name }` part that
- * React Native's FormData expects for a file upload.
+ * Normalises an expo-image-picker asset into `{ uri, type, name }`.
+ *
+ * NOT for appending to FormData — Expo's fetch rejects that shape outright (see
+ * blobPart below). ApiService.uploadFile consumes this to get a trustworthy
+ * mime type and file name for the native uploader.
  *
  * The mime type is the reason this exists. The server accepts jpeg, png, gif,
  * webp and pdf and rejects anything else with "Only images or PDF are
@@ -132,4 +135,35 @@ export function filePart(asset, fallbackBase = 'upload') {
   const base = (fromName.replace(/\.[^.]*$/, '') || fallbackBase).replace(/[^A-Za-z0-9_-]/g, '') || fallbackBase;
 
   return { uri, type, name: `${base}.${safeExt}` };
+}
+
+/**
+ * Wraps a local file URI in an object that Expo's `fetch` will accept as a
+ * multipart part.
+ *
+ * Expo installs its own WinterCG `fetch` (expo/src/winter/fetch). Its FormData
+ * encoder handles a part only when it is a string, a Blob, or an object
+ * exposing `bytes()` — and its own source says outright that "`uri` is not
+ * supported for React Native's FormData". So the classic React Native file part,
+ * `{ uri, name, type }`, falls through to `throw new Error('Unsupported
+ * FormDataPart implementation')`. That is the error, and it hits every upload
+ * built that way.
+ *
+ * expo-file-system's `File` implements Blob and provides bytes(), name and
+ * type, so appending one of these gives the encoder something it understands.
+ *
+ * Prefer ApiService.uploadFile for a SINGLE file: it uploads natively and lets
+ * the mime type be set explicitly, which matters for HEIC. Use this only where
+ * one request has to carry several files, which uploadAsync cannot do.
+ */
+export function blobPart(asset) {
+  if (!asset?.uri) return null;
+  try {
+    // Required lazily: this module is imported by screens that never upload,
+    // and expo-file-system is a native module.
+    const { File } = require('expo-file-system');
+    return new File(String(asset.uri));
+  } catch (e) {
+    return null;
+  }
 }
