@@ -256,6 +256,14 @@ async function initInfowayConnection() {
 
       console.log('[Infoway] Connected! Live tick-by-tick streaming active.')
 
+      // Fill in today's opening price for every instrument, so "change" and
+      // "change %" are right from the first request instead of reading 0.00%
+      // until the next UTC midnight. Runs detached and staggered — it is a
+      // nice-to-have, and nothing else waits on it.
+      infowayService
+        .backfillDayOpens(SUPPORTED_SYMBOLS)
+        .catch((e) => console.error('[Infoway] day-open backfill failed:', e.message))
+
 
 
       // Subscribe to tick-by-tick price updates from Infoway

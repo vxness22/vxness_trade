@@ -383,6 +383,15 @@ class InfowayService {
     this.forexWs = null
     this.cryptoWs = null
     this.prices = new Map()
+    // symbol -> { day: 'YYYY-MM-DD' (UTC), mid: number }
+    //
+    // The session's opening mid, kept so a quote can report how far it has
+    // moved today. Nothing tracked this before, so `change` and `change_pct`
+    // were never anything but null — which is why every instrument on both the
+    // web terminal and the app read "+0.00%" and Market Movers had nothing to
+    // rank. Rolled over on the first tick of a new UTC day, the same boundary
+    // the rest of the platform counts a trading day by.
+    this.dayOpens = new Map()
     this.subscribers = new Set()
     // symbol -> half the last observed depth spread, used to re-spread a trade
     // print (which carries a price but no book).
@@ -434,6 +443,16 @@ class InfowayService {
         })
         console.log(`[Infoway] Loaded ${this.prices.size} persisted (frozen) prices from disk`)
       }
+      // Only today's opens are worth restoring — an entry from a previous day
+      // would report a change measured from the wrong session. getChange()
+      // checks the day too, so a stale entry is harmless either way.
+      if (saved && saved.dayOpens) {
+        const today = InfowayService.utcDay(Date.now())
+        Object.entries(saved.dayOpens).forEach(([symbol, o]) => {
+          if (o && o.day === today && Number(o.mid) > 0) this.dayOpens.set(symbol, o)
+        })
+        if (this.dayOpens.size) console.log(`[Infoway] Restored ${this.dayOpens.size} session opens for ${today}`)
+      }
     } catch (e) {
       console.error('[Infoway] Failed to load persisted prices:', e.message)
     }
@@ -446,6 +465,11 @@ class InfowayService {
       const payload = {
         savedAt: Date.now(),
         prices: Object.fromEntries(this.prices),
+        // Saved with the quotes so a restart does not reset every instrument's
+        // day change to zero. Without it, the opening mid would be re-captured
+        // at whatever the price was when the process came back, and the whole
+        // board would read "+0.00%" until the next UTC midnight.
+        dayOpens: Object.fromEntries(this.dayOpens),
       }
       fs.writeFileSync(PRICE_CACHE_FILE, JSON.stringify(payload), 'utf8')
     } catch (e) {
@@ -648,6 +672,7 @@ class InfowayService {
             time: msg.data.t || Date.now(),
           }
           this.lastTickAt = Date.now()
+          this.noteDayOpen(symbol, priceData)
           this.prices.set(symbol, priceData)
           this.subscribers.forEach(callback => {
             try { callback(symbol, priceData) } catch (e) {}
@@ -675,6 +700,7 @@ class InfowayService {
             time: msg.data.t || Date.now()
           }
           this.lastTickAt = Date.now()
+          this.noteDayOpen(symbol, priceData)
           this.prices.set(symbol, priceData)
           this.subscribers.forEach(callback => {
             try { callback(symbol, priceData) } catch (e) {}
@@ -808,10 +834,73 @@ class InfowayService {
     if (!symbol || !(price?.bid > 0) || !(price?.ask > 0)) return
     if (price.ask >= price.bid) this.halfSpreads.set(symbol, (price.ask - price.bid) / 2)
     this.lastTickAt = Date.now()
+    this.noteDayOpen(symbol, price)
     this.prices.set(symbol, price)
     this.subscribers.forEach(callback => {
       try { callback(symbol, price) } catch (e) {}
     })
+  }
+
+  // The UTC day a timestamp falls in, as 'YYYY-MM-DD'.
+  static utcDay(ts) {
+    return new Date(ts || Date.now()).toISOString().slice(0, 10)
+  }
+
+  // Record the opening mid for today, the first time this symbol is seen in it.
+  // Called from every path that stores a quote, so there is one definition of
+  // "where the day started" no matter which feed delivered the tick.
+  noteDayOpen(symbol, priceData) {
+    const mid = (Number(priceData.bid) + Number(priceData.ask)) / 2
+    if (!(mid > 0)) return
+    const day = InfowayService.utcDay(priceData.time)
+    const cur = this.dayOpens.get(symbol)
+    if (!cur || cur.day !== day) this.dayOpens.set(symbol, { day, mid })
+  }
+
+  // Move since today's open: { change, changePercent } in price terms, or nulls
+  // when the day's opening price is not known yet (a symbol whose first tick of
+  // the day has not arrived, or the first minutes after a restart).
+  getChange(symbol) {
+    const q = this.getPrice(symbol)
+    const open = this.dayOpens.get(symbol)
+    if (!q || !open || !(open.mid > 0)) return { change: null, changePercent: null }
+    // Only meaningful while the stored open belongs to the CURRENT day.
+    if (open.day !== InfowayService.utcDay(Date.now())) return { change: null, changePercent: null }
+    const mid = (Number(q.bid) + Number(q.ask)) / 2
+    if (!(mid > 0)) return { change: null, changePercent: null }
+    const change = mid - open.mid
+    return { change, changePercent: (change / open.mid) * 100 }
+  }
+
+  // Fill in today's opening price from the vendor's daily candle, for symbols
+  // whose first tick of the day arrived before this process did.
+  //
+  // Without it, a restart or a deploy mid-session captures "the open" at
+  // whatever the price happened to be at that moment, so the whole board reads
+  // 0.00% until the next UTC midnight. Best-effort by design: staggered so 88
+  // symbols do not burst at the vendor at once, and every failure simply leaves
+  // that symbol to the first-tick path.
+  async backfillDayOpens(symbols = []) {
+    if (!INFOWAY_API_KEY) return 0
+    const today = InfowayService.utcDay(Date.now())
+    let filled = 0
+    for (const symbol of symbols) {
+      if (this.shutdown) break
+      const cur = this.dayOpens.get(symbol)
+      if (cur && cur.day === today) continue          // already known
+      try {
+        const bars = await this.fetchKlines(symbol, '1d', new Date(), 2)
+        const todays = bars.find(b => InfowayService.utcDay(b.time?.getTime?.()) === today)
+        const open = Number(todays?.open)
+        if (open > 0) {
+          this.dayOpens.set(symbol, { day: today, mid: open })
+          filled++
+        }
+      } catch (e) { /* leave it to the first tick of the next day */ }
+      await new Promise(r => setTimeout(r, 150))
+    }
+    if (filled) console.log(`[Infoway] Backfilled ${filled} session opens for ${today}`)
+    return filled
   }
 
   subscribe(callback) {
