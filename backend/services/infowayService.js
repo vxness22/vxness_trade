@@ -323,6 +323,21 @@ function dropSessionBreakBars(candles, symbol) {
   return candles.filter((c) => !isSessionBreak(Math.floor(c.time.getTime() / 1000)))
 }
 
+// The FX week shuts from Friday 17:00 to Sunday 17:00 New York, and TradingView
+// draws nothing in between. Infoway occasionally emits a flat no-tick row there
+// anyway; on EURUSD one put a Saturday 29-Aug-2026 candle (O=H=L=C) on the daily
+// chart that TradingView's FX:EURUSD does not have. A row whose session is
+// labelled Saturday or Sunday belongs to no trading day, so it is dropped —
+// Sunday evening's open is labelled Monday (see sessionTradingDate) and stays.
+function dropWeekendBars(candles, symbol) {
+  if (CRYPTO_SYMBOLS.includes(symbol)) return candles
+  return candles.filter((c) => {
+    const date = sessionTradingDate(Math.floor(c.time.getTime() / 1000))
+    const day = new Date(`${date}T00:00:00Z`).getUTCDay()
+    return day !== 0 && day !== 6
+  })
+}
+
 /**
  * Fold a sorted bar series into larger bars. `bucketOf(seconds)` returns the
  * epoch-second stamp of the bar a source bar belongs to; consecutive sources
@@ -1139,7 +1154,8 @@ class InfowayService {
       })).filter((c) => Number.isFinite(c.open) && c.time instanceof Date && !isNaN(c.time))
 
       candles.sort((a, b) => a.time - b.time)
-      return dedupeRepeatedBars(dropSessionBreakBars(candles, symbol), symbol, timeframe)
+      return dedupeRepeatedBars(
+        dropWeekendBars(dropSessionBreakBars(candles, symbol), symbol), symbol, timeframe)
     } catch (err) {
       console.error(`[Infoway] batch_kline ${code} ${timeframe} error:`, err.message)
       return []
