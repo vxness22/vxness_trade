@@ -32,7 +32,7 @@ import { Monitor } from "lucide-react"
 // So some visitors will hit that warning and have to click through. The fix is
 // not to bring the zip back, it is an OV/EV code-signing certificate — see
 // "Code signing" in desk_terminal/README.md.
-export const WINDOWS_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.exe?v=2.0"
+export const WINDOWS_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.exe?v=2.5"
 
 // Flip to the .dmg URL once a macOS build has been produced and uploaded — the
 // installer can only be built and notarised on a Mac.
