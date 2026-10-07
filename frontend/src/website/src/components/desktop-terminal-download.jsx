@@ -6,15 +6,23 @@ import { Monitor } from "lucide-react"
 // only the vxness.in server block defines `location /downloads/`, so a visitor
 // on trade. or admin. would otherwise get the SPA's index.html instead of a file.
 //
-// ?v= is NOT decoration — bump it on every installer release.
+// Link the VERSIONED file (VxnessTerminal-Setup-<version>.exe), and change it
+// on every installer release.
 //
-// nginx sends `Cache-Control: public, max-age=14400` on /downloads/, and
-// Cloudflare honours it. Replacing the file on the origin therefore changes
-// nothing for up to four hours: the CDN keeps answering cf-cache-status: HIT
-// with the PREVIOUS build, at its old Content-Length and Last-Modified. That is
-// the worst kind of stale, because the download succeeds and looks correct.
-// The query string is part of Cloudflare's cache key, so bumping it forces a
-// MISS and pulls the new binary through. Same trick as tvchart.css?v=3.
+// Cloudflare caches /downloads/. Replacing a file on the origin under the same
+// URL therefore changes nothing for a while: the CDN keeps answering
+// cf-cache-status: HIT with the PREVIOUS build, at its old Content-Length and
+// Last-Modified — the worst kind of stale, because the download succeeds and
+// looks correct. 2.5.1 went out that way: the generic VxnessTerminal-Setup.exe
+// and the old ?v= link both kept serving 2.5.
+//
+// A new release's versioned filename has never been requested, so it can only
+// be fetched fresh from the origin. It also lands on the visitor's disk named
+// with its version, so anyone can see which build they downloaded — the
+// generic name made 2.5 and 2.5.1 indistinguishable.
+//
+// Upload each release as VxnessTerminal-Setup-<version>.exe (and refresh the
+// generic VxnessTerminal-Setup.exe beside it for old links).
 //
 // The setup .exe is the ONLY thing published here. A .zip of the same build
 // used to sit beside it and is deliberately gone — it is no longer on the
@@ -31,8 +39,8 @@ import { Monitor } from "lucide-react"
 //
 // So some visitors will hit that warning and have to click through. The fix is
 // not to bring the zip back, it is an OV/EV code-signing certificate — see
-// "Code signing" in desk_terminal/README.md.
-export const WINDOWS_URL = "https://vxness.in/downloads/VxnessTerminal-Setup.exe?v=2.5.1"
+// "Code signing" in final_desktop/README.md.
+export const WINDOWS_URL = "https://vxness.in/downloads/VxnessTerminal-Setup-2.5.1.exe"
 
 // Flip to the .dmg URL once a macOS build has been produced and uploaded — the
 // installer can only be built and notarised on a Mac.
