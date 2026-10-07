@@ -2,7 +2,7 @@ import dotenv from 'dotenv'
 dotenv.config()
 import express from 'express'
 import infowayService, { SUPPORTED_SYMBOLS, CRYPTO_SYMBOLS, FALLBACK_PRICES } from '../services/infowayService.js'
-import { classify } from '../utils/symbolMeta.js'
+import { classify, displayDigits, contractSize as engineContractSize } from '../utils/symbolMeta.js'
 
 const router = express.Router()
 
@@ -218,24 +218,21 @@ function getInstrumentName(symbol) {
 }
 
 // Helper to get digits for symbol
+// One digits table for every client — see displayDigits in utils/symbolMeta.js.
+// Crypto is sized from the live price, so DOGE shows 0.08473 and SHIB 0.00000514
+// instead of both rounding to 0.08 / 0.00.
 function getDigits(symbol) {
-  // Indices are quoted in points; two decimals is what the feed carries and what
-  // every reference platform shows for them. Checked before the JPY rule, or
-  // JPN225 would be read as a yen pair and shown to three.
-  if (isIndexSymbol(symbol)) return 2
-  if (symbol.includes('JPY')) return 3
-  // Metals (gold/silver/platinum/palladium) show 2 decimals, like TradingView.
-  if (/^X(AU|AG|PT|PD)/.test(symbol)) return 2
-  if (infowayService.isCrypto(symbol)) return 2
-  return 5
+  return displayDigits(symbol, infowayService.getPrice(symbol)?.bid)
 }
 
 // Helper to get contract size
+// The engine's own contract sizes (utils/symbolMeta.js), which every fill,
+// margin and P&L is computed with. This table used to be a separate copy that
+// disagreed with it — silver 100 against 5000, oil 100000 against 1000,
+// platinum 100000 against 100 — so the web and app previewed margin and P&L on
+// numbers the engine never used.
 function getContractSize(symbol) {
-  if (isIndexSymbol(symbol)) return 1        // 1 unit = 1 index point
-  if (infowayService.isCrypto(symbol)) return 1
-  if (symbol === 'XAUUSD' || symbol === 'XAGUSD') return 100
-  return 100000
+  return engineContractSize(symbol)
 }
 
 // GET /api/prices/status - Live/frozen state of the Infoway price feed (MUST be before /:symbol)

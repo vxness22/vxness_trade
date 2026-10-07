@@ -2,6 +2,7 @@ import express from 'express'
 import Charges from '../models/Charges.js'
 import AccountType from '../models/AccountType.js'
 import { resolveTradeSegment } from '../utils/tradeSegment.js'
+import { invalidateSpreadCache } from '../utils/terminalQuotes.js'
 
 const router = express.Router()
 
@@ -10,6 +11,8 @@ const normInstrumentKey = (s) => (s == null || s === '' ? '' : String(s).toUpper
 // Pushes 'chargesUpdated' so every connected trading UI refetches spreads/commissions immediately.
 const emitChargesUpdated = (req, payload = {}) => {
   try { req.app.get('io')?.emit('chargesUpdated', { at: Date.now(), ...payload }) } catch {}
+  // Same moment for the desktop terminal's price socket and /api/algo quotes.
+  invalidateSpreadCache()
 }
 
 // Live trading config — never let Cloudflare/proxies cache a stale response.

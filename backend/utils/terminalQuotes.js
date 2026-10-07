@@ -10,7 +10,7 @@
 // several times a second per symbol; recomputing there would hammer Mongo.
 
 import Charges from '../models/Charges.js'
-import { pipSize, classify } from './symbolMeta.js'
+import { pipSize, classify, displayDigits } from './symbolMeta.js'
 import { resolveTradeSegment } from './tradeSegment.js'
 
 const CACHE_TTL_MS = 30_000
@@ -70,22 +70,29 @@ export function applySpread(symbol, bid, ask, entry) {
   return { bid: b, ask: b + d }
 }
 
-// Number of decimals the terminal should render for a symbol. Derived from
-// pipSize so it can never drift from the spread/commission scaling — except for
-// indices, where the two genuinely want different units.
-//
-// An index's natural spread unit is the whole point (admin types "2" for a
-// two-point spread on US30), so pipSize is 1 there. Its natural DISPLAY is two
-// decimals — the feed carries 52968.73 and every reference platform shows it
-// that way. Deriving digits from pipSize would round that to 52969 and throw
-// away a real part of the quote, so this one class is stated outright.
-export function digitsFor(symbol) {
-  if (classify(symbol) === 'index') return 2
-  const ps = pipSize(symbol)
-  if (!(ps > 0)) return 5
-  return Math.max(0, Math.round(Math.log10(1 / ps)))
+// Number of decimals the terminal renders a symbol with. The same table the web
+// and the app read (utils/symbolMeta.js displayDigits), sized from the live
+// price for crypto — the desktop watchlist used to keep its own copy, which
+// disagreed with the blotter beside it and with the web.
+export function digitsFor(symbol, price = null) {
+  return displayDigits(symbol, price)
 }
 
+// Listeners told when an admin changes spreads, so live consumers (the
+// desktop price socket) can re-resolve at once instead of quoting the old
+// spread for up to a minute and a half.
+const spreadListeners = new Set()
+export function onSpreadsChanged(fn) {
+  spreadListeners.add(fn)
+  return () => spreadListeners.delete(fn)
+}
+
+// Called whenever Charges change. The web terminal already refetched on the
+// 'chargesUpdated' socket event; this is the desktop's equivalent. Nothing used
+// to call it, so the desktop ran on a 30s memo plus a 60s per-socket refresh.
 export function invalidateSpreadCache() {
   cache.clear()
+  for (const fn of spreadListeners) {
+    try { fn() } catch { /* a listener must not break the admin's save */ }
+  }
 }

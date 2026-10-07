@@ -1,4 +1,5 @@
 import express from 'express'
+import { addToBalance, debitBalance } from '../utils/accountBalance.js'
 import bcrypt from 'bcryptjs'
 import User from '../models/User.js'
 import Transaction from '../models/Transaction.js'
@@ -237,8 +238,8 @@ router.post('/trading-account/:id/add-fund', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Trading account not found' })
     }
     
-    account.balance = (account.balance || 0) + parseFloat(amount)
-    await account.save()
+    // Atomic — see utils/accountBalance.js.
+    account.balance = (await addToBalance(account._id, parseFloat(amount))).balance
     
     // Create transaction record
     const txData = {
@@ -291,8 +292,11 @@ router.post('/trading-account/:id/deduct', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Insufficient balance in trading account' })
     }
     
-    account.balance = (account.balance || 0) - parseFloat(amount)
-    await account.save()
+    const debited = await debitBalance(account._id, parseFloat(amount))
+    if (!debited) {
+      return res.status(400).json({ success: false, message: 'Insufficient balance in trading account' })
+    }
+    account.balance = debited.balance
     
     // Create transaction record
     const txData = {

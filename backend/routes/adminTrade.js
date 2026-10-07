@@ -11,6 +11,7 @@ import { pnlUsd, marginUsd } from '../utils/symbolMeta.js'
 
 
 import TradingAccount from '../models/TradingAccount.js'
+import { addToBalance } from '../utils/accountBalance.js'
 
 
 
@@ -723,11 +724,8 @@ router.put('/edit/:tradeId', async (req, res) => {
 
         if (account) {
 
-          account.balance += trade.realizedPnl
-
-          if (account.balance < 0) account.balance = 0
-
-          await account.save()
+          // Atomic — see utils/accountBalance.js.
+          account.balance = (await addToBalance(account._id, trade.realizedPnl, { floorZero: true })).balance
 
         }
 
@@ -737,11 +735,7 @@ router.put('/edit/:tradeId', async (req, res) => {
 
         // Trade was already closed - adjust balance by difference
 
-        account.balance = account.balance - oldPnl + trade.realizedPnl
-
-        if (account.balance < 0) account.balance = 0
-
-        await account.save()
+        account.balance = (await addToBalance(account._id, trade.realizedPnl - oldPnl, { floorZero: true })).balance
 
       }
 
@@ -799,15 +793,7 @@ router.put('/edit/:tradeId', async (req, res) => {
 
 
 
-          account.balance = account.balance - oldPnl + realizedPnl
-
-
-
-          if (account.balance < 0) account.balance = 0
-
-
-
-          await account.save()
+          account.balance = (await addToBalance(account._id, realizedPnl - oldPnl, { floorZero: true })).balance
 
 
 
@@ -1134,15 +1120,7 @@ router.post('/close/:tradeId', async (req, res) => {
 
 
 
-      account.balance += realizedPnl
-
-
-
-      if (account.balance < 0) account.balance = 0
-
-
-
-      await account.save()
+      account.balance = (await addToBalance(account._id, realizedPnl, { floorZero: true })).balance
 
 
 

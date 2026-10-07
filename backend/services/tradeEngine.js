@@ -18,6 +18,10 @@ import AdminLog from '../models/AdminLog.js'
 
 import ibEngine from './ibEngineNew.js'
 
+// Balance moves are single atomic updates — see utils/accountBalance.js for why
+// read → modify → save lost money whenever two of them met.
+import { applyRealizedPnl, chargeBalance } from '../utils/accountBalance.js'
+
 
 
 // How far a stop/target may sit from the current market before the SL/TP sweep
@@ -650,11 +654,7 @@ class TradeEngine {
 
     if (orderType === 'MARKET' && commission > 0) {
 
-      account.balance -= commission
-
-      if (account.balance < 0) account.balance = 0
-
-      await account.save()
+      await chargeBalance(account._id, commission)
 
     }
 
@@ -668,7 +668,12 @@ class TradeEngine {
 
   // Close a trade
 
-  async closeTrade(tradeId, currentBid, currentAsk, closedBy = 'USER', adminId = null) {
+  // `enforceHold: false` is for closes the trader did not ask for directly — a
+  // copy-trade follower closed because its master closed. The master already
+  // met the 3-minute hold, and its follower copy opens a few milliseconds after
+  // it; holding the follower to the rule independently left it OPEN, with no
+  // master left to close it, whenever the master closed just past 3 minutes.
+  async closeTrade(tradeId, currentBid, currentAsk, closedBy = 'USER', adminId = null, { enforceHold = true } = {}) {
 
     const trade = await Trade.findById(tradeId).populate({ path: 'tradingAccountId', populate: { path: 'accountTypeId' } })
 
@@ -677,7 +682,7 @@ class TradeEngine {
     if (trade.status !== 'OPEN') throw new Error('Trade is not open')
 
     // Check 3-minute minimum trade duration (skip for SL/TP/STOP_OUT auto-closes)
-    if (closedBy === 'USER' || closedBy === 'ADMIN') {
+    if (enforceHold && (closedBy === 'USER' || closedBy === 'ADMIN')) {
       const tradeOpenTime = new Date(trade.openedAt || trade.createdAt)
       const now = new Date()
       const timeDiffMs = now - tradeOpenTime
@@ -764,61 +769,32 @@ class TradeEngine {
 
 
 
-    await trade.save()
-
-
-
-    // Update account balance with proper credit handling
-
-    const account = await TradingAccount.findById(trade.tradingAccountId)
-
-    
-
-    if (realizedPnl >= 0) {
-
-      // Profit: Add to balance only (credit stays the same)
-
-      account.balance += realizedPnl
-
-    } else {
-
-      // Loss: First deduct from balance, then from credit if balance insufficient
-
-      const loss = Math.abs(realizedPnl)
-
-      
-
-      if (account.balance >= loss) {
-
-        // Balance can cover the loss
-
-        account.balance -= loss
-
-      } else {
-
-        // Balance cannot cover the loss - use credit for remaining
-
-        const remainingLoss = loss - account.balance
-
-        account.balance = 0
-
-        
-
-        // Deduct remaining loss from credit
-
-        if (account.credit > 0) {
-
-          account.credit = Math.max(0, (account.credit || 0) - remainingLoss)
-
-        }
-
-      }
-
+    // Claim the close atomically: only one caller can move this trade from
+    // OPEN to CLOSED. The status test at the top is a read, and the balance
+    // credit below would otherwise run once per caller — the 1-second SL/TP
+    // sweep and a trader's own close, or two follower closes racing, could each
+    // pass that test and each pay the P&L into the account.
+    const closeFields = {
+      closePrice: trade.closePrice,
+      realizedPnl: trade.realizedPnl,
+      status: 'CLOSED',
+      closedBy: trade.closedBy,
+      closedAt: trade.closedAt,
     }
+    if (adminId) {
+      closeFields.adminModified = true
+      closeFields.adminModifiedBy = adminId
+      closeFields.adminModifiedAt = trade.adminModifiedAt
+    }
+    const claimed = await Trade.updateOne({ _id: trade._id, status: 'OPEN' }, { $set: closeFields })
+    if (!claimed.modifiedCount) throw new Error('Trade is not open')
 
-    
 
-    await account.save()
+
+    // Update account balance with proper credit handling — atomically; see
+    // applyRealizedPnl for why this is no longer read → modify → save.
+
+    await applyRealizedPnl(trade.tradingAccountId, realizedPnl)
 
 
 
@@ -867,6 +843,158 @@ class TradeEngine {
 
 
     return { trade, realizedPnl }
+
+  }
+
+
+
+  // Close PART of an open position, through the same closeTrade() a full close
+  // uses — so the slice pays commission-on-close, credits IB, and moves the
+  // balance exactly as a full close would. The route that did this before
+  // booked the slice by hand and skipped all three, and left copy-trade
+  // followers at their full size.
+  //
+  // The slice is split off as its own OPEN trade first (the parent shrinks
+  // atomically, guarded on its current size so two partials cannot both take
+  // the same lots), then closed. Followers of a master trade are reduced by the
+  // same share.
+  async partialCloseTrade(tradeId, lots, currentBid, currentAsk, closedBy = 'USER', { followers = true, enforceHold = true } = {}) {
+
+    const parent = await Trade.findById(tradeId)
+
+    if (!parent) throw new Error('Trade not found')
+
+    if (parent.status !== 'OPEN') throw new Error('Trade is not open')
+
+    const round2 = (n) => Math.round(n * 100) / 100
+
+    const sliceLots = round2(Number(lots))
+
+    if (!(sliceLots > 0)) throw new Error('Lots to close must be greater than 0')
+
+    // The platform's lot step is 0.01: a slice or a remainder off that grid is
+    // a size no other screen can show or close.
+    if (Math.abs(sliceLots - Number(lots)) > 1e-9) throw new Error('Lots must be a multiple of 0.01')
+
+    const remaining = round2(parent.quantity - sliceLots)
+
+    if (remaining < 0.01) throw new Error('That closes the whole position; close it fully instead')
+
+    // Same minimum hold a full close enforces, checked before anything moves.
+    if (enforceHold && (closedBy === 'USER' || closedBy === 'ADMIN')) {
+      const heldMs = Date.now() - new Date(parent.openedAt || parent.createdAt).getTime()
+      if (heldMs < 3 * 60 * 1000) {
+        const wait = Math.ceil((3 * 60 * 1000 - heldMs) / 1000)
+        throw new Error(`Trade cannot be closed before 3 minutes. Please wait ${wait} seconds.`)
+      }
+    }
+
+    const share = sliceLots / parent.quantity
+
+    const sliceMargin = (parent.marginUsed || 0) * share
+
+    const sliceSwap = (parent.swap || 0) * share
+
+    const sliceCommission = (parent.commission || 0) * share
+
+    const shrunk = await Trade.findOneAndUpdate(
+      { _id: parent._id, status: 'OPEN', quantity: parent.quantity },
+      {
+        $set: {
+          quantity: remaining,
+          marginUsed: (parent.marginUsed || 0) - sliceMargin,
+          swap: (parent.swap || 0) - sliceSwap,
+          commission: (parent.commission || 0) - sliceCommission,
+        },
+      },
+      { new: true }
+    )
+
+    if (!shrunk) throw new Error('The position changed while closing; please try again')
+
+    const slice = await Trade.create({
+      userId: parent.userId,
+      tradingAccountId: parent.tradingAccountId,
+      accountType: parent.accountType,
+      isChallengeAccount: parent.isChallengeAccount,
+      tradeId: await Trade.generateTradeId(),
+      symbol: parent.symbol,
+      segment: parent.segment,
+      side: parent.side,
+      orderType: 'MARKET',
+      quantity: sliceLots,
+      openPrice: parent.openPrice,
+      // No brackets: the slice is closed on the next line, and the 1-second
+      // SL/TP sweep must not be able to grab it first.
+      marginUsed: sliceMargin,
+      leverage: parent.leverage,
+      contractSize: parent.contractSize,
+      spread: parent.spread,
+      // Its share of the open commission, for the record only — that was
+      // already deducted when the parent opened.
+      commission: sliceCommission,
+      swap: sliceSwap,
+      status: 'OPEN',
+      openedAt: parent.openedAt || parent.createdAt,
+    })
+
+    const result = await this.closeTrade(slice._id, currentBid, currentAsk, closedBy, null, { enforceHold })
+
+    if (followers) this.partialCloseFollowersAsync(parent._id, share, closedBy)
+
+    return { trade: result.trade, realizedPnl: result.realizedPnl, remaining: shrunk }
+
+  }
+
+
+
+  // A master's partial close takes the same share off every open follower copy.
+  async partialCloseFollowersAsync(masterTradeId, share, closedBy) {
+
+    try {
+
+      const CopyTrade = (await import('../models/CopyTrade.js')).default
+
+      const links = await CopyTrade.find({ masterTradeId, status: 'OPEN' })
+
+      for (const link of links) {
+
+        try {
+
+          const follower = await Trade.findById(link.followerTradeId)
+
+          if (!follower || follower.status !== 'OPEN') continue
+
+          const q = infowayService.getTradablePrice(follower.symbol)
+
+          if (!q) continue
+
+          const lots = Math.round(follower.quantity * share * 100) / 100
+
+          if (lots < 0.01) continue
+
+          if (Math.round((follower.quantity - lots) * 100) / 100 < 0.01) {
+            await this.closeTrade(follower._id, q.bid, q.ask, closedBy, null, { enforceHold: false })
+            link.status = 'CLOSED'
+            link.closedAt = new Date()
+            await link.save()
+          } else {
+            await this.partialCloseTrade(follower._id, lots, q.bid, q.ask, closedBy, { followers: false, enforceHold: false })
+          }
+
+        } catch (e) {
+
+          console.error(`[CopyTrade] partial close of follower ${link.followerTradeId} failed:`, e.message)
+
+        }
+
+      }
+
+    } catch (error) {
+
+      console.error('Error partially closing follower trades:', error)
+
+    }
 
   }
 
@@ -1096,17 +1224,9 @@ class TradeEngine {
 
 
 
-      // Reset account balance if negative
+      // Reset account balance if negative (atomically, and only if it is)
 
-      const finalAccount = await TradingAccount.findById(tradingAccountId)
-
-      if (finalAccount.balance < 0) {
-
-        finalAccount.balance = 0
-
-      }
-
-      await finalAccount.save()
+      await TradingAccount.updateOne({ _id: tradingAccountId, balance: { $lt: 0 } }, { $set: { balance: 0 } })
 
 
 
@@ -1287,9 +1407,21 @@ class TradeEngine {
 
         console.log(`[Regular SL/TP] TRIGGERED! Trade ${trade.tradeId}: ${trigger} at exact price=${trade.side === 'BUY' ? closeBid : closeAsk}`)
 
-        const result = await this.closeTrade(trade._id, closeBid, closeAsk, trigger)
+        // Each close stands alone. A trade closed a moment ago by its owner (or
+        // by another sweep) now throws "Trade is not open" from closeTrade's
+        // atomic claim; uncaught, that aborted the whole pass and left every
+        // other account's stops unchecked until the next one.
+        try {
 
-        triggeredTrades.push({ trade: result.trade, trigger, pnl: result.realizedPnl })
+          const result = await this.closeTrade(trade._id, closeBid, closeAsk, trigger)
+
+          triggeredTrades.push({ trade: result.trade, trigger, pnl: result.realizedPnl })
+
+        } catch (err) {
+
+          console.warn(`[Regular SL/TP] ${trade.tradeId}: ${trigger} not applied — ${err.message}`)
+
+        }
 
       }
 
@@ -1371,15 +1503,32 @@ class TradeEngine {
 
         try {
 
-          // Update trade to OPEN status
+          const fillPrice = trade.side === 'BUY' ? currentAsk : currentBid
+
+          const openedAt = new Date()
+
+          // Claim the fill atomically. The 2-second sweep and a client's own
+          // check-pending call can look at the same order at once; without this
+          // both filled it, and with commission now charged on fill, both would
+          // have charged it.
+          const claimed = await Trade.updateOne(
+            { _id: trade._id, status: 'PENDING' },
+            { $set: { status: 'OPEN', openPrice: fillPrice, openedAt } }
+          )
+
+          if (!claimed.modifiedCount) continue
 
           trade.status = 'OPEN'
 
-          trade.openPrice = trade.side === 'BUY' ? currentAsk : currentBid
+          trade.openPrice = fillPrice
 
-          trade.openedAt = new Date()
+          trade.openedAt = openedAt
 
-          await trade.save()
+          // A filled pending order pays its commission the moment it becomes a
+          // position, exactly as a market order does at open. Only market
+          // opens used to deduct it, so a limit or stop entry was quietly
+          // commission-free while its Charges column showed an amount.
+          if (trade.commission > 0) await chargeBalance(trade.tradingAccountId, trade.commission)
 
 
 

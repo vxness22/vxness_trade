@@ -22,9 +22,12 @@ import KYC from '../models/KYC.js'
 import SupportTicket from '../models/SupportTicket.js'
 import { instrumentCatalogue } from './prices.js'
 import AlgoKey from '../models/AlgoKey.js'
+import Charges from '../models/Charges.js'
+import SharedTrade from '../models/SharedTrade.js'
 import TerminalRefreshToken, { REFRESH_TTL_DAYS } from '../models/TerminalRefreshToken.js'
 import infowayService, { SUPPORTED_SYMBOLS } from '../services/infowayService.js'
 import tradeEngine from '../services/tradeEngine.js'
+import copyTradingEngine from '../services/copyTradingEngine.js'
 import { contractSize as symbolContractSize, quoteToUsd, notionalUsd, pipSize } from '../utils/symbolMeta.js'
 import { resolveTradeSegment } from '../utils/tradeSegment.js'
 import { jwtAuth, ownedAccount, signAccessToken, fail } from '../utils/terminalAuth.js'
@@ -258,6 +261,30 @@ function liveQuote(symbol) {
   return p && p.bid > 0 ? p : null
 }
 
+// The quote a FILL is priced at: only what the feed delivered, never the
+// FALLBACK_PRICES placeholder liveQuote() can return for display. Same source
+// the web terminal and /api/algo fill from.
+function tradableQuote(symbol) {
+  return infowayService.getTradablePrice(symbol)
+}
+
+// A trader's note, trimmed to what the model stores.
+function commentFrom(body) {
+  const c = body?.comment
+  return typeof c === 'string' ? c.trim().slice(0, 255) : null
+}
+
+// A master trader's positions drive their followers': brackets are mirrored
+// the same way the web terminal's /api/trade/modify does it.
+async function mirrorBracketsToFollowers(trade) {
+  try {
+    const master = await MasterTrader.findOne({ tradingAccountId: trade.tradingAccountId, status: 'ACTIVE' })
+    if (master) await copyTradingEngine.mirrorSlTpModification(trade._id, trade.sl ?? null, trade.tp ?? null)
+  } catch (e) {
+    console.error('[v1] mirroring SL/TP to followers failed:', e.message)
+  }
+}
+
 // Spread as a POINT COUNT, where a point is pipSize(symbol) — the platform's
 // single definition of one, shared with spread/commission pricing.
 //
@@ -323,6 +350,11 @@ function positionJson(t) {
     // browser cannot work the rate out for a cross like EURGBP (it only holds
     // ticks for the charted symbol), so the server sends it.
     quote_to_usd: quoteToUsd(t.symbol, current, (s) => infowayService.getPrice(s)),
+    // The raw bid `profit` was computed at. Bid is the one side every client's
+    // quote shares (the admin spread only moves the ask), so a client can carry
+    // P&L forward between polls by the change in bid alone — for a SELL too,
+    // whose closing side is an ask the desktop only sees spread-adjusted.
+    mark_bid: q ? q.bid : null,
     // Display precision. Without it the app formatted every price with
     // toFixed(5), so gold showed as 4372.63000 and USDJPY as 154.17000.
     digits: instrumentDigits(t.symbol),
@@ -330,7 +362,7 @@ function positionJson(t) {
       notionalUsd(t.symbol, t.quantity, t.openPrice, (s) => infowayService.getPrice(s)) * 100
     ) / 100,
     opened_at: (t.openedAt || t.createdAt)?.toISOString?.() || '',
-    comment: '',
+    comment: t.comment || '',
   }
 }
 
@@ -374,7 +406,10 @@ router.put('/positions/:id', jwtAuth, async (req, res) => {
 
     const body = req.body || {}
     const has = (k) => Object.prototype.hasOwnProperty.call(body, k)
-    if (!has('stop_loss') && !has('take_profit')) return fail(res, 400, 'Nothing to update')
+    if (!has('stop_loss') && !has('take_profit') && !has('comment')) {
+      return fail(res, 400, 'Nothing to update')
+    }
+    if (has('comment')) trade.comment = commentFrom(body) ?? ''
 
     const q = liveQuote(trade.symbol)
     const ref = closingPrice(trade.side, q)
@@ -411,6 +446,9 @@ router.put('/positions/:id', jwtAuth, async (req, res) => {
     }
 
     await trade.save()
+    // Followers of a master keep their brackets in step with it, as they do
+    // when the master edits from the website.
+    if (has('stop_loss') || has('take_profit')) await mirrorBracketsToFollowers(trade)
     res.json({ message: 'Position updated', ...positionJson(trade) })
   } catch (e) {
     fail(res, 500, e.message)
@@ -437,7 +475,7 @@ router.post('/positions/:id/close', jwtAuth, async (req, res) => {
         `Market is closed for ${trade.symbol}.`)
     }
 
-    const q = liveQuote(trade.symbol)
+    const q = tradableQuote(trade.symbol)
     if (!q) return fail(res, 503, `No live price for ${trade.symbol}. Please try again.`)
 
     const askedLots = Number(req.body?.lots)
@@ -454,84 +492,175 @@ router.post('/positions/:id/close', jwtAuth, async (req, res) => {
     }
 
     // ---- Partial close ----
-    // The same 3-minute minimum hold the full close enforces; applying it here
-    // too stops a partial being used to sidestep the rule.
-    const heldMs = Date.now() - new Date(trade.openedAt || trade.createdAt).getTime()
-    if (heldMs < 3 * 60 * 1000) {
-      const wait = Math.ceil((3 * 60 * 1000 - heldMs) / 1000)
-      return fail(res, 400, `Trade cannot be closed before 3 minutes. Please wait ${wait} seconds.`)
-    }
-
-    const closePrice = trade.side === 'BUY' ? q.bid : q.ask
-    const share = askedLots / trade.quantity
-    const rawPnl = tradeEngine.calculatePnl(
-      trade.side, trade.openPrice, closePrice, askedLots, trade.contractSize, trade.symbol
-    )
-    const swapShare = (trade.swap || 0) * share
-    const realized = rawPnl - swapShare
-
-    // Book the closed slice as its own CLOSED trade so history and reporting
-    // see a real fill rather than a position that silently shrank.
-    const sliceId = await Trade.generateTradeId()
-    await Trade.create({
-      userId: trade.userId,
-      tradingAccountId: trade.tradingAccountId,
-      accountType: trade.accountType,
-      isChallengeAccount: trade.isChallengeAccount,
-      tradeId: sliceId,
-      symbol: trade.symbol,
-      segment: trade.segment,
-      side: trade.side,
-      orderType: 'MARKET',
-      quantity: askedLots,
-      openPrice: trade.openPrice,
-      closePrice,
-      stopLoss: trade.stopLoss,
-      takeProfit: trade.takeProfit,
-      marginUsed: (trade.marginUsed || 0) * share,
-      leverage: trade.leverage,
-      contractSize: trade.contractSize,
-      spread: trade.spread,
-      commission: 0,                       // already charged on the parent open
-      swap: swapShare,
-      realizedPnl: realized,
-      status: 'CLOSED',
-      closedBy: 'USER',
-      openedAt: trade.openedAt,
-      closedAt: new Date(),
-    })
-
-    // Shrink the survivor, releasing its share of the margin and swap.
-    trade.quantity = Math.round((trade.quantity - askedLots) * 100) / 100
-    trade.marginUsed = (trade.marginUsed || 0) * (1 - share)
-    trade.swap = (trade.swap || 0) - swapShare
-    await trade.save()
-
-    // Same balance-then-credit waterfall the full close applies.
-    const account = await TradingAccount.findById(trade.tradingAccountId)
-    if (realized >= 0) {
-      account.balance += realized
-    } else {
-      const loss = Math.abs(realized)
-      if (account.balance >= loss) {
-        account.balance -= loss
-      } else {
-        const remaining = loss - account.balance
-        account.balance = 0
-        account.credit = Math.max(0, (account.credit || 0) - remaining)
-      }
-    }
-    await account.save()
-
+    // Through the engine's own partialCloseTrade(), which closes the slice with
+    // the same closeTrade() a full close uses: commission-on-close, IB credit,
+    // the balance/credit waterfall, the 3-minute hold, the 0.01 lot step, and
+    // copy-trade followers reduced by the same share. This route used to book
+    // the slice by hand and skipped the commission, the IB credit and the
+    // followers.
+    const result = await tradeEngine.partialCloseTrade(trade._id, askedLots, q.bid, q.ask, 'USER')
     res.json({
-      message: `Closed ${askedLots} of ${askedLots + trade.quantity} lots`,
+      message: `Closed ${result.trade.quantity} of ${result.trade.quantity + result.remaining.quantity} lots`,
       id: String(trade._id),
-      close_price: closePrice,
-      profit: Math.round(realized * 100) / 100,
-      remaining_lots: trade.quantity,
+      close_price: result.trade.closePrice,
+      profit: Math.round(result.realizedPnl * 100) / 100,
+      remaining_lots: result.remaining.quantity,
     })
   } catch (e) {
     fail(res, 400, e.message)
+  }
+})
+
+// "1:500", "500" or 500 -> 500; anything unreadable -> 0.
+function leverageNumber(v) {
+  const n = parseInt(String(v ?? '').replace(/^\s*1\s*:\s*/, ''), 10)
+  return Number.isFinite(n) && n > 0 ? n : 0
+}
+
+/* ──────────────────────  sharing  ────────────────────── */
+
+// The figures a shared card shows, for an open or a closed trade. Nothing that
+// identifies the trader — no name, email or account number — ever leaves here.
+function sharedTradeJson(t, share) {
+  const open = t.status === 'OPEN'
+  const q = open ? liveQuote(t.symbol) : null
+  const current = open ? (q ? (t.side === 'BUY' ? q.bid : q.ask) : t.openPrice) : t.closePrice
+  const profit = open
+    ? (q ? tradeEngine.calculateFloatingPnl(t, q.bid, q.ask) : 0)
+    : (t.realizedPnl ?? 0)
+  const digits = instrumentDigits(t.symbol)
+  // Same tick the desktop's share card counts in: one pip, 10^-(digits-1).
+  const tick = Math.pow(10, -(digits - 1))
+  const move = t.side === 'BUY' ? (current - t.openPrice) : (t.openPrice - current)
+  const margin = t.marginUsed || 0
+  return {
+    code: share.code,
+    symbol: t.symbol,
+    side: t.side,
+    lots: t.quantity,
+    open_price: t.openPrice,
+    current_price: current,
+    digits,
+    status: open ? 'open' : 'closed',
+    profit: Math.round(profit * 100) / 100,
+    roi_pct: margin > 0 ? Math.round((profit / margin) * 10000) / 100 : null,
+    ticks: tick > 0 ? Math.round((move / tick) * 10) / 10 : null,
+    display_mode: share.displayMode,
+    description: share.description || '',
+    link_description: share.linkDescription || '',
+    opened_at: (t.openedAt || t.createdAt)?.toISOString?.() || '',
+    closed_at: t.closedAt?.toISOString?.() || '',
+  }
+}
+
+// POST /api/v1/positions/:id/share — {description?, link_description?, display_mode}
+// Mints (or updates) the public link for one of the caller's own trades.
+router.post('/positions/:id/share', jwtAuth, async (req, res) => {
+  try {
+    let trade
+    try { trade = await Trade.findById(String(req.params.id)) } catch { trade = null }
+    if (!trade || !['OPEN', 'CLOSED'].includes(trade.status)) return fail(res, 404, 'Position not found')
+    const account = await ownedAccount(req.user._id, trade.tradingAccountId)
+    if (!account) return fail(res, 404, 'Position not found')
+
+    const body = req.body || {}
+    const text = (v) => (typeof v === 'string' ? v.trim().slice(0, 500) : '')
+    const mode = ['pnl', 'roi', 'ticks'].includes(body.display_mode) ? body.display_mode : 'pnl'
+
+    let share = await SharedTrade.findOne({ tradeId: trade._id })
+    if (!share) {
+      share = new SharedTrade({ tradeId: trade._id, userId: req.user._id, code: SharedTrade.newCode() })
+    }
+    share.description = text(body.description)
+    share.linkDescription = text(body.link_description)
+    share.displayMode = mode
+    await share.save()
+
+    res.json({ short_code: share.code, ...sharedTradeJson(trade, share) })
+  } catch (e) {
+    fail(res, 400, e.message)
+  }
+})
+
+// GET /api/v1/share/:code — PUBLIC. What vxness.in/s/<code> renders.
+router.get('/share/:code', async (req, res) => {
+  try {
+    const code = String(req.params.code || '')
+    if (!/^[A-Za-z0-9]{6,16}$/.test(code)) return fail(res, 404, 'This link does not exist')
+    const share = await SharedTrade.findOne({ code })
+    if (!share) return fail(res, 404, 'This link does not exist')
+    const trade = await Trade.findById(share.tradeId)
+    if (!trade) return fail(res, 404, 'This trade is no longer available')
+    res.set('Cache-Control', 'no-store')
+    res.json(sharedTradeJson(trade, share))
+  } catch (e) {
+    fail(res, 500, e.message)
+  }
+})
+
+/* ──────────────────────  instrument specification  ────────────────────── */
+
+// GET /api/v1/trading/instruments/:symbol?account_id=
+//
+// The desktop's Specification panel. Catalogue facts (digits, contract, lots)
+// plus what THIS account is charged on the symbol — spread, commission per lot
+// and swaps — resolved by the same Charges.getChargesForTrade the engine fills
+// with, so the panel states the terms an order is actually priced on.
+router.get('/trading/instruments/:symbol', jwtAuth, async (req, res) => {
+  try {
+    const symbol = String(req.params.symbol || '').toUpperCase()
+    const meta = instrumentCatalogue().find(i => i.symbol === symbol)
+    if (!meta) return fail(res, 404, `Unknown symbol ${symbol}`)
+
+    let accountTypeId = null
+    if (req.query.account_id) {
+      const account = await ownedAccount(req.user._id, req.query.account_id)
+      if (!account) return fail(res, 404, 'Trading account not found for this user')
+      accountTypeId = account.accountTypeId?._id || account.accountTypeId || null
+    }
+
+    const segment = resolveTradeSegment(symbol)
+    const charges = await Charges.getChargesForTrade(req.user._id, symbol, segment, accountTypeId)
+    const q = liveQuote(symbol)
+    const pip = pipSize(symbol)
+
+    const spreadValue = Number(charges.spreadValue) || 0
+    const priceImpact = charges.spreadType === 'PERCENTAGE'
+      ? (q ? (q.ask - q.bid) * (spreadValue / 100) : 0)
+      : spreadValue * pip
+
+    const commissionPerLot = charges.commissionValue > 0
+      ? tradeEngine.calculateCommission(1, q ? q.ask : 0, charges.commissionType,
+          charges.commissionValue, meta.contractSize, symbol)
+      : 0
+
+    const hasSwaps = Number(charges.swapLong) !== 0 || Number(charges.swapShort) !== 0
+
+    res.json({
+      symbol,
+      display_name: meta.name,
+      segment,
+      digits: meta.digits,
+      pip_size: pip,
+      min_lot: meta.minVolume,
+      max_lot: meta.maxVolume,
+      lot_step: meta.volumeStep,
+      contract_size: meta.contractSize,
+      spread: {
+        type: String(charges.spreadType || 'FIXED').toLowerCase(),
+        value: spreadValue,
+        price_impact: priceImpact,
+      },
+      commission_type: charges.commissionType,
+      commission_preview_per_lot: Math.round(commissionPerLot * 100) / 100,
+      // null = none configured, which the panel shows differently from a 0 rate.
+      swap_long: hasSwaps ? Number(charges.swapLong) : null,
+      swap_short: hasSwaps ? Number(charges.swapShort) : null,
+      swap_type: charges.swapType,
+      swap_free: false,
+    })
+  } catch (e) {
+    fail(res, 500, e.message)
   }
 })
 
@@ -568,7 +697,7 @@ function orderJson(t) {
     stop_loss: t.sl ?? t.stopLoss ?? 0,
     take_profit: t.tp ?? t.takeProfit ?? 0,
     created_at: (t.createdAt)?.toISOString?.() || '',
-    comment: '',
+    comment: t.comment || '',
     status: 'pending',
   }
 }
@@ -587,11 +716,10 @@ router.get('/orders', jwtAuth, async (req, res) => {
   }
 })
 
-// POST /api/v1/orders/ — place a limit/stop order at a price the trader chose.
-//
-// Deliberately does NOT go through tradeEngine.openTrade: that helper derives
-// pendingPrice from the CURRENT market quote, so every pending order would sit
-// at spot instead of the requested level.
+// POST /api/v1/orders/ — a market order, or a limit/stop order at the price
+// the trader chose. Both go through tradeEngine.openTrade, exactly as the
+// website's /api/trade/open does; a pending order passes its level as the
+// explicit entry price, so it arms there rather than at spot.
 router.post('/orders', jwtAuth, async (req, res) => {
   try {
     const body = req.body || {}
@@ -619,8 +747,8 @@ router.post('/orders', jwtAuth, async (req, res) => {
       if (!isMarketOpen(symbol)) {
         return fail(res, 400, marketClosedReason(symbol) || `${symbol} is closed for trading right now`)
       }
-      const quote = liveQuote(symbol)
-      if (!quote || !(quote.bid > 0) || !(quote.ask > 0)) {
+      const quote = tradableQuote(symbol)
+      if (!quote) {
         return fail(res, 400, `No live price for ${symbol} right now`)
       }
 
@@ -655,6 +783,17 @@ router.post('/orders', jwtAuth, async (req, res) => {
         body.leverage || null,
         null,
       )
+      const note = commentFrom(body)
+      if (note) { trade.comment = note; await Trade.updateOne({ _id: trade._id }, { $set: { comment: note } }) }
+
+      // A master's fills are copied to followers — the web terminal and
+      // /api/algo both do this; this path (the app's Buy/Sell) did not.
+      try {
+        const master = await MasterTrader.findOne({ tradingAccountId: account._id, status: 'ACTIVE' })
+        if (master) await copyTradingEngine.copyTradeToFollowers(trade, master._id)
+      } catch (copyErr) {
+        console.error('[v1] copy-trade fan-out failed:', copyErr.message)
+      }
       return res.json(positionJson(trade))
     }
 
@@ -669,7 +808,7 @@ router.post('/orders', jwtAuth, async (req, res) => {
 
     // A limit must sit on the far side of the market and a stop beyond it;
     // otherwise the order fills on the next tick and is really a market order.
-    const q = liveQuote(symbol)
+    const q = tradableQuote(symbol)
     if (q) {
       const ref = side === 'buy' ? q.ask : q.bid
       const wrong =
@@ -685,10 +824,6 @@ router.post('/orders', jwtAuth, async (req, res) => {
       }
     }
 
-    const contractSize = symbolContractSize(symbol)
-    const leverageNum = parseInt(String(account.leverage).replace('1:', ''), 10) || 100
-    const marginUsed = tradeEngine.calculateMargin(lots, price, `1:${leverageNum}`, contractSize, symbol)
-
     const sl = Number(body.stop_loss) > 0 ? Number(body.stop_loss) : null
     const tp = Number(body.take_profit) > 0 ? Number(body.take_profit) : null
 
@@ -699,27 +834,30 @@ router.post('/orders', jwtAuth, async (req, res) => {
     const bracketErr = validatePendingBrackets(side, sl, tp, price)
     if (bracketErr) return fail(res, 400, bracketErr)
 
-    const tradeId = await Trade.generateTradeId()
-    const order = await Trade.create({
-      userId: req.user._id,
-      tradingAccountId: account._id,
-      tradeId,
+    // Through the same tradeEngine.openTrade the website's pending orders use,
+    // with the requested level passed as the explicit entry price. This used to
+    // build the Trade itself, skipping the engine's checks — free margin, max
+    // open trades, lot limits — and its commission, so the same order was
+    // margin-checked and charged on the web and neither on the desktop.
+    const quote = tradableQuote(symbol)
+    if (!quote) return fail(res, 400, `No live price for ${symbol} right now`)
+    const order = await tradeEngine.openTrade(
+      req.user._id,
+      String(account._id),
       symbol,
-      segment: resolveTradeSegment(symbol),
-      side: side.toUpperCase(),
+      resolveTradeSegment(symbol),
+      side.toUpperCase(),
       orderType,
-      quantity: lots,
-      openPrice: price,
-      pendingPrice: price,
-      stopLoss: sl,
+      lots,
+      quote.bid,
+      quote.ask,
       sl,
-      takeProfit: tp,
       tp,
-      marginUsed,
-      leverage: leverageNum,
-      contractSize,
-      status: 'PENDING',
-    })
+      body.leverage || null,
+      price,
+    )
+    const note = commentFrom(body)
+    if (note) { order.comment = note; await Trade.updateOne({ _id: order._id }, { $set: { comment: note } }) }
 
     res.json({ message: 'Pending order placed', ...orderJson(order) })
   } catch (e) {
@@ -748,6 +886,14 @@ router.put('/orders/:id', jwtAuth, async (req, res) => {
     const body = req.body || {}
     const has = (k) => Object.prototype.hasOwnProperty.call(body, k)
 
+    // The same rules placing an order applies — the web's PUT /trade/pending
+    // already enforced them, this route did not, so an edit could move a limit
+    // through the market (an instant fill) or leave a stop on the wrong side
+    // of its own entry.
+    if (!req.user.kycApproved) {
+      return fail(res, 403, 'Complete KYC verification and wait for admin approval before trading.')
+    }
+
     if (has('price')) {
       const p = Number(body.price)
       if (!Number.isFinite(p) || p <= 0) return fail(res, 400, 'price must be greater than 0')
@@ -757,6 +903,7 @@ router.put('/orders/:id', jwtAuth, async (req, res) => {
     if (has('lots')) {
       const l = Number(body.lots)
       if (!Number.isFinite(l) || l <= 0) return fail(res, 400, 'lots must be greater than 0')
+      if (Math.abs(Math.round(l * 100) / 100 - l) > 1e-9) return fail(res, 400, 'Lots must be a multiple of 0.01')
       order.quantity = l
     }
     if (has('stop_loss')) {
@@ -769,6 +916,32 @@ router.put('/orders/:id', jwtAuth, async (req, res) => {
       order.takeProfit = v
       order.tp = v
     }
+    if (has('comment')) order.comment = commentFrom(body) ?? ''
+
+    // Judged on the RESULTING order, so an edit to one leg is checked against
+    // the others as they now stand.
+    const entry = order.pendingPrice ?? order.openPrice
+    if (has('price')) {
+      const q = tradableQuote(order.symbol)
+      if (q) {
+        const isBuy = order.side === 'BUY'
+        const isLimit = order.orderType.endsWith('_LIMIT')
+        const ref = isBuy ? q.ask : q.bid
+        const wrong =
+          (isBuy && isLimit && entry >= ref) ||
+          (isBuy && !isLimit && entry <= ref) ||
+          (!isBuy && isLimit && entry <= ref) ||
+          (!isBuy && !isLimit && entry >= ref)
+        if (wrong) {
+          const where = isLimit ? (isBuy ? 'below' : 'above') : (isBuy ? 'above' : 'below')
+          return fail(res, 400,
+            `A ${order.side.toLowerCase()} ${isLimit ? 'limit' : 'stop'} must be ${where} the current price (${ref}).`)
+        }
+      }
+    }
+    const bracketErr = validatePendingBrackets(
+      order.side.toLowerCase(), order.sl ?? null, order.tp ?? null, entry)
+    if (bracketErr) return fail(res, 400, bracketErr)
 
     // Price or size changed ⇒ the reserved margin is stale.
     if (has('price') || has('lots')) {
@@ -791,6 +964,9 @@ router.delete('/orders/:id', jwtAuth, async (req, res) => {
     if (!order) return fail(res, 404, 'Pending order not found')
 
     order.status = 'CANCELLED'
+    // Stamped like the web's cancel, so history and statements can say when.
+    order.closedAt = new Date()
+    order.closedBy = 'USER'
     await order.save()
     res.json({ message: 'Order cancelled', id: String(order._id) })
   } catch (e) {
@@ -859,6 +1035,11 @@ router.get('/portfolio/trades', jwtAuth, async (req, res) => {
         // closed at a price of 0 would have been dropped from the list outright.
         close_time: t.closedAt?.toISOString?.() || '',
         close_reason: t.closedBy || 'USER',
+        // The brackets the trade carried when it closed. The desktop history has
+        // S/L and T/P columns, and they were always blank without these.
+        stop_loss: t.sl ?? t.stopLoss ?? 0,
+        take_profit: t.tp ?? t.takeProfit ?? 0,
+        comment: t.comment || '',
       })),
     })
   } catch (e) {
@@ -908,6 +1089,15 @@ router.get('/wallet/transactions', jwtAuth, async (req, res) => {
       const mag = Math.abs(t.amount)
       if (scopedId && String(t.fromTradingAccountId) === scopedId) return -mag
       if (scopedId && String(t.toTradingAccountId) === scopedId) return mag
+      // Main-wallet transfers record the account in tradingAccountId, not in
+      // to/fromTradingAccountId. Seen from that account, money moved IN from
+      // the wallet is a credit and money moved OUT to it a debit — the types
+      // are named from the wallet's side. Without this, the account's own
+      // ledger showed every top-up as a negative amount.
+      if (scopedId && String(t.tradingAccountId) === scopedId) {
+        if (t.type === 'Transfer_To_Account') return mag
+        if (t.type === 'Transfer_From_Account') return -mag
+      }
       // 'Transfer_To_Account' leaves the main wallet, so unscoped it is a debit.
       return DEBIT_TYPES.has(t.type) ? -mag : mag
     }
@@ -1771,13 +1961,22 @@ async function createSignupUser(payload) {
   }
 
   let parentIBId = null, referredBy = null
-  if (payload.referralCode) {
-    const ib = await User.findOne({ referralCode: payload.referralCode, isIB: true, ibStatus: 'ACTIVE' })
-    if (ib) { parentIBId = ib._id; referredBy = payload.referralCode }
+  // Both spellings: the desktop terminal sends referral_code, the app
+  // referralCode. Reading only one silently dropped the IB link for the other.
+  const referral = String(payload.referralCode || payload.referral_code || '').trim()
+  if (referral) {
+    const ib = await User.findOne({ referralCode: referral, isIB: true, ibStatus: 'ACTIVE' })
+    if (ib) { parentIBId = ib._id; referredBy = referral }
   }
 
+  // The user record has one name field. A client that splits first and last
+  // name (the desktop does) would otherwise lose the surname entirely.
+  const fullName = [payload.firstName || payload.first_name || payload.name || '',
+                    payload.lastName || payload.last_name || '']
+    .map(x => String(x).trim()).filter(Boolean).join(' ')
+
   const user = await User.create({
-    firstName: payload.firstName || payload.first_name || payload.name || '',
+    firstName: fullName,
     email,
     phone: payload.phone || '',
     countryCode: payload.countryCode || payload.country_code || '',
@@ -3169,17 +3368,28 @@ router.get('/accounts/available-groups', jwtAuth, async (_req, res) => {
   try {
     const types = await AccountType.find({ isActive: true }).sort({ minDeposit: 1 })
     res.json({
-      items: types.map(t => ({
-        id: String(t._id),
-        name: t.name,
-        description: t.description || '',
-        min_deposit: money(t.minDeposit),
-        leverage: t.leverage,
-        is_demo: !!t.isDemo,
-        demo_balance: money(t.demoBalance),
-        commission: money(t.commission),
-        min_spread: t.minSpread ?? null,
-      })),
+      items: types.map(t => {
+        const maxLev = leverageNumber(t.leverage)
+        return {
+          id: String(t._id),
+          name: t.name,
+          description: t.description || '',
+          min_deposit: money(t.minDeposit),
+          leverage: t.leverage,
+          is_demo: !!t.isDemo,
+          demo_balance: money(t.demoBalance),
+          commission: money(t.commission),
+          min_spread: t.minSpread ?? null,
+          // The same facts as numbers, under the names the desktop terminal
+          // reads. Without them its leverage picker capped and defaulted every
+          // type to 1:100 and never showed the minimum deposit.
+          max_leverage: maxLev,
+          effective_max_leverage: maxLev,
+          leverage_default: maxLev,
+          minimum_deposit: money(t.minDeposit),
+          currency: 'USD',
+        }
+      }),
     })
   } catch (e) {
     fail(res, 500, e.message)
@@ -3206,8 +3416,14 @@ router.post('/accounts/open', jwtAuth, async (req, res) => {
       return fail(res, 403, 'Complete KYC verification before opening a live account')
     }
 
-    const leverage = String(req.body?.leverage || type.leverage || '1:100')
-    const accountId = String(Date.now()).slice(-8)
+    // Stored as "1:N" like every other account, and never above what the type
+    // allows. The raw request value used to be stored as given: a client could
+    // ask for any leverage, and a bare number ("500") was saved unformatted.
+    const typeMax = leverageNumber(type.leverage) || 100
+    const asked = leverageNumber(req.body?.leverage) || typeMax
+    const leverage = `1:${Math.max(1, Math.min(asked, typeMax))}`
+    // The shared generator checks for collisions; a timestamp slice did not.
+    const accountId = await TradingAccount.generateAccountId()
     const account = await TradingAccount.create({
       userId: req.user._id,
       accountTypeId: type._id,
@@ -3225,6 +3441,7 @@ router.post('/accounts/open', jwtAuth, async (req, res) => {
       is_demo: !!account.isDemo,
       balance: money(account.balance),
       leverage: account.leverage,
+      currency: 'USD',
     })
   } catch (e) {
     fail(res, 400, e.message)

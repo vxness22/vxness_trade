@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken'
 import AlgoKey, { hashSecret } from '../models/AlgoKey.js'
 import TradingAccount from '../models/TradingAccount.js'
 import infowayService, { SUPPORTED_SYMBOLS } from '../services/infowayService.js'
-import { loadSpreadTable, applySpread } from '../utils/terminalQuotes.js'
+import { loadSpreadTable, applySpread, onSpreadsChanged } from '../utils/terminalQuotes.js'
 
 // Live tick stream for the desktop terminal, on /ws/algo/prices.
 //
@@ -72,8 +72,24 @@ export function initAlgoPriceHub(httpServer) {
       } catch {
         return null
       }
-      // With only a JWT there is no account in the credential; use the user's
-      // most recent one so the stream still has a spread table to apply.
+      // A JWT names no account, so the client says which one it is quoting for
+      // in `account_id` — the account selected on screen. Spreads are set per
+      // account type and per user, so quoting the user's newest account
+      // instead showed a different ask from the one /api/algo/trade then
+      // filled at, whenever the selected account was not the newest.
+      //
+      // An investor token is pinned to the one account it was issued for.
+      const asked = decoded.ro === true && decoded.acct
+        ? String(decoded.acct)
+        : (msg.account_id ? String(msg.account_id) : '')
+      if (asked) {
+        const account = await TradingAccount.findById(asked).populate('accountTypeId').catch(() => null)
+        if (!account || String(account.userId) !== String(decoded.id)) return null
+        return { userId: decoded.id, account }
+      }
+
+      // Older clients send no account_id: keep quoting the user's most recent
+      // account, as before, so they still get a spread table to apply.
       const account = await TradingAccount.findOne({
         userId: decoded.id, status: { $ne: 'Archived' },
       }).populate('accountTypeId').sort({ createdAt: -1 })
@@ -83,6 +99,18 @@ export function initAlgoPriceHub(httpServer) {
 
     return null
   }
+
+  // An admin spread change re-resolves every open socket's table at once,
+  // instead of waiting out SPREAD_REFRESH_MS (the timer stays as a backstop).
+  onSpreadsChanged(() => {
+    for (const ws of wss.clients) {
+      if (ws.readyState !== ws.OPEN || !ws.authed || !ws.session) continue
+      const { userId, account } = ws.session
+      loadSpreadTable(userId, account.accountTypeId?._id, SUPPORTED_SYMBOLS)
+        .then((table) => { ws.spreadTable = table })
+        .catch(() => { /* keep the previous table */ })
+    }
+  })
 
   wss.on('connection', (ws) => {
     ws.authed = false
@@ -147,9 +175,11 @@ export function initAlgoPriceHub(httpServer) {
 
         // Prime the watchlist immediately instead of waiting for each symbol's
         // next tick — a quiet market would otherwise show an empty table.
+        // Only what the feed delivered: a placeholder quote must never reach a
+        // watchlist a trader can click Buy on.
         for (const symbol of SUPPORTED_SYMBOLS) {
-          const p = infowayService.getPrice(symbol)
-          if (!p || !(p.bid > 0)) continue
+          const p = infowayService.getTradablePrice(symbol)
+          if (!p) continue
           const q = applySpread(symbol, p.bid, p.ask, ws.spreadTable.get(symbol))
           send(ws, {
             type: 'tick',
@@ -157,6 +187,9 @@ export function initAlgoPriceHub(httpServer) {
             bid: q.bid,
             ask: q.ask,
             spread: q.ask - q.bid,
+            // The raw feed mid — what both terminals' charts plot, and what
+            // the history klines are. bid/ask above carry the admin spread.
+            mid: (p.bid + p.ask) / 2,
             timestamp: new Date(p.time || Date.now()).toISOString(),
           })
         }
@@ -199,6 +232,7 @@ export function initAlgoPriceHub(httpServer) {
           bid: q.bid,
           ask: q.ask,
           spread: q.ask - q.bid,
+          mid: (price.bid + price.ask) / 2,
           timestamp: new Date(price.time || Date.now()).toISOString(),
         })
       }

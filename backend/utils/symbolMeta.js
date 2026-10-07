@@ -76,6 +76,34 @@ export function contractSize(symbol) {
   return 100000
 }
 
+// Decimals a price is DISPLAYED with — the one table every client reads (web
+// catalogue, app, desktop watchlist and blotter). There used to be three, and
+// they disagreed: the same DOGE quote read 0.08 on one screen and 0.08473 on
+// another, and SHIB/PEPE (≈0.000005) rounded to 0.00 outright.
+//
+// This is display only. pipSize() above stays as it is, because it is the unit
+// admin spreads and commissions are entered in — changing it would reprice.
+//
+// Crypto spans eight orders of magnitude, so it is sized from the price itself
+// when one is available; without one it falls back to two decimals.
+export function displayDigits(symbol, price = null) {
+  const s = String(symbol || '').toUpperCase()
+  const cls = classify(s)
+  if (cls === 'index') return 2
+  if (cls === 'jpy') return 3
+  if (cls === 'metal') return s.startsWith('XAG') ? 3 : 2
+  if (cls === 'commodity') return 3
+  if (cls === 'crypto') {
+    const p = Math.abs(Number(price))
+    if (!(p > 0)) return 2
+    if (p >= 1000) return 2
+    if (p >= 1) return 4
+    if (p >= 0.01) return 5
+    return 8
+  }
+  return 5
+}
+
 export function isCrypto(symbol) { return classify(symbol) === 'crypto' }
 export function isMetal(symbol) { return classify(symbol) === 'metal' }
 export function isCommodity(symbol) { return classify(symbol) === 'commodity' }

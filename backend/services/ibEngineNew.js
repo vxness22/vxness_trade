@@ -8,7 +8,7 @@ import Trade from '../models/Trade.js'
 import Charges from '../models/Charges.js'
 import IBCommissionConfig from '../models/IBCommissionConfig.js'
 import { resolveTradeSegment } from '../utils/tradeSegment.js'
-import { notionalUsd } from '../utils/symbolMeta.js'
+import { notionalUsd, contractSize as symbolContractSize } from '../utils/symbolMeta.js'
 import infowayService from './infowayService.js'
 
 class IBEngine {
@@ -23,12 +23,12 @@ class IBEngine {
     }
   }
 
+  // The engine's table. The local one returned 1 for every six-letter symbol
+  // containing "USD" — EURUSD, USDJPY and the rest recorded as crypto-sized on
+  // each commission entry. (Payout amounts were unaffected: percentage pools
+  // are computed from the USD notional, not from this.)
   getContractSize(symbol) {
-    if (this.CONTRACT_SIZES[symbol]) return this.CONTRACT_SIZES[symbol]
-    if (symbol.includes('BTC') || symbol.includes('ETH') || symbol.includes('USD')) {
-      if (symbol.length <= 6) return this.CONTRACT_SIZES.DEFAULT_CRYPTO
-    }
-    return this.CONTRACT_SIZES.DEFAULT_FOREX
+    return symbolContractSize(symbol)
   }
 
   _calcChargeCommission(quantity, price, commissionType, commissionValue, contractSize, symbol = null) {

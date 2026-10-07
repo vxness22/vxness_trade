@@ -1,5 +1,6 @@
 import express from 'express'
 import TradingAccount from '../models/TradingAccount.js'
+import { addToBalance, debitBalance } from '../utils/accountBalance.js'
 import AccountType from '../models/AccountType.js'
 import Wallet from '../models/Wallet.js'
 import Transaction from '../models/Transaction.js'
@@ -218,10 +219,9 @@ router.post('/:id/transfer', async (req, res) => {
       }
 
       wallet.balance -= amount
-      account.balance += amount
-      
       await wallet.save()
-      await account.save()
+      // Atomic — see utils/accountBalance.js.
+      account.balance = (await addToBalance(account._id, amount)).balance
 
       // Log transaction
       await Transaction.create({
@@ -246,10 +246,11 @@ router.post('/:id/transfer', async (req, res) => {
         return res.status(400).json({ message: 'Insufficient account balance' })
       }
 
-      account.balance -= amount
+      // Atomic, with the balance check inside the update itself.
+      const debited = await debitBalance(account._id, amount)
+      if (!debited) return res.status(400).json({ message: 'Insufficient account balance' })
+      account.balance = debited.balance
       wallet.balance += amount
-      
-      await account.save()
       await wallet.save()
 
       // Log transaction
@@ -330,11 +331,11 @@ router.post('/account-transfer', async (req, res) => {
     }
 
     // Perform transfer
-    fromAccount.balance -= amount
-    toAccount.balance += amount
-
-    await fromAccount.save()
-    await toAccount.save()
+    // Atomic: the debit only happens if the balance covers it at that instant.
+    const debited = await debitBalance(fromAccount._id, amount)
+    if (!debited) return res.status(400).json({ message: 'Insufficient balance' })
+    fromAccount.balance = debited.balance
+    toAccount.balance = (await addToBalance(toAccount._id, amount)).balance
 
     // Log transaction for sender (debit)
     await Transaction.create({

@@ -5,6 +5,7 @@ import CopyCommission from '../models/CopyCommission.js'
 import CopySettings from '../models/CopySettings.js'
 import Trade from '../models/Trade.js'
 import TradingAccount from '../models/TradingAccount.js'
+import { debitBalance } from '../utils/accountBalance.js'
 import Wallet from '../models/Wallet.js'
 import tradeEngine from './tradeEngine.js'
 
@@ -378,11 +379,15 @@ class CopyTradingEngine {
     const results = await Promise.all(copyTrades.map(async (copyTrade) => {
       try {
         // Close the follower trade
+        // Driven by the master's close, which already met the 3-minute hold —
+        // see enforceHold in tradeEngine.closeTrade.
         const result = await tradeEngine.closeTrade(
           copyTrade.followerTradeId,
           masterClosePrice,
           masterClosePrice,
-          'USER'
+          'USER',
+          null,
+          { enforceHold: false }
         )
 
         // Update copy trade record
@@ -486,10 +491,9 @@ class CopyTradingEngine {
         const masterShare = totalCommission - adminShare
 
         // Deduct from follower account
-        const followerAccount = await TradingAccount.findById(group.followerAccountId)
-        if (followerAccount && followerAccount.balance >= totalCommission) {
-          followerAccount.balance -= totalCommission
-          await followerAccount.save()
+        // Atomic, and only when the balance covers it — see utils/accountBalance.js.
+        const followerAccount = await debitBalance(group.followerAccountId, totalCommission)
+        if (followerAccount) {
 
           // Create commission record
           const commission = await CopyCommission.create({
@@ -633,7 +637,9 @@ class CopyTradingEngine {
           copyTrade.followerTradeId,
           price.bid,
           price.ask,
-          'ADMIN'
+          'ADMIN',
+          null,
+          { enforceHold: false }
         )
 
         copyTrade.status = 'CLOSED'

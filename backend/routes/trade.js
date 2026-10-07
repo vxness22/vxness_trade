@@ -7,7 +7,6 @@ import Charges from '../models/Charges.js'
 import tradeEngine from '../services/tradeEngine.js'
 import propTradingEngine from '../services/propTradingEngine.js'
 import copyTradingEngine from '../services/copyTradingEngine.js'
-import ibEngine from '../services/ibEngineNew.js'
 import MasterTrader from '../models/MasterTrader.js'
 import infowayService from '../services/infowayService.js'
 import { resolveTradeSegment } from '../utils/tradeSegment.js'
@@ -85,8 +84,6 @@ router.post('/open', webAuth, async (req, res) => {
       side, 
       orderType, 
       quantity, 
-      bid, 
-      ask, 
       leverage,
       sl, 
       tp 
@@ -108,23 +105,22 @@ router.post('/open', webAuth, async (req, res) => {
 
     if (!(await assertKycApprovedForUserId(ownerId, res))) return
 
-    // Check if market data is available (bid/ask must be valid numbers > 0)
-    if (!bid || !ask || parseFloat(bid) <= 0 || parseFloat(ask) <= 0 || isNaN(parseFloat(bid)) || isNaN(parseFloat(ask))) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Market is closed or no price data available. Please try again when market is open.',
-        code: 'MARKET_CLOSED'
-      })
-    }
-
-    // Check for stale prices (if bid equals ask exactly, likely no real data)
-    if (parseFloat(bid) === parseFloat(ask) && parseFloat(bid) === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'No live market data. Trading is not available at this time.',
+    // The fill is priced from the server's own feed, never from the request.
+    // This route used to take bid/ask from the body and check only that they
+    // were above zero, so the same order filled at a different price here than
+    // on the desktop terminal or the app (which price from the feed), and a
+    // crafted request could name its own fill price. Any bid/ask a client still
+    // sends is ignored.
+    const quote = infowayService.getTradablePrice(symbol)
+    if (!quote) {
+      return res.status(400).json({
+        success: false,
+        message: 'No live market data for this instrument. Trading is not available at this time.',
         code: 'NO_DATA_FEED'
       })
     }
+    const bid = quote.bid
+    const ask = quote.ask
 
     // Validate side
     if (!['BUY', 'SELL'].includes(side)) {
@@ -164,8 +160,7 @@ router.post('/open', webAuth, async (req, res) => {
     {
       const parsedSl = sl ? parseFloat(sl) : null
       const parsedTp = tp ? parseFloat(tp) : null
-      // The request's own bid/ask is what this order is being priced at, and it
-      // is already validated above.
+      // Judged against the same server quote the order is priced at.
       const bracketErr = validateBrackets(side, parsedSl, parsedTp,
                                           { bid: parseFloat(bid), ask: parseFloat(ask) })
       if (bracketErr) {
@@ -319,7 +314,7 @@ router.post('/open', webAuth, async (req, res) => {
 // POST /api/trade/close - Close a trade
 router.post('/close', webAuth, async (req, res) => {
   try {
-    const { tradeId, bid, ask } = req.body
+    const { tradeId } = req.body
 
     if (!tradeId) {
       return res.status(400).json({
@@ -330,15 +325,6 @@ router.post('/close', webAuth, async (req, res) => {
 
     if (!(await ownedTrade(req, tradeId))) return denyTrade(res)
 
-    // Check if market data is available
-    if (!bid || !ask || parseFloat(bid) <= 0 || parseFloat(ask) <= 0 || isNaN(parseFloat(bid)) || isNaN(parseFloat(ask))) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Market is closed or no price data available. Cannot close trade.',
-        code: 'MARKET_CLOSED'
-      })
-    }
-
     // Get trade first to check if it's a challenge or master trade
     const tradeToClose = await Trade.findById(tradeId)
     
@@ -348,6 +334,30 @@ router.post('/close', webAuth, async (req, res) => {
         message: 'Trade not found' 
       })
     }
+
+    // A closed market cannot be traded on, in either direction — the same rule
+    // /api/v1 (desktop terminal and app) and /api/algo apply. The cached quote
+    // does not disappear at the weekend, it just stops moving, so a Saturday
+    // close would have filled at Friday's price.
+    if (!isMarketOpen(tradeToClose.symbol)) {
+      return res.status(400).json({
+        success: false,
+        message: `Market is closed for ${tradeToClose.symbol}. Positions can be closed when it reopens.`,
+        code: 'MARKET_CLOSED_WEEKEND'
+      })
+    }
+
+    // Priced from the server's feed, never the request body — see /open.
+    const quote = infowayService.getTradablePrice(tradeToClose.symbol)
+    if (!quote) {
+      return res.status(400).json({
+        success: false,
+        message: 'No live market data for this instrument. Cannot close the trade right now.',
+        code: 'NO_DATA_FEED'
+      })
+    }
+    const bid = quote.bid
+    const ask = quote.ask
 
     if (!(await assertKycApprovedForUserId(tradeToClose.userId, res))) return
 
@@ -425,45 +435,15 @@ router.post('/close', webAuth, async (req, res) => {
       })
     }
     
-    // Regular trading account - use standard trade engine
-    const result = await tradeEngine.closeTrade(
-      tradeId,
-      parseFloat(bid),
-      parseFloat(ask),
-      'USER'
-    )
-
-    // Check if this was a master trade and close follower trades
-    if (tradeToClose) {
-      console.log(`[CopyTrade] Checking if trade ${tradeId} belongs to a master. TradingAccountId: ${tradeToClose.tradingAccountId}`)
-      const master = await MasterTrader.findOne({ 
-        tradingAccountId: tradeToClose.tradingAccountId, 
-        status: 'ACTIVE' 
-      })
-      
-      console.log(`[CopyTrade] Master found: ${master ? master._id : 'NO MASTER FOUND'}`)
-      
-      if (master) {
-        try {
-          const closePrice = tradeToClose.side === 'BUY' ? parseFloat(bid) : parseFloat(ask)
-          console.log(`[CopyTrade] Calling closeFollowerTrades for master trade ${tradeId} at price ${closePrice}`)
-          const copyResults = await copyTradingEngine.closeFollowerTrades(tradeId, closePrice)
-          console.log(`[CopyTrade] Closed ${copyResults.length} follower trades for master trade ${tradeId}`)
-        } catch (copyError) {
-          console.error('[CopyTrade] Error closing follower trades:', copyError)
-        }
-      }
-    }
-
-    // Process IB commission for the closed trade
-    try {
-      const ibResult = await ibEngine.processTradeCommission(result.trade)
-      if (ibResult.processed) {
-        console.log(`IB commission processed for trade ${result.trade._id}: ${ibResult.commissions?.length || 0} IBs credited`)
-      }
-    } catch (ibError) {
-      console.error('Error processing IB commission:', ibError)
-    }
+    // Regular trading account - use standard trade engine.
+    //
+    // closeTrade() itself pays the IB commission and closes copy-trade
+    // followers (tradeEngine.closeTrade → processTradeCommission and
+    // closeFollowerTradesAsync), exactly as it does for the desktop terminal
+    // and the app. This route used to do both AGAIN afterwards; the engine's
+    // follower close is not awaited, so the two raced each other and a
+    // follower position could be closed — and credited — twice.
+    const result = await tradeEngine.closeTrade(tradeId, bid, ask, 'USER')
 
     res.json({
       success: true,

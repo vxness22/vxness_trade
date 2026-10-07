@@ -83,10 +83,14 @@ router.post('/to-trading', async (req, res) => {
 
     // Perform transfer
     user.walletBalance -= transferAmount
-    tradingAccount.balance += transferAmount
-
     await user.save()
-    await tradingAccount.save()
+
+    // Atomic: a trading account's balance is also moved by every close (see
+    // applyRealizedPnl in services/tradeEngine.js). A read → modify → save here
+    // could write over a P&L credited a moment earlier, or be written over.
+    const credited = await TradingAccount.findOneAndUpdate(
+      { _id: tradingAccount._id }, { $inc: { balance: transferAmount } }, { new: true })
+    tradingAccount.balance = credited.balance
 
     // Log transaction
     await Transaction.create({
@@ -197,10 +201,18 @@ router.post('/from-trading', async (req, res) => {
     }
 
     // Perform transfer
-    tradingAccount.balance -= transferAmount
-    user.walletBalance += transferAmount
+    // Atomic: a trading account's balance is also moved by every close (see
+    // applyRealizedPnl in services/tradeEngine.js). A read → modify → save here
+    // could write over a P&L credited a moment earlier, or be written over.
+    const debited = await TradingAccount.findOneAndUpdate(
+      { _id: tradingAccount._id, balance: { $gte: transferAmount } },
+      { $inc: { balance: -transferAmount } }, { new: true })
+    if (!debited) {
+      return res.status(400).json({ success: false, message: 'Insufficient balance in trading account' })
+    }
+    tradingAccount.balance = debited.balance
 
-    await tradingAccount.save()
+    user.walletBalance += transferAmount
     await user.save()
 
     // Log transaction

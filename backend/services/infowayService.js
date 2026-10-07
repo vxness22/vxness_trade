@@ -835,6 +835,16 @@ class InfowayService {
     return this.prices.has(symbol)
   }
 
+  // The quote a FILL may be priced at: only what the feed actually delivered,
+  // never a FALLBACK_PRICES placeholder. getPrice() is right for display during
+  // a momentary outage; executing against an invented number is not. Every
+  // order path — web, desktop and app — prices from here so the same order at
+  // the same moment fills at the same price whichever client sent it.
+  getTradablePrice(symbol) {
+    const p = this.prices.get(symbol)
+    return p && p.bid > 0 && p.ask > 0 ? p : null
+  }
+
   getAllPrices() {
     const prices = {}
     this.prices.forEach((price, symbol) => { prices[symbol] = price })

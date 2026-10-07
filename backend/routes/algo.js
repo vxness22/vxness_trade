@@ -10,14 +10,14 @@ import express from 'express'
 import Trade from '../models/Trade.js'
 import TradingAccount from '../models/TradingAccount.js'
 import infowayService, { SUPPORTED_SYMBOLS } from '../services/infowayService.js'
+import { instrumentCatalogue } from './prices.js'
 import tradeEngine from '../services/tradeEngine.js'
 import copyTradingEngine from '../services/copyTradingEngine.js'
 import MasterTrader from '../models/MasterTrader.js'
-import { contractSize as symbolContractSize } from '../utils/symbolMeta.js'
 import { resolveTradeSegment } from '../utils/tradeSegment.js'
 import { isMarketOpen } from '../utils/marketHours.js'
 import { algoAuth, fail } from '../utils/terminalAuth.js'
-import { loadSpreadTable, applySpread, digitsFor } from '../utils/terminalQuotes.js'
+import { loadSpreadTable, applySpread } from '../utils/terminalQuotes.js'
 import { validateBrackets } from '../utils/bracketGuard.js'
 
 const router = express.Router()
@@ -41,16 +41,22 @@ function displayName(symbol) {
 }
 
 // GET /api/algo/symbols — instrument specs for the watchlist and chart scale.
+//
+// The same catalogue the web terminal and the app list (routes/prices.js), so
+// all three show the same instruments with the same digits, contract sizes and
+// lot limits. This used to list all of SUPPORTED_SYMBOLS — including the ones
+// the feed has never delivered, which only ever had a hard-coded placeholder
+// price that the desktop could then quote and trade against.
 router.get('/symbols', (req, res) => {
-  const symbols = SUPPORTED_SYMBOLS.map((s) => ({
-    symbol: s,
-    display_name: displayName(s),
-    category: resolveTradeSegment(s),
-    digits: digitsFor(s),
-    min_lot: 0.01,
-    max_lot: 100,
-    lot_step: 0.01,
-    contract_size: symbolContractSize(s),
+  const symbols = instrumentCatalogue().map((i) => ({
+    symbol: i.symbol,
+    display_name: displayName(i.symbol),
+    category: resolveTradeSegment(i.symbol),
+    digits: i.digits,
+    min_lot: i.minVolume,
+    max_lot: i.maxVolume,
+    lot_step: i.volumeStep,
+    contract_size: i.contractSize,
   }))
   res.json({ symbols })
 })
@@ -92,14 +98,15 @@ router.get('/prices', async (req, res) => {
   try {
     const requested = String(req.query.symbols || '')
       .split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
-    const list = requested.length ? requested : SUPPORTED_SYMBOLS
+    const list = requested.length ? requested : instrumentCatalogue().map(i => i.symbol)
 
     const table = await loadSpreadTable(req.user._id, req.account.accountTypeId?._id, list)
 
     const prices = []
     for (const symbol of list) {
-      const raw = infowayService.getPrice(symbol)
-      if (!raw || !(raw.bid > 0)) continue
+      // Only what the feed delivered — never a placeholder quote.
+      const raw = infowayService.getTradablePrice(symbol)
+      if (!raw) continue
       const q = applySpread(symbol, raw.bid, raw.ask, table.get(symbol))
       prices.push({
         symbol,
@@ -115,7 +122,13 @@ router.get('/prices', async (req, res) => {
   }
 })
 
-// GET /api/algo/bars?symbol=&timeframe=&limit= — historical OHLC.
+// GET /api/algo/bars?symbol=&timeframe=&limit=&to=&tag= — historical OHLC.
+//
+// `to` (unix seconds) is the END of the window, so the chart can page back
+// through history instead of always receiving the newest `limit` bars — which
+// capped the desktop chart at 1000 candles. `tag` is echoed back untouched so a
+// client with several requests in flight for the same symbol and timeframe (the
+// chart and the Strategy Tester) can tell its replies apart.
 // Bars are MID (Infoway klines); the terminal's datafeed shifts them to BID by
 // half the live spread, exactly like the web chart does.
 router.get('/bars', async (req, res) => {
@@ -127,10 +140,16 @@ router.get('/bars', async (req, res) => {
     if (!SUPPORTED_SYMBOLS.includes(symbol)) return fail(res, 404, `Unknown symbol ${symbol}`)
     if (!VALID_TIMEFRAMES.has(timeframe)) return fail(res, 400, `Unsupported timeframe ${timeframe}`)
 
-    const candles = await infowayService.getCandles(symbol, timeframe, new Date(), limit)
+    const toSec = Number(req.query.to)
+    const end = Number.isFinite(toSec) && toSec > 0
+      ? new Date(Math.min(toSec * 1000, Date.now()))
+      : new Date()
+
+    const candles = await infowayService.getCandles(symbol, timeframe, end, limit)
     res.json({
       symbol,
       timeframe,
+      tag: req.query.tag ? String(req.query.tag) : undefined,
       bars: candles.map(c => ({
         time: new Date(c.time).toISOString(),
         open: c.open,
@@ -163,13 +182,20 @@ router.post('/trade', async (req, res) => {
     const account = req.account
     if (account.status !== 'Active') return fail(res, 403, `Account is ${account.status}`)
 
-    const price = infowayService.getPrice(symbol)
-    if (!price || !(price.bid > 0) || !(price.ask > 0)) {
+    // Only a quote the feed actually delivered — never a placeholder.
+    const price = infowayService.getTradablePrice(symbol)
+    if (!price) {
       return fail(res, 503, `No live price for ${symbol}. Please try again.`)
     }
 
     // ---- CLOSE: flatten every open position on this symbol ----
     if (action === 'CLOSE') {
+      // A closed market cannot be traded on, in either direction — the rule
+      // every other close path applies. The cached quote just stops moving at
+      // the weekend, so this used to close at Friday's price.
+      if (!isMarketOpen(symbol)) {
+        return fail(res, 400, `Market is closed for ${symbol}. Positions can be closed when it reopens.`)
+      }
       const open = await Trade.find({
         tradingAccountId: account._id, symbol, status: 'OPEN'
       })
@@ -242,6 +268,10 @@ router.post('/trade', async (req, res) => {
       sl,
       tp
     )
+
+    // The desktop tags its orders ("terminal", or the trader's own note).
+    const note = typeof req.body?.comment === 'string' ? req.body.comment.trim().slice(0, 255) : ''
+    if (note) await Trade.updateOne({ _id: trade._id }, { $set: { comment: note } })
 
     // Mirror the web path: a master trader's fills are copied to followers.
     try {

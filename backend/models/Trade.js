@@ -120,6 +120,15 @@ const tradeSchema = new mongoose.Schema({
     type: Number,
     default: null
   },
+  // The trader's own note on a position or order. The desktop terminal sets
+  // and edits it; there was no field for it, so every comment was dropped on
+  // the way in and the edit endpoint answered "Nothing to update".
+  comment: {
+    type: String,
+    default: '',
+    maxlength: 255,
+    trim: true
+  },
   closedBy: {
     type: String,
     enum: ['USER', 'SL', 'TP', 'STOP_OUT', 'ADMIN', null],

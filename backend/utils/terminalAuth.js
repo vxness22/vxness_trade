@@ -129,6 +129,19 @@ export async function algoAuth(req, res, next) {
     const accountId = req.headers['x-account-id']
     if (!accountId) return fail(res, 400, 'Missing X-Account-Id')
 
+    // The same investor rules jwtAuth enforces on /api/v1. Without them a
+    // read-only investor token could place trades here, since /api/algo/trade
+    // is a POST this door never refused, and could name any of the owner's
+    // other accounts in X-Account-Id.
+    if (decoded.ro === true) {
+      if (!READ_ONLY_SAFE_METHODS.includes(req.method)) {
+        return fail(res, 403, 'This is a read-only investor session')
+      }
+      if (decoded.acct && String(accountId) !== String(decoded.acct)) {
+        return fail(res, 403, 'This investor session is limited to one account')
+      }
+    }
+
     const account = await TradingAccount.findById(String(accountId)).populate('accountTypeId')
     if (!account) return fail(res, 404, 'Trading account not found')
     if (String(account.userId) !== String(decoded.id)) {
