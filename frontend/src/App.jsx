@@ -39,6 +39,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import AdminThemeSettings from './pages/AdminThemeSettings'
 import BrandedLogin from './pages/BrandedLogin'
 import BrandedSignup from './pages/BrandedSignup'
+import SharedTradePage from './pages/SharedTradePage'
 import AdminEmailTemplates from './pages/AdminEmailTemplates'
 import AdminBonusManagement from './pages/AdminBonusManagement'
 import AdminCreditRequests from './pages/AdminCreditRequests'
@@ -88,6 +89,8 @@ function App() {
         <Route path="/contact" element={<WebsiteContact />} />
         <Route path="/blog" element={<WebsiteBlog />} />
         <Route path="/legal/*" element={<WebsiteLegal />} />
+        {/* A trade shared from the desktop terminal (vxness.in/s/<code>) */}
+        <Route path="/s/:code" element={<SharedTradePage />} />
         <Route path="/markets/forex" element={<WebsiteForexMarket />} />
         <Route path="/markets/indices" element={<WebsiteIndicesMarket />} />
         <Route path="/markets/commodities" element={<WebsiteCommoditiesMarket />} />
