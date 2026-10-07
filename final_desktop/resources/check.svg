@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tick for a checked QCheckBox indicator. A style sheet on a check box
+     replaces the native drawing of its indicator, so the mark has to be
+     supplied as an image or the box comes out blank when ticked — the same
+     reason spin-up.svg / spin-down.svg exist. White, because it is only ever
+     drawn on the accent-filled indicator. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <path d="M3.5 8.5 L6.5 11.5 L12.5 4.5"
+        fill="none" stroke="#ffffff" stroke-width="2.2"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
